@@ -88,6 +88,8 @@ docs/
 │   ├── requirements-catalog.md
 │   ├── assumptions-decisions-dependencies.md
 │   ├── traceability-matrix.md
+│   ├── delegation-board.md
+│   ├── file-map.md
 │   ├── delegation-protocol.md
 │   └── definition-of-done.md
 ├── 01-architecture/
@@ -202,6 +204,8 @@ Una fase no puede cerrarse si alguno de sus requisitos carece de prueba o eviden
 - límites para cambios fuera de alcance;
 - política de commits;
 - criterio de reintento y reasignación.
+
+`delegation-board.md` mantendrá el estado operativo, dependencias y brief de cada tarea. `file-map.md` fijará ownership inicial. Un brief puede estar documentalmente listo mientras la tarea permanece bloqueada por el DAG; sólo el tablero autoriza la delegación.
 
 ### 6.7 Definition of Done
 

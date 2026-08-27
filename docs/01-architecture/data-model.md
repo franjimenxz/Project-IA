@@ -162,6 +162,10 @@ Unique y foreign keys incluyen tenant. La query vectorial filtra tenant y `publi
 
 Tenant, id, conversation, workflow opcional, reason code, summary estructurado, external case reference, status, requested/accepted/resolved timestamps y owner reference.
 
+### Patient canónico
+
+`Patient` es un contrato de integración, no una entidad maestra del Core durante el MVP. Sólo se persisten referencias o campos mínimos dentro del workflow cuando son necesarios para completar la operación y según política de retención. Si una fase futura requiere un repositorio de pacientes propio, debe definir ownership, base legal y migración mediante TDD/ADR.
+
 ### ScheduledJob
 
 Tenant, id, type, payload versionado, business key, scheduled time, status, attempts, lock owner/expiry, last error y timestamps. Unique por `(tenant_id, type, business_key)`.
@@ -200,4 +204,3 @@ Tenant, id, run/conversation/workflow/tool refs opcionales, actor type/ref, acti
 ## Retención y borrado
 
 Las políticas finales dependen de `EXT-006`. El diseño permite retención por clase: contenido de mensajes, documentos, estado, auditoría y telemetría. Un borrado autorizado elimina o anonimiza datos de negocio conservando el mínimo registro de auditoría legalmente requerido, definido por política aprobada.
-

@@ -21,10 +21,12 @@ Este directorio es la fuente de verdad para diseñar, implementar, verificar y o
 ### Para coordinar implementación
 
 1. [`00-governance/master-roadmap.md`](00-governance/master-roadmap.md)
-2. [`00-governance/delegation-protocol.md`](00-governance/delegation-protocol.md)
-3. [`00-governance/traceability-matrix.md`](00-governance/traceability-matrix.md)
-4. `phases/<fase>/implementation-plan.md`
-5. `phases/<fase>/agent-briefs/*.md`
+2. [`00-governance/delegation-board.md`](00-governance/delegation-board.md)
+3. [`00-governance/delegation-protocol.md`](00-governance/delegation-protocol.md)
+4. [`00-governance/file-map.md`](00-governance/file-map.md)
+5. [`00-governance/traceability-matrix.md`](00-governance/traceability-matrix.md)
+6. `phases/<fase>/implementation-plan.md`
+7. `phases/<fase>/agent-briefs/*.md`
 
 ### Para verificar y operar
 
@@ -58,4 +60,3 @@ Una contradicción se resuelve en el nivel superior; nunca mediante una desviaci
 ## Estado del programa
 
 La documentación define ocho fases. La API médica, el proveedor real de WhatsApp y la plataforma real de handoff son dependencias externas; el MVP trabaja con puertos y mocks hasta que sus gates estén satisfechos.
-

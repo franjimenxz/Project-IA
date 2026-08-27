@@ -6,7 +6,7 @@
 
 ## Objetivo
 
-Crear un CLI Python que detecte IDs duplicados, links locales rotos y placeholders fuera de `docs/templates`.
+Crear un CLI Python que detecte IDs de definición duplicados, links locales rotos y placeholders fuera de `docs/templates`. Las referencias repetidas a un ID son válidas; sólo se consideran definiciones la primera columna de registros normativos y los headings declarados por el catálogo.
 
 ## Lectura obligatoria
 
@@ -35,4 +35,3 @@ AC-P01-001–005; reportar archivo/línea y exit 1 ante hallazgos.
 ## Handoff
 
 Usar `delegation-protocol.md`; incluir ejemplos positivo/negativo y commit `test: validate documentation identifiers`.
-

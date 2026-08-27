@@ -10,13 +10,15 @@ Permitir trabajo concurrente sin pérdida de contexto, contratos incompatibles n
 
 Una tarea puede delegarse sólo si:
 
-- su estado es `ready`;
+- su brief está documentalmente `ready` y el tablero de delegación marca su ejecución `ready`;
 - sus dependencias están `accepted`;
 - el TDD y los criterios asociados están aprobados;
 - las interfaces consumidas existen o tienen fake versionado;
 - los archivos permitidos no están reservados por otra tarea;
 - los comandos de prueba son concretos;
 - no depende de una `EXT` sin satisfacer.
+
+El estado documental del brief indica que las instrucciones son completas. El estado operativo vive en `delegation-board.md` y controla si la tarea puede ejecutarse ahora.
 
 ## Paquete obligatorio del agente
 
@@ -128,4 +130,3 @@ Aplicá prueba roja, implementación mínima, prueba verde y suite relevante.
 No cambies contratos o ADRs sin escalar.
 Entregá el handoff en el formato definido por delegation-protocol.md.
 ```
-

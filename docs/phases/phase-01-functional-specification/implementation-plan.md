@@ -45,7 +45,7 @@ Expected: FAIL because `check_unique_ids` is unavailable.
 
 - [ ] **Step 3: Implement ID extraction and duplicate reporting**
 
-Implement regex `\b(?:UC|RF|RNF|BR|CON|EXT)-\d{2,3}\b`, count per namespace and return sorted duplicates.
+Implement regex `\b(?:UC|RF|RNF|BR|CON|EXT)-\d{2,3}\b` sobre registros de definición (primera columna de las tablas del catálogo y headings de casos), no sobre referencias narrativas; return sorted duplicates.
 
 - [ ] **Step 4: Verify green and quality**
 
@@ -69,7 +69,14 @@ git commit -m "test: validate documentation identifiers"
 
 - [ ] Write a failing test where `RF-001` is `must` but absent from matrix.
 - [ ] Run `pytest tests/docs/test_traceability.py -v`; expect missing function failure.
-- [ ] Implement parsing of catalog table IDs/priority and matrix ID/ranges, returning missing IDs.
+- [ ] Implement parsing of catalog table IDs/priority and matrix ID/ranges, returning missing IDs:
+
+```python
+def missing_must_requirements(catalog: str, matrix: str) -> set[str]:
+    required = parse_catalog_rows(catalog, priority="must", prefixes={"RF", "RNF"})
+    covered = expand_identifier_ranges(parse_matrix_requirement_cells(matrix))
+    return required - covered
+```
 - [ ] Run `pytest tests/docs/test_traceability.py -v && ruff check scripts tests/docs`; expect exit 0.
 - [ ] Commit with `git commit -m "test: enforce requirement traceability"`.
 
@@ -81,7 +88,14 @@ git commit -m "test: validate documentation identifiers"
 
 - [ ] Add a failing subprocess test expecting `python scripts/check_docs.py --all docs` to exit 0.
 - [ ] Run the test; expect failure until CLI exists.
-- [ ] Add CLI flags for links, IDs/placeholders and invoke traceability; add CI job on Python 3.13.
+- [ ] Add CLI flags for links, definition IDs/placeholders and invoke traceability; add CI job on Python 3.13:
+
+```yaml
+- name: Validate documentation
+  run: |
+    python scripts/check_docs.py --all docs
+    python scripts/check_traceability.py
+    pytest tests/docs -v
+```
 - [ ] Run `python scripts/check_docs.py --all docs && pytest tests/docs -v`; expect exit 0.
 - [ ] Commit with `git commit -m "ci: enforce documentation quality"`.
-

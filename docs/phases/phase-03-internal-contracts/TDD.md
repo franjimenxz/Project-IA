@@ -44,6 +44,14 @@ class PatientRef(BaseModel):
     name: NonEmptyStr | None = None
     email: EmailStr | None = None
 
+class Patient(BaseModel):
+    patient_id: NonEmptyStr
+    document_type: NonEmptyStr | None = None
+    document_number: SecretStr | None = None
+    name: NonEmptyStr
+    email: EmailStr | None = None
+    coverage: NonEmptyStr | None = None
+
 class AppointmentCreateRequest(BaseModel):
     schema_version: Literal[1] = 1
     slot_id: NonEmptyStr
@@ -61,6 +69,8 @@ class Appointment(BaseModel):
     practitioner: NonEmptyStr | None = None
     location: NonEmptyStr | None = None
 ```
+
+`PatientRef` representa datos aportados o una referencia parcial para una operación. `Patient` representa la respuesta canónica de una capability externa; el Core no la convierte automáticamente en un registro maestro persistente.
 
 Validaciones cruzadas:
 
@@ -112,4 +122,3 @@ Cambio aditivo opcional conserva versión. Campo obligatorio, semántica o enum 
 ## Seguridad
 
 SecretStr evita representación accidental; redactor procesa summaries. Contratos del modelo no incluyen `tenant_id`, endpoint o credential reference. Requests se limitan en tamaño y strings normalizados.
-

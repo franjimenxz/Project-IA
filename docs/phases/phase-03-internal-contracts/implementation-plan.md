@@ -50,7 +50,7 @@ def test_search_rejects_reversed_dates():
 ```
 
 - [ ] Run the node; expect missing class.
-- [ ] Implement all six request types, AppointmentSlot, PatientRef, Appointment and validators from TDD.
+- [ ] Implement all six request types, AppointmentSlot, PatientRef, Patient, Appointment and validators from TDD.
 - [ ] Run `pytest tests/unit/contracts/test_appointments.py -v && mypy src/ia_mcp/contracts`.
 - [ ] Commit `feat: define appointment contracts`.
 
@@ -96,4 +96,3 @@ async def test_create_is_idempotent(appointment_capability, request):
 - [ ] Define Protocol and fake state keyed by tenant plus idempotency key; implement all six tools and fault plan.
 - [ ] Run `pytest -m contract tests/contract/appointments -v` and tenant-crossing tests.
 - [ ] Commit `test: provide contract-compliant appointment fake`.
-
