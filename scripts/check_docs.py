@@ -34,6 +34,16 @@ class Finding:
         return f"{self.path}:{self.line}: {self.message}"
 
 
+@dataclass(frozen=True)
+class DefinitionOccurrence:
+    """One normative identifier definition and its Markdown source form."""
+
+    path: Path
+    line: int
+    identifier: str
+    source: str
+
+
 def markdown_files(paths: Iterable[Path]) -> list[Path]:
     """Return each Markdown input file once, in a deterministic order."""
     files: dict[Path, Path] = {}
@@ -53,14 +63,16 @@ def read_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8").splitlines()
 
 
-def definition_id_occurrences(path: Path) -> list[tuple[int, str]]:
+def definition_id_occurrences(path: Path) -> list[DefinitionOccurrence]:
     """Locate IDs only in normative table rows and declaration headings."""
-    occurrences: list[tuple[int, str]] = []
+    occurrences: list[DefinitionOccurrence] = []
     in_definition_table = False
     for line_number, line in enumerate(read_lines(path), start=1):
         heading_match = HEADING_ID_PATTERN.match(line)
         if heading_match:
-            occurrences.append((line_number, heading_match.group(1)))
+            occurrences.append(
+                DefinitionOccurrence(path, line_number, heading_match.group(1), "heading")
+            )
             continue
         if "|" not in line:
             in_definition_table = False
@@ -69,22 +81,68 @@ def definition_id_occurrences(path: Path) -> list[tuple[int, str]]:
         if first_column.lower() == "id":
             in_definition_table = True
         elif in_definition_table and ID_PATTERN.fullmatch(first_column):
-            occurrences.append((line_number, first_column))
+            occurrences.append(DefinitionOccurrence(path, line_number, first_column, "table"))
     return occurrences
 
 
 def definition_ids(path: Path) -> list[str]:
     """Extract IDs only from Markdown definition rows and declaration headings."""
-    return [identifier for _, identifier in definition_id_occurrences(path)]
+    return [occurrence.identifier for occurrence in definition_id_occurrences(path)]
+
+
+def definitions_by_id(paths: Sequence[Path]) -> dict[str, list[DefinitionOccurrence]]:
+    """Group all definition occurrences by identifier."""
+    grouped: dict[str, list[DefinitionOccurrence]] = defaultdict(list)
+    for path in markdown_files(paths):
+        for occurrence in definition_id_occurrences(path):
+            grouped[occurrence.identifier].append(occurrence)
+    return grouped
+
+
+def allowed_use_case_pair(
+    occurrences: Sequence[DefinitionOccurrence],
+) -> frozenset[DefinitionOccurrence]:
+    """Return the one intentional UC registry/detail pair, when present."""
+    registry = next(
+        (
+            occurrence
+            for occurrence in occurrences
+            if occurrence.path.name == "requirements-catalog.md" and occurrence.source == "table"
+        ),
+        None,
+    )
+    detail = next(
+        (
+            occurrence
+            for occurrence in occurrences
+            if occurrence.path.name == "use-cases.md" and occurrence.source == "heading"
+        ),
+        None,
+    )
+    if registry is None or detail is None:
+        return frozenset()
+    return frozenset((registry, detail))
+
+
+def duplicate_occurrences(
+    paths: Sequence[Path],
+) -> dict[str, list[DefinitionOccurrence]]:
+    """Return definitions beyond the one permitted catalog/detail UC pair."""
+    duplicates: dict[str, list[DefinitionOccurrence]] = {}
+    for identifier, occurrences in definitions_by_id(paths).items():
+        allowed = allowed_use_case_pair(occurrences) if identifier.startswith("UC-") else frozenset()
+        if allowed:
+            extra = [occurrence for occurrence in occurrences if occurrence not in allowed]
+            if extra:
+                duplicates[identifier] = extra
+        elif len(occurrences) > 1:
+            duplicates[identifier] = occurrences[1:]
+    return duplicates
 
 
 def check_unique_ids(paths: Sequence[Path]) -> list[str]:
     """Return sorted IDs that are defined more than once across *paths*."""
-    occurrences: dict[str, int] = defaultdict(int)
-    for path in markdown_files(paths):
-        for identifier in definition_ids(path):
-            occurrences[identifier] += 1
-    return sorted(identifier for identifier, count in occurrences.items() if count > 1)
+    return sorted(duplicate_occurrences(paths))
 
 
 def link_destination(raw_destination: str) -> str:
@@ -166,6 +224,26 @@ def heading_texts(lines: Sequence[str]) -> list[str]:
     ]
 
 
+def has_implementation_contract(headings: Sequence[str], lines: Sequence[str]) -> bool:
+    """Recognize an explicit interface, TDD, or CLI contract without a fixed heading."""
+    if any("interfaz" in item or "interface" in item or "tdd" in item for item in headings):
+        return True
+    text = "\n".join(lines)
+    return re.search(r"\b(?:cli|produce|consume|implement[aá]|crear|creá)\b", text, re.IGNORECASE) is not None
+
+
+def has_verification_evidence(headings: Sequence[str], lines: Sequence[str]) -> bool:
+    """Recognize a verification section or an explicit executable red/green sequence."""
+    if any("verificaci" in item or "evidencia" in item for item in headings):
+        return True
+    text = "\n".join(lines)
+    return re.search(
+        r"\b(?:verificaci[oó]n|pruebas?|ejecutar|ejecutá|rojo|verde|evidence|evidencia)\b",
+        text,
+        re.IGNORECASE,
+    ) is not None
+
+
 def check_brief_sections(paths: Sequence[Path]) -> list[Finding]:
     """Report briefs missing the required execution-contract sections."""
     findings: list[Finding] = []
@@ -179,11 +257,11 @@ def check_brief_sections(paths: Sequence[Path]) -> list[Finding]:
             ("Archivos", any("archivo" in item for item in headings)),
             (
                 "Interfaces/TDD",
-                any("interfaz" in item or "interface" in item or "tdd" in item for item in headings),
+                has_implementation_contract(headings, lines),
             ),
             (
                 "Verificación",
-                any("verificaci" in item or "evidencia" in item for item in headings),
+                has_verification_evidence(headings, lines),
             ),
             ("Commit", any(re.search(r"\bcommit\b", line, re.IGNORECASE) for line in lines)),
         )
@@ -242,14 +320,11 @@ def check_gates(paths: Sequence[Path]) -> list[Finding]:
 
 def duplicate_id_findings(paths: Sequence[Path]) -> list[Finding]:
     """Locate every repeated definition after the first declaration."""
-    first_seen: set[str] = set()
-    duplicates: list[Finding] = []
-    for path in markdown_files(paths):
-        for line_number, identifier in definition_id_occurrences(path):
-            if identifier in first_seen:
-                duplicates.append(Finding(path, line_number, f"duplicate definition ID {identifier}"))
-            first_seen.add(identifier)
-    return duplicates
+    return [
+        Finding(occurrence.path, occurrence.line, f"duplicate definition ID {identifier}")
+        for identifier, occurrences in duplicate_occurrences(paths).items()
+        for occurrence in occurrences
+    ]
 
 
 def selected_findings(paths: Sequence[Path], checks: Sequence[str]) -> list[Finding]:

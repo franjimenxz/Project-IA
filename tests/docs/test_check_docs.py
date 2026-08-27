@@ -44,6 +44,39 @@ def test_duplicate_case_heading_is_reported(tmp_path: Path) -> None:
     assert check_unique_ids([cases]) == ["UC-01"]
 
 
+def test_registry_row_and_detail_heading_form_one_logical_use_case_definition(
+    tmp_path: Path,
+) -> None:
+    """The intentional catalog/detail pair must not be reported as a duplicate UC."""
+    catalog = tmp_path / "requirements-catalog.md"
+    catalog.write_text(
+        "| ID | Use case |\n| --- | --- |\n| UC-01 | Start conversation |\n",
+        encoding="utf-8",
+    )
+    cases = tmp_path / "use-cases.md"
+    cases.write_text("## UC-01 — Start conversation\n", encoding="utf-8")
+
+    assert check_unique_ids([catalog, cases]) == []
+
+
+def test_extra_registry_row_is_still_a_duplicate_beside_the_valid_use_case_pair(
+    tmp_path: Path,
+) -> None:
+    """Allowing the catalog/detail pair must not permit an additional UC registry row."""
+    catalog = tmp_path / "requirements-catalog.md"
+    catalog.write_text(
+        "| ID | Use case |\n"
+        "| --- | --- |\n"
+        "| UC-01 | Start conversation |\n"
+        "| UC-01 | Duplicate registry entry |\n",
+        encoding="utf-8",
+    )
+    cases = tmp_path / "use-cases.md"
+    cases.write_text("## UC-01 — Start conversation\n", encoding="utf-8")
+
+    assert check_unique_ids([catalog, cases]) == ["UC-01"]
+
+
 def test_identifier_references_in_a_non_catalog_table_are_not_definitions(
     tmp_path: Path,
 ) -> None:
@@ -148,6 +181,59 @@ def test_complete_brief_with_combined_interface_tdd_section_is_valid(tmp_path: P
     )
 
     assert check_brief_sections([brief]) == []
+
+
+def test_brief_accepts_inline_red_green_verification_after_combined_file_interface_scope(
+    tmp_path: Path,
+) -> None:
+    """Requiring a literal Verificación heading would reject an executable brief contract."""
+    brief = tmp_path / "P01-T99-inline-sequence.md"
+    brief.write_text(
+        "# P01-T99 — Inline sequence\n"
+        "## Lectura obligatoria\ntext\n"
+        "## Archivos exactos e interfaces\n"
+        "Crear `validator.py`; produce `validate(Path) -> Report`.\n"
+        "Rojo: el caso inválido falla. Verde: Ejecutá `pytest tests/docs -v`.\n"
+        "Evidence: exit code 0. Commit: `test: inline sequence`.\n",
+        encoding="utf-8",
+    )
+
+    assert check_brief_sections([brief]) == []
+
+
+def test_brief_accepts_cli_as_an_explicit_interface_without_an_interface_heading(
+    tmp_path: Path,
+) -> None:
+    """A CLI contract is an interface even when its brief does not name a section literally."""
+    brief = tmp_path / "P01-T99-cli.md"
+    brief.write_text(
+        "# P01-T99 — CLI\n"
+        "## Lectura obligatoria\ntext\n"
+        "## Archivos permitidos\n`scripts/validate.py`\n"
+        "Ejecutar el CLI `python scripts/validate.py --all docs`.\n"
+        "## Verificación\n`python scripts/validate.py --all docs`\n"
+        "## Handoff\nCommit `test: validate docs`.\n",
+        encoding="utf-8",
+    )
+
+    assert check_brief_sections([brief]) == []
+
+
+def test_brief_without_executable_verification_still_fails(tmp_path: Path) -> None:
+    """Semantic matching must not permit a brief that lacks verifiability evidence."""
+    brief = tmp_path / "P01-T99-no-verification.md"
+    brief.write_text(
+        "# P01-T99 — No verification\n"
+        "## Lectura obligatoria\ntext\n"
+        "## Archivos e interfaces\n`validator.py`\n"
+        "Implementá `validate(Path) -> Report`.\n"
+        "Commit: `test: missing verification`.\n",
+        encoding="utf-8",
+    )
+
+    result = messages(check_brief_sections([brief]))
+
+    assert result == [f"{brief}:1: missing required brief section 'Verificación'"]
 
 
 def test_agent_brief_directory_readme_is_not_itself_a_task_brief(tmp_path: Path) -> None:
