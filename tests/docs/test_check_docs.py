@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -370,6 +371,59 @@ def test_cli_all_returns_zero_for_clean_document_tree(tmp_path: Path) -> None:
 
     result = subprocess.run(
         [sys.executable, "scripts/check_docs.py", "--all", str(docs)],
+        capture_output=True,
+        check=False,
+        cwd=Path(__file__).parents[2],
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_quality_extra_is_installable_with_the_locked_documentation_tools(
+    tmp_path: Path,
+) -> None:
+    """Removing the project quality extra must break the CI dependency install."""
+    report = tmp_path / "install-report.json"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--dry-run",
+            "--report",
+            str(report),
+            ".[quality]",
+        ],
+        capture_output=True,
+        check=False,
+        cwd=Path(__file__).parents[2],
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    project = next(
+        item["metadata"]
+        for item in json.loads(report.read_text(encoding="utf-8"))["install"]
+        if item["metadata"]["name"] == "ia-mcp"
+    )
+    assert set(project["requires_dist"]) == {
+        'pytest==9.1.1; extra == "quality"',
+        'ruff==0.16.5; extra == "quality"',
+    }
+
+
+def test_console_pytest_collects_documentation_tests_from_the_project_root() -> None:
+    """Dropping the project import path must break the CI pytest command."""
+    result = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("pytest")),
+            "tests/docs/test_traceability.py",
+            "--collect-only",
+            "-q",
+        ],
         capture_output=True,
         check=False,
         cwd=Path(__file__).parents[2],
