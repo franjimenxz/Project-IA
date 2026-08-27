@@ -17,8 +17,8 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 | Tarea | Wave | Estado inicial | Depende de | Brief |
 |---|---|---|---|---|
-| P01-T01 | W0 | ready | — | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T01-document-validator.md) |
-| P01-T02 | W0 | blocked | P01-T01 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T02-traceability-checker.md) |
+| P01-T01 | W0 | accepted | — | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T01-document-validator.md) |
+| P01-T02 | W0 | ready | P01-T01 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T02-traceability-checker.md) |
 | P01-T03 | W0 | blocked | P01-T01, P01-T02 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T03-docs-ci.md) |
 | P02-T01 | W1 | blocked | P01-T03 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T01-bootstrap.md) |
 | P02-T02 | W1 | blocked | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T02-tenancy.md) |
@@ -68,3 +68,10 @@ Delegar únicamente `P01-T01`. Después de implementación y dos revisiones, mar
 ## Actualización
 
 Sólo el coordinador edita estados. Cada transición cita commit y evidencia en una nota de revisión o PR. Una tarea bloqueada por `EXT` no se desbloquea por decisión técnica interna.
+
+## Registro de transiciones
+
+| Tarea | Transición | Implementación | Evidencia |
+|---|---|---|---|
+| P01-T01 | `ready → in_review → accepted` | `e6b5736`, `655dae8`, `371aa73` | [P01-T01](../phases/phase-01-functional-specification/evidence/P01-T01.md) |
+| P01-T02 | `blocked → ready` | dependencia P01-T01 aceptada | [P01-T01](../phases/phase-01-functional-specification/evidence/P01-T01.md) |
