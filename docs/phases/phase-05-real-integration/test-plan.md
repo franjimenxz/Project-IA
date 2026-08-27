@@ -1,6 +1,6 @@
 # Test Plan — Fase 5
 
-**Estado:** blocked hasta EXT-001–003
+**Estado:** preparación permitida; ejecución real condicionada por EXT-001/EXT-003 y sandbox por EXT-002
 
 | Capa | Casos | Ejecución |
 |---|---|---|
@@ -14,4 +14,3 @@
 No se graban credenciales ni datos reales en cassettes. Payload fixtures se sanitizan y conservan hash/fuente documental.
 
 Gate: contract suite, aislamiento, sandbox, reconcile/rollback y evidencia firmada por owner de integración.
-

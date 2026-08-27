@@ -1,6 +1,9 @@
 # P05-T01 — Intake de API
 
-**Estado:** blocked por EXT-001–003  
+**Estado:** blocked
+
+**Depends on:** P03-T05, P04-T10, EXT-001
+
 **Objetivo:** producir mapping completo con fuente oficial por decisión.
 
 No escribir adapter ni inferir ejemplos. Permitidos: mapping y manifest de fixtures sanitizadas. Escalar contradicciones y capabilities ausentes.
@@ -9,7 +12,7 @@ Gate de handoff: revisión institucional, arquitectura y seguridad; commit `docs
 
 ## Lectura obligatoria
 
-Plan maestro §§24–25/30, contracts TDD, `../TDD.md`, acceptance/test plan, EXT-001–003 y ADR-003.
+Plan maestro §§24–25/30, contracts TDD, `../TDD.md`, acceptance/test plan, EXT-001 y ADR-003. EXT-003 puede relevarse durante el mapping, pero no bloquea este intake.
 
 ## Archivos e interfaces
 

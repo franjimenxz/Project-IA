@@ -1,7 +1,8 @@
 # TDD — Integración institucional real
 
 **ID:** TDD-P05-001  
-**Estado:** blocked por EXT-001–003  
+**Estado:** staged; cada tarea se desbloquea con su dependencia externa específica
+
 **Requisitos:** RF-023–RF-027, RNF-002, RNF-004, RNF-010–RNF-015
 
 ## Arquitectura invariable
@@ -73,4 +74,3 @@ Hosts allowlisted, TLS verificado, payload size limitado, redirects deshabilitad
 ## Rollout
 
 Feature flag por tenant: shadow/read-only donde sea posible → canary interno → operaciones no mutables → mutaciones controladas → activación. Rollback vuelve a fake/disabled sólo en entornos donde sea seguro y no afirma mutaciones no reconciliadas.
-

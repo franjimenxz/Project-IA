@@ -12,7 +12,9 @@
 
 ## Global Constraints
 
-- Plan bloqueado hasta EXT-001–003.
+- P05-T01 se desbloquea con P03-T05/P04-T10 aceptadas y EXT-001.
+- P05-T02 requiere además EXT-003; P05-T03 requiere el transporte/auth aceptado.
+- P05-T04 requiere P05-T03 aceptada y EXT-002.
 - Sólo detalles citados por documentación oficial.
 - Secrets nunca en fixtures.
 - Cambios de contratos requieren ADR/versionado.
@@ -68,4 +70,3 @@
 - [ ] Ensayar feature flag, abort, rollback y manejo de outcomes inciertos.
 - [ ] Obtener aceptación de integración/seguridad/operaciones.
 - [ ] Commit `test: verify institutional MCP in sandbox`.
-

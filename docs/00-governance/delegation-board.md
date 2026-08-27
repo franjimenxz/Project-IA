@@ -43,10 +43,10 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P04-T11 | W4 | blocked | P04-T04, P04-T06 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T11-handoff.md) |
 | P04-T12 | W5 | blocked | P04-T08, P04-T10 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T12-scheduler.md) |
 | P04-T13 | W5 | blocked | P04-T05, P04-T09–P04-T12 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T13-mvp-e2e.md) |
-| P05-T01 | W6 | blocked | P03-T05, P04-T10, EXT-001–EXT-003 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T01-api-intake.md) |
-| P05-T02 | W6 | blocked | P05-T01 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T02-transport-auth.md) |
-| P05-T03 | W6 | blocked | P05-T01, P05-T02 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T03-appointment-adapter.md) |
-| P05-T04 | W6 | blocked | P05-T03, EXT-002 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T04-sandbox-rollout.md) |
+| P05-T01 | W6-intake | blocked | P03-T05, P04-T10, EXT-001 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T01-api-intake.md) |
+| P05-T02 | W6-build | blocked | P05-T01, EXT-003 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T02-transport-auth.md) |
+| P05-T03 | W6-build | blocked | P05-T01, P05-T02 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T03-appointment-adapter.md) |
+| P05-T04 | W6-sandbox | blocked | P05-T03, EXT-002 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T04-sandbox-rollout.md) |
 | P06-T01 | W6 | blocked | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
 | P06-T02 | W6 | blocked | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
 | P06-T03 | W6 | blocked | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |

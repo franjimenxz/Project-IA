@@ -1,7 +1,12 @@
 # Fase 5 — Primera integración real
 
-**Estado:** blocked  
-**Gate de entrada:** Fase 3 aceptada, Slices 4.2–4.3 aceptadas y EXT-001–EXT-003 satisfechas
+**Estado:** staged/blocking por tarea
+
+**Gate de intake:** P03-T05 y P04-T10 aceptadas, y EXT-001 satisfecha
+
+**Gate de transporte/auth:** P05-T01 aceptada y EXT-003 satisfecha
+
+**Gate de sandbox:** P05-T03 aceptada y EXT-002 satisfecha
 
 **Gate de salida:** G4
 
@@ -11,11 +16,11 @@
 
 Implementar el MCP/adaptador del primer instituto contra una API oficial, sin modificar los contratos del Core salvo necesidad genérica aprobada.
 
-## Condición de desbloqueo
+## Condiciones de desbloqueo progresivas
 
-- documentación oficial versionada;
-- sandbox y datos de prueba;
-- autenticación, scopes, expiración y rate limits;
+- P05-T01: documentación oficial versionada (`EXT-001`);
+- P05-T02/P05-T03: autenticación, scopes, expiración y rate limits confirmados (`EXT-003`);
+- P05-T04: sandbox y datos de prueba disponibles (`EXT-002`);
 - contacto técnico/operativo para discrepancias.
 
 ## Trabajo permitido antes del desbloqueo

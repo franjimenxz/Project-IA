@@ -1,6 +1,6 @@
 # P05-T04 — Sandbox y rollout
 
-**Estado:** blocked · **Depends on:** P05-T03
+**Estado:** blocked · **Depends on:** P05-T03 accepted, EXT-002
 
 Ejecutá contract/E2E en sandbox dedicado con datos sintéticos. No usar pacientes reales ni guardar secrets/payloads crudos.
 

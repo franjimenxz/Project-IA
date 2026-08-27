@@ -41,7 +41,9 @@ La arquitectura y los contratos se estabilizan primero. A continuación se imple
 | W3 | Slice 4.1 y base de Slice 4.2 | W2 aceptada | FAQ aislada y workflow de alta con mock |
 | W4 | Slices 4.3 y 4.4 | Slice 4.2 aceptada | Ciclo de turnos y handoff |
 | W5 | Slice 4.5, pruebas de resiliencia y operabilidad | W4 integrada | Recordatorios y reconstrucción de runs |
-| W6 | Fase 5 cuando se cumpla `EXT-001`; en paralelo Fases 6 y 7 | MVP técnico integrado | Sandbox real y suite de readiness |
+| W6-intake | P05-T01; en paralelo Fases 6 y 7 | P03-T05/P04-T10 aceptadas y `EXT-001` | Mapping institucional aprobado |
+| W6-build | P05-T02 y P05-T03 | P05-T01 aceptada y `EXT-003` | Adapter contract-compliant |
+| W6-sandbox | P05-T04 | P05-T03 aceptada y `EXT-002` | Sandbox real, canary y rollback |
 | W7-prep | Fase 8 package/provision disabled | Fase 4 aceptada | Segundo package validado sin activar |
 | W7-activate | Fase 8 preflight/activación/prueba final | Fases 5, 6 y 7 aceptadas | Segundo tenant sin cambios específicos en Core |
 
