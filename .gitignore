@@ -15,4 +15,5 @@ dist/
 *.key
 secrets/
 artifacts/
-
+.worktrees/
+.superpowers/
