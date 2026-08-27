@@ -24,10 +24,11 @@ Cada límite valida autenticidad, autorización, esquema, tamaño, timeout y san
 
 ## Resolución y propagación de tenant
 
-- El tenant se deriva de `channel + external_account_id` autenticado o del principal administrativo.
+- El tenant se deriva de `channel + external_account_id` autenticado o del principal administrativo y produce `TenantIdentity`.
+- Configuration Service captura versión activa y crea un `TenantContext`; sólo ese contexto habilita accesos de runtime.
 - Headers de tenant sólo se aceptan en APIs internas autenticadas y se cotejan con scopes.
 - El texto del usuario, parámetros de tool del LLM y metadata de documentos no pueden cambiar tenant.
-- `TenantContext` se pasa explícitamente; no se usa un global mutable.
+- `TenantContext` se pasa explícitamente; no se usa un global mutable ni un UUID crudo.
 - Repositorios incluyen tenant en query y claves.
 - Adapters comprueban que integration y credentials reference pertenecen al tenant.
 - Audit events registran tenant de autoridad.
@@ -176,4 +177,3 @@ Una sospecha de fuga:
 ## Gate de producción
 
 Threat model revisado, suite negativa aceptada, secretos/rotación configurados, proveedor de datos aprobado, retención definida, pruebas de restore y respuesta a incidente ensayada.
-

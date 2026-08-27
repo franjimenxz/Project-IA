@@ -8,7 +8,7 @@
 | [P04-T04](P04-T04-faq-harness.md) | 4.1 | T01–T03 |
 | [P04-T05](P04-T05-faq-e2e.md) | 4.1 | T04 |
 | [P04-T06](P04-T06-workflow-engine.md) | 4.2 | P02-T03 |
-| [P04-T07](P04-T07-appointment-search.md) | 4.2 | T06, P03-T04 |
+| [P04-T07](P04-T07-appointment-search.md) | 4.2 | T06, P03-T05 |
 | [P04-T08](P04-T08-appointment-create.md) | 4.2 | T07 |
 | [P04-T09](P04-T09-cancel.md) | 4.3 | T08 |
 | [P04-T10](P04-T10-reschedule-confirm.md) | 4.3 | T08 |
@@ -17,4 +17,3 @@
 | [P04-T13](P04-T13-mvp-e2e.md) | Integración | T05, T09–T12 |
 
 Cada brief hereda restricciones de `../TDD.md`, `../implementation-plan.md`, ADR-002 y delegation protocol.
-

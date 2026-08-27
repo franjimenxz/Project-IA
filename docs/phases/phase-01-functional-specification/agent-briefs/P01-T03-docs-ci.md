@@ -8,6 +8,10 @@
 
 Ejecutar validación documental, Ruff y tests docs en cada pull request.
 
+## Lectura obligatoria
+
+Briefs P01-T01/T02 aceptados, `../TDD.md`, `../test-plan.md`, root `AGENTS.md` y Task 3 del plan.
+
 ## Archivos permitidos
 
 `.github/workflows/quality.yml`, `pyproject.toml`, tests docs necesarios para CLI.
@@ -23,4 +27,3 @@ Python 3.13; dependencias bloqueadas; no agregar servicios externos.
 ## Handoff
 
 Adjuntar workflow validado y commit `ci: enforce documentation quality`.
-

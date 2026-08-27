@@ -6,4 +6,4 @@
 | [P03-T02](P03-T02-appointment-contracts.md) | P03-T01 | Schemas appointments |
 | [P03-T03](P03-T03-tool-registry.md) | P02-T02 | Registry/allowlist |
 | [P03-T04](P03-T04-fake-appointments.md) | P03-T02, P03-T03 | Protocol, fake y contract suite |
-
+| [P03-T05](P03-T05-tool-executor.md) | P03-T03, P03-T04 | Segunda autorización y dispatch |

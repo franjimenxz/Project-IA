@@ -34,6 +34,18 @@ src/ia_mcp/
 
 ```python
 @dataclass(frozen=True, slots=True)
+class TenantIdentity:
+    tenant_id: UUID
+    tenant_slug: str
+
+@dataclass(frozen=True, slots=True)
+class TenantAdminContext:
+    identity: TenantIdentity
+    principal_id: UUID
+    roles: frozenset[str]
+    correlation_id: UUID
+
+@dataclass(frozen=True, slots=True)
 class TenantContext:
     tenant_id: UUID
     tenant_slug: str
@@ -43,27 +55,30 @@ class TenantContext:
 class TenantResolver(Protocol):
     async def resolve_channel(self, channel: str, account_id: str) -> TenantIdentity: ...
 
-class ConfigRepository(Protocol):
-    async def get_active(self, tenant_id: UUID) -> TenantConfig: ...
-    async def publish(self, tenant_id: UUID, draft: TenantConfigDraft, actor_id: UUID) -> TenantConfig: ...
-    async def activate(self, tenant_id: UUID, version: int, actor_id: UUID) -> None: ...
+class ActiveConfigRepository(Protocol):
+    async def get_active(self, identity: TenantIdentity) -> TenantConfig: ...
+
+class ConfigurationService(Protocol):
+    async def capture(self, identity: TenantIdentity, correlation_id: UUID) -> tuple[TenantContext, TenantConfig]: ...
+    async def publish(self, admin: TenantAdminContext, draft: TenantConfigDraft) -> TenantConfig: ...
+    async def activate(self, admin: TenantAdminContext, version: int) -> None: ...
 ```
 
 ## Config lifecycle
 
-Draft valida schema y referencias → `validated` → publicación inmutable → activación atómica. `get_active` devuelve config y versión en una lectura consistente. Rollback activa una versión publicada anterior y genera audit event.
+Draft valida schema y referencias → `validated` → publicación inmutable → activación atómica. `capture` lee config y versión en una operación consistente y construye el único `TenantContext` autorizado para el run. Rollback activa una versión publicada anterior y genera audit event.
 
 ## Persistencia
 
-Primera migración crea `tenant`, `tenant_config`, `channel_integration` y `audit_event`. Las FK `(tenant_id, version)` y `(tenant_id, id)` impiden referencias cruzadas. Repositories siempre reciben tenant explícito.
+Primera migración crea `tenant`, `tenant_config`, `channel_integration` y `audit_event`. Las FK `(tenant_id, version)` y `(tenant_id, id)` impiden referencias cruzadas. Ningún repository público tenant-scoped acepta un UUID crudo: pre-captura usa `TenantIdentity`, administración usa `TenantAdminContext` y runtime usa `TenantContext`.
 
 ## API base
 
 - `GET /health/live`: proceso vivo, sin dependencias.
 - `GET /health/ready`: DB y configuración del proceso disponibles.
-- `POST /v1/simulated/messages`: envelope validado; inicialmente resuelve tenant y responde acknowledgment estructurado.
+- `POST /v1/simulated/messages`: sólo test/development; verifica headers `X-Simulated-Account`, `X-Simulated-Timestamp` y `X-Simulated-Signature` (HMAC sobre timestamp + body), luego resuelve tenant y responde acknowledgment estructurado.
 
-El endpoint simulado usa `channel_account_id`, no acepta `tenant_id` del body.
+El body sólo contiene message/user/content. `channel_account_id` proviene del header autenticado, no acepta `tenant_id` ni account id del body, rechaza timestamps vencidos, firmas inválidas y replay, y no se registra en el router de producción.
 
 ## Errores
 
@@ -80,4 +95,3 @@ SQLite no sustituye PostgreSQL para constraints o JSON/vector. Unit tests usan f
 ## Rollout
 
 Esta fase no procesa pacientes reales. Feature flag mantiene endpoint simulado fuera de producción. Migraciones se prueban up/down en base efímera.
-

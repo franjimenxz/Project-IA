@@ -1,7 +1,10 @@
 # Fase 5 — Primera integración real
 
 **Estado:** blocked  
-**Gate de entrada:** G4  
+**Gate de entrada:** Fase 3 aceptada, Slices 4.2–4.3 aceptadas y EXT-001–EXT-003 satisfechas
+
+**Gate de salida:** G4
+
 **Bloqueantes:** EXT-001, EXT-002, EXT-003
 
 ## Objetivo
@@ -25,4 +28,3 @@ Implementar el MCP/adaptador del primer instituto contra una API oficial, sin mo
 ## Trabajo prohibido
 
 Inventar endpoints, auth, requests, responses, códigos de error, idempotencia o semántica de reprogramación.
-

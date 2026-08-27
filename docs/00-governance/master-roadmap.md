@@ -42,7 +42,8 @@ La arquitectura y los contratos se estabilizan primero. A continuación se imple
 | W4 | Slices 4.3 y 4.4 | Slice 4.2 aceptada | Ciclo de turnos y handoff |
 | W5 | Slice 4.5, pruebas de resiliencia y operabilidad | W4 integrada | Recordatorios y reconstrucción de runs |
 | W6 | Fase 5 cuando se cumpla `EXT-001`; en paralelo Fases 6 y 7 | MVP técnico integrado | Sandbox real y suite de readiness |
-| W7 | Fase 8 | Fases 5, 6 y 7 aceptadas | Segundo tenant sin cambios específicos en Core |
+| W7-prep | Fase 8 package/provision disabled | Fase 4 aceptada | Segundo package validado sin activar |
+| W7-activate | Fase 8 preflight/activación/prueba final | Fases 5, 6 y 7 aceptadas | Segundo tenant sin cambios específicos en Core |
 
 ## Gates globales
 
@@ -79,6 +80,8 @@ La arquitectura y los contratos se estabilizan primero. A continuación se imple
 
 ### G4 — Integración real lista
 
+G4 es el gate de salida de Fase 5. Su entrada requiere G2, las Slices 4.2–4.3 aceptadas y las dependencias externas indicadas.
+
 - `EXT-001`, `EXT-002` y `EXT-003` satisfechos;
 - contract tests contra adaptador real;
 - sandbox end-to-end;
@@ -101,4 +104,3 @@ Se actualiza el roadmap cuando cambia un contrato compartido, aparece una nueva 
 Fase 1 → Fase 2 → Fase 3 → Slice 4.2 → Slice 4.3 → Fase 5 → Fase 8.
 
 La Fase 5 puede permanecer bloqueada sin impedir validar el MVP contra mocks. No puede considerarse lista para producción sin documentación oficial y sandbox.
-

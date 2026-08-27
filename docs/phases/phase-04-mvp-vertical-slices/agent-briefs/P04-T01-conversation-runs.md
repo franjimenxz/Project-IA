@@ -22,3 +22,14 @@ AC-P04-002, 003, 007, 008. Probar duplicado, CAS, A→B not found y run config s
 
 `pytest -m integration tests/integration/mvp/test_conversations.py -v && pytest -m security tests/security/test_tenant_isolation.py -v`. Commit `feat: persist tenant-scoped conversations and runs`.
 
+## Lectura obligatoria
+
+`docs/01-architecture/data-model.md`, ADR-002, `../TDD.md`, `../acceptance-criteria.md` y Task 1 del plan.
+
+## Archivos exactos
+
+Crear `src/ia_mcp/conversation/models.py`, `ports.py`, `adapters/sqlalchemy.py`, `src/ia_mcp/agent_runtime/run_repository.py`, migración `alembic/versions/0002_conversations.py` y `tests/integration/mvp/test_conversations.py`. No modificar config, knowledge, skills o API.
+
+## Secuencia y evidencia
+
+Rojo: ejecutar el node de duplicate message antes de crear schema. Verde: comando de verificación anterior más `mypy src/ia_mcp/conversation`. Entregar AC-P04-002/003/007/008, migración up/down, hash y handoff normativo.

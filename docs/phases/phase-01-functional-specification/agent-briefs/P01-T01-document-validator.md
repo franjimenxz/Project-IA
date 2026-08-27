@@ -8,6 +8,8 @@
 
 Crear un CLI Python que detecte IDs de definición duplicados, links locales rotos y placeholders fuera de `docs/templates`. Las referencias repetidas a un ID son válidas; sólo se consideran definiciones la primera columna de registros normativos y los headings declarados por el catálogo.
 
+También debe fallar si un brief carece de lectura obligatoria, archivos, interfaz/secuencia TDD, verificación o commit; si una fase declara el mismo gate de entrada y salida; o si referencia un gate inexistente.
+
 ## Lectura obligatoria
 
 `docs/README.md`, `docs/00-governance/requirements-catalog.md`, plan de esta fase.

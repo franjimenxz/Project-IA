@@ -120,7 +120,7 @@ async def test_duplicate_command_returns_recorded_transition(engine):
 
 **Brief:** `agent-briefs/P04-T07-appointment-search.md`
 
-**Files:** Create appointments workflow/skill and tests.
+**Files:** Create appointments workflow/skill and tests; consume `ToolExecutor` from P03-T05.
 
 - [ ] Write table-driven failing tests for required fields varying between tenants A/B.
 - [ ] Run tests; expect missing workflow definition.
@@ -132,7 +132,7 @@ async def test_duplicate_command_returns_recorded_transition(engine):
 
 **Brief:** `agent-briefs/P04-T08-appointment-create.md`
 
-**Files:** Modify appointment workflow; create tool executor/audit and E2E tests.
+**Files:** Modify appointment workflow and ToolExecutor audit adapter; create E2E tests.
 
 - [ ] Write failing E2E replay test: selected slot + two confirm messages produce one appointment/tool mutation.
 - [ ] Run node; expect workflow stops before create.
@@ -184,8 +184,8 @@ async def test_duplicate_command_returns_recorded_transition(engine):
 
 - [ ] Write failing clock test for appointment at 2026-09-03T12:00-03:00 scheduling at 2026-09-01T12:00-03:00.
 - [ ] Run node; expect missing scheduler.
-- [ ] Implement persistent jobs, unique business key, claim lease, eligibility recheck, outbox and confirmation ingress.
-- [ ] Run clock/replay/restart/cross-tenant tests.
+- [ ] Implement persistent jobs, stable unique business key, mutable `scheduled_for`, monotonic `schedule_version`, claim lease, eligibility/version recheck, outbox and confirmation ingress.
+- [ ] Run clock/reschedule-stale/replay/restart/cross-tenant tests.
 - [ ] Commit `feat: schedule idempotent appointment reminders`.
 
 ### Task 13: MVP integrated suite
@@ -199,4 +199,3 @@ async def test_duplicate_command_returns_recorded_transition(engine):
 - [ ] Fix only wiring/configuration defects within existing contracts; escalate contract changes.
 - [ ] Run all Phase 4 commands plus Ruff/types.
 - [ ] Commit `test: verify complete multi-tenant MVP journeys`.
-

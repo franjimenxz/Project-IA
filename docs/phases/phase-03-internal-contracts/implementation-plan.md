@@ -51,6 +51,7 @@ def test_search_rejects_reversed_dates():
 
 - [ ] Run the node; expect missing class.
 - [ ] Implement all six request types, AppointmentSlot, PatientRef, Patient, Appointment and validators from TDD.
+- [ ] Add tenant-policy tests proving `Patient` permits absent name/id globally while workflow validation can require configured fields.
 - [ ] Run `pytest tests/unit/contracts/test_appointments.py -v && mypy src/ia_mcp/contracts`.
 - [ ] Commit `feat: define appointment contracts`.
 
@@ -86,8 +87,8 @@ def test_available_tools_are_three_way_intersection():
 
 ```python
 async def test_create_is_idempotent(appointment_capability, request):
-    first = await appointment_capability.create(request, idempotency_key="k-1")
-    second = await appointment_capability.create(request, idempotency_key="k-1")
+    first = await appointment_capability.create(TENANT_A_CTX, request, idempotency_key="k-1")
+    second = await appointment_capability.create(TENANT_A_CTX, request, idempotency_key="k-1")
     assert first == second
     assert first.ok is True
 ```
@@ -96,3 +97,23 @@ async def test_create_is_idempotent(appointment_capability, request):
 - [ ] Define Protocol and fake state keyed by tenant plus idempotency key; implement all six tools and fault plan.
 - [ ] Run `pytest -m contract tests/contract/appointments -v` and tenant-crossing tests.
 - [ ] Commit `test: provide contract-compliant appointment fake`.
+
+### Task 5: ToolExecutor tenant-aware
+
+**Brief:** `agent-briefs/P03-T05-tool-executor.md`
+
+**Files:** Create `src/ia_mcp/mcp/executor.py`, `tests/unit/mcp/test_executor.py`; consume registry and capability ports.
+
+- [ ] **Write failing authorization test**
+
+```python
+async def test_forbidden_tool_never_reaches_capability(executor, capability_spy):
+    result = await executor.execute(TENANT_A_CTX, RUN_ID, tool_call("appointments.create"))
+    assert result.error.code == ToolErrorCode.FORBIDDEN
+    capability_spy.assert_not_called()
+```
+
+- [ ] Run `pytest tests/unit/mcp/test_executor.py -v`; expect missing executor.
+- [ ] Implement second authorization, tenant-aware resolution, typed dispatch and sanitized audit hook; no SQL/transport details.
+- [ ] Run registry/executor/security tests and mypy.
+- [ ] Commit `feat: enforce tool authorization at execution`.

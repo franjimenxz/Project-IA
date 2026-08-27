@@ -45,7 +45,7 @@ Expected: FAIL because `check_unique_ids` is unavailable.
 
 - [ ] **Step 3: Implement ID extraction and duplicate reporting**
 
-Implement regex `\b(?:UC|RF|RNF|BR|CON|EXT)-\d{2,3}\b` sobre registros de definición (primera columna de las tablas del catálogo y headings de casos), no sobre referencias narrativas; return sorted duplicates.
+Implement regex `\b(?:UC|RF|RNF|BR|CON|EXT)-\d{2,3}\b` sobre registros de definición (primera columna de las tablas del catálogo y headings de casos), no sobre referencias narrativas; return sorted duplicates. Agregar validación de secciones obligatorias en cada brief (`Lectura obligatoria`, archivos, interfaces/TDD, verificación y commit) y gates de entrada/salida no circulares.
 
 - [ ] **Step 4: Verify green and quality**
 
@@ -77,6 +77,8 @@ def missing_must_requirements(catalog: str, matrix: str) -> set[str]:
     covered = expand_identifier_ranges(parse_matrix_requirement_cells(matrix))
     return required - covered
 ```
+
+- [ ] Add acceptance-reference parsing that expands full and shorthand ranges such as `AC-P04-050–058` and fails on undefined endpoints/IDs.
 - [ ] Run `pytest tests/docs/test_traceability.py -v && ruff check scripts tests/docs`; expect exit 0.
 - [ ] Commit with `git commit -m "test: enforce requirement traceability"`.
 

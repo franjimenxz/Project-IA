@@ -8,8 +8,8 @@
 | Componente | Responsabilidad única | Consume | Produce | Persistencia |
 |---|---|---|---|---|
 | Channel Gateway | Verificar, normalizar y entregar mensajes | Webhook/provider | `InboundMessage`, `DeliveryResult` | Dedupe de mensajes |
-| Tenant Resolver | Mapear canal/cuenta a tenant activo | Channel account | `TenantContext` parcial | Tenant/integration |
-| Config Repository | Versionar, publicar y resolver configuración | Tenant | `TenantConfig` | TenantConfig |
+| Tenant Resolver | Mapear canal/cuenta autenticada a tenant activo | Channel account | `TenantIdentity` | Tenant/integration |
+| Configuration Service | Capturar versión activa y construir contexto inmutable | `TenantIdentity` | `TenantContext` + `TenantConfig` | TenantConfig |
 | Conversation Service | Estado de ownership e historial | Mensajes | Conversation snapshot | Conversation/Message |
 | Agent Harness | Orquestar un turno conversacional | Contexto, skills, LLM | `AgentTurnResult` | AgentRun |
 | Intent Router | Seleccionar skill/fallback permitido | Mensaje + config | `SkillName` | No |
@@ -61,7 +61,7 @@ class TenantScopedRepository(Protocol):
     async def get(self, tenant: TenantContext, entity_id: UUID) -> Entity: ...
 ```
 
-No se admiten overloads sin tenant. Para tareas administrativas cross-tenant existe un puerto separado, autenticado como plataforma y no reutilizable por el Agent Harness.
+No se admiten overloads con UUID crudo. Antes de capturar config, sólo `ActiveConfigRepository` acepta `TenantIdentity`; después, todos los repositorios tenant-scoped exigen `TenantContext`. Para tareas administrativas existe un puerto separado con `TenantAdminContext`, autenticado y no reutilizable por el Agent Harness.
 
 ### Tool execution
 
@@ -103,4 +103,3 @@ Audit events son append-only desde la aplicación; correcciones se representan c
 ## Crecimiento y extracción
 
 Un módulo se separa como servicio sólo si presenta ciclo de despliegue, escala, aislamiento operativo o ownership organizacional independiente. La extracción conserva el puerto actual y reemplaza el adapter local por transporte; no modifica consumidores de dominio.
-

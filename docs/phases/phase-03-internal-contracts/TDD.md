@@ -45,10 +45,11 @@ class PatientRef(BaseModel):
     email: EmailStr | None = None
 
 class Patient(BaseModel):
-    patient_id: NonEmptyStr
+    model_config = ConfigDict(extra="forbid")
+    patient_id: NonEmptyStr | None = None
     document_type: NonEmptyStr | None = None
     document_number: SecretStr | None = None
-    name: NonEmptyStr
+    name: NonEmptyStr | None = None
     email: EmailStr | None = None
     coverage: NonEmptyStr | None = None
 
@@ -68,9 +69,33 @@ class Appointment(BaseModel):
     specialty: NonEmptyStr
     practitioner: NonEmptyStr | None = None
     location: NonEmptyStr | None = None
+
+class AppointmentGetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal[1] = 1
+    appointment_id: NonEmptyStr
+
+class AppointmentCancelRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal[1] = 1
+    appointment_id: NonEmptyStr
+    reason: NonEmptyStr | None = None
+
+class AppointmentRescheduleRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal[1] = 1
+    appointment_id: NonEmptyStr
+    new_slot_id: NonEmptyStr
+    booking_token: SecretStr | None = None
+
+class AppointmentConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal[1] = 1
+    appointment_id: NonEmptyStr
+    confirmed: Literal[True] = True
 ```
 
-`PatientRef` representa datos aportados o una referencia parcial para una operación. `Patient` representa la respuesta canónica de una capability externa; el Core no la convierte automáticamente en un registro maestro persistente.
+`PatientRef` representa datos aportados o una referencia parcial para una operación. `Patient` representa una respuesta canónica mínima de una capability externa; ningún campo demográfico o identificador es obligatorio a nivel global. `AppointmentPolicy.required_fields` y la capability del tenant determinan qué combinación debe existir para cada operación. El Core no la convierte automáticamente en un registro maestro persistente.
 
 Validaciones cruzadas:
 
@@ -78,6 +103,8 @@ Validaciones cruzadas:
 - `ends_at > starts_at`;
 - crear requiere los campos configurados antes de invocar tool;
 - al menos un identificador permitido para localizar paciente/turno según capability.
+
+`AppointmentStatus` contiene `scheduled`, `pending_confirmation`, `confirmed`, `cancelled` y `rescheduled`. Un estado externo desconocido no se fuerza a un valor: produce `contract_violation` hasta que una extensión canónica sea aprobada.
 
 ## Resultados y errores
 
@@ -111,9 +138,20 @@ El validator exige exactamente uno de `value` o `error` según `ok`. `upstream_r
 
 `available = server_capabilities ∩ tenant_config.enabled_tools ∩ skill.allowed_tools`. Una llamada se vuelve a validar al ejecutar. Tool desconocida o fuera de allowlist devuelve `forbidden`, no se reenvía.
 
+```python
+class AppointmentCapability(Protocol):
+    async def search(self, tenant: TenantContext, request: AppointmentSearchRequest) -> ToolResult[list[AppointmentSlot]]: ...
+    async def create(self, tenant: TenantContext, request: AppointmentCreateRequest, idempotency_key: str) -> ToolResult[Appointment]: ...
+
+class ToolExecutor(Protocol):
+    async def execute(self, tenant: TenantContext, run_id: UUID, call: ToolCall) -> ToolResult[Any]: ...
+```
+
+Las restantes operations de `AppointmentCapability` siguen la misma regla: `TenantContext` explícito y `idempotency_key` obligatoria para mutaciones. `ToolExecutor` autoriza nuevamente antes de resolver MCP; una denegación no toca capability/transporte y genera auditoría sanitizada.
+
 ## Fake MCP
 
-Fake agenda mantiene slots/appointments en memoria por tenant para unit/E2E, con reloj y UUID inyectados. Implementa búsqueda, alta, cancelación, reprogramación y confirmación; simula errores mediante fault plan tipado. Nunca se usa como adapter productivo.
+Fake agenda mantiene slots/appointments en memoria por `tenant.tenant_id` para unit/E2E, con reloj y UUID inyectados. Implementa búsqueda, alta, cancelación, reprogramación y confirmación; simula errores mediante fault plan tipado. Nunca se usa como adapter productivo.
 
 ## Compatibilidad
 

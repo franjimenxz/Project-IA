@@ -58,7 +58,27 @@ La aplicación es un monolito modular. API, worker y MCP pueden ejecutarse como 
 
 ## 5. Contexto de tenant
 
-`TenantContext` es un value object inmutable creado después de autenticar el envelope del canal:
+La identidad autenticada y el contexto de ejecución son tipos distintos. `TenantIdentity` se crea después de autenticar el envelope; todavía no autoriza acceso a datos de conversación o negocio:
+
+```python
+@dataclass(frozen=True, slots=True)
+class TenantIdentity:
+    tenant_id: UUID
+    tenant_slug: str
+```
+
+Las operaciones administrativas usan un contexto separado y autorizado:
+
+```python
+@dataclass(frozen=True, slots=True)
+class TenantAdminContext:
+    identity: TenantIdentity
+    principal_id: UUID
+    roles: frozenset[str]
+    correlation_id: UUID
+```
+
+`TenantContext` se crea únicamente después de capturar atómicamente la configuración activa:
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -71,8 +91,10 @@ class TenantContext:
 
 Reglas:
 
-- no se crea desde texto enviado por el paciente;
-- se pasa explícitamente a repositorios, servicios, retrieval, workflows, MCP y auditoría;
+- ninguno de los dos tipos se crea desde texto enviado por el paciente;
+- `TenantIdentity` sólo puede usarse para capturar configuración activa y resolver el mapping autenticado inicial; mutaciones administrativas exigen `TenantAdminContext`;
+- todos los repositorios y servicios de conversación, knowledge, workflows, MCP, handoff, scheduling y auditoría exigen `TenantContext`;
+- `TenantContext` se pasa explícitamente a repositorios, servicios, retrieval, workflows, MCP y auditoría;
 - ninguna API interna sensible acepta un tenant opcional;
 - el tenant de una entidad se valida contra el contexto antes de leer o mutar;
 - jobs serializan `tenant_id` y vuelven a resolver configuración autorizada;
@@ -101,10 +123,10 @@ La configuración contiene referencias a secretos, nunca valores. La validación
 ## 7. Flujo de ejecución del agente
 
 1. Channel Gateway verifica autenticidad, normaliza el mensaje y genera `message_id`.
-2. Tenant Resolver deriva tenant desde la integración/canal autenticado.
-3. Conversation Service carga o crea conversación y aplica deduplicación.
-4. Config Repository captura la versión activa.
-5. Agent Harness crea `run_id`, estado y traza raíz.
+2. Tenant Resolver deriva un `TenantIdentity` desde la integración/canal autenticado.
+3. Configuration Service captura payload y versión activa en una lectura consistente y crea el `TenantContext` inmutable.
+4. Conversation Service carga o crea conversación usando `TenantContext` y aplica deduplicación.
+5. Agent Harness crea `run_id`, estado y traza raíz usando el mismo contexto.
 6. Intent Router selecciona una skill permitida o fallback.
 7. Context Compiler arma un contexto mínimo con políticas, memoria relevante, retrieval y tools allowlisted.
 8. LLM Port produce respuesta estructurada o propuesta de tool/workflow.
@@ -112,6 +134,8 @@ La configuración contiene referencias a secretos, nunca valores. La validación
 10. Mutaciones se entregan al Workflow Engine; el LLM no llama directamente al adapter.
 11. Resultado, tool calls, métricas y auditoría se persisten.
 12. Channel Gateway entrega respuesta con clave de deduplicación.
+
+Una activación concurrente puede cambiar la versión para ejecuciones posteriores, pero nunca muta el `TenantContext` ya creado.
 
 ## 8. Agent Harness
 
@@ -272,6 +296,8 @@ class ChannelAdapter(Protocol):
 
 `InboundMessage` contiene `channel`, `channel_account_id`, `external_message_id`, `external_user_id`, timestamp, contenido normalizado y metadata permitida. La combinación canal/cuenta resuelve tenant; el usuario no puede sobrescribirla.
 
+El adapter simulado existe sólo en `test`/`development`. La identidad de cuenta viaja fuera del body de usuario en headers firmados con HMAC de entorno de prueba (`account`, `timestamp`, hash del body); firma, freshness y replay se validan antes de construir `InboundMessage`. No se monta esa ruta en producción.
+
 ## 15. Handoff
 
 ```python
@@ -287,7 +313,7 @@ El resumen contiene identificador de paciente permitido, motivo, información re
 
 ## 16. Scheduling
 
-Los recordatorios son jobs determinísticos persistidos. La clave única es `(tenant_id, appointment_id, reminder_kind, scheduled_for)`. El worker verifica estado vigente antes de enviar y usa outbox para evitar separación entre commit y entrega.
+Los recordatorios son jobs determinísticos persistidos. La identidad estable es `(tenant_id, appointment_id, reminder_kind)`. `scheduled_for` y `schedule_version` son atributos mutables: una reprogramación reemplaza la fecha, incrementa versión y vuelve obsoleta cualquier entrega reclamada con una versión anterior. El worker verifica versión y estado vigente antes de enviar y usa outbox para evitar separación entre commit y entrega.
 
 El reloj es una dependencia inyectable para pruebas. La respuesta al recordatorio reingresa por Channel Gateway y continúa un workflow de confirmación.
 
@@ -386,4 +412,3 @@ Unitarios, contrato, integración, E2E, aislamiento, seguridad, resiliencia, eva
 - estado autoritativo persistente;
 - errores y observabilidad comunes;
 - slices del roadmap implementables sin redefinir arquitectura.
-

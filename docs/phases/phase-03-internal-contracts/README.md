@@ -15,10 +15,10 @@ Definir schemas canónicos, tools, errores y fakes ejecutables independientes de
 - versionado/compatibilidad;
 - ToolResult/ToolError;
 - registry y allowlist;
+- ToolExecutor tenant-aware con segunda autorización;
 - fake MCP/agenda;
 - contract suite reutilizable.
 
 ## Gate
 
 Fake y cualquier adapter candidato pasan la misma suite; schemas tienen ejemplos y rechazan extra fields; ninguna credencial forma parte de un contrato expuesto al modelo.
-

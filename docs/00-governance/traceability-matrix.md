@@ -7,14 +7,14 @@
 
 | Requisitos | Diseño principal | Criterios | Pruebas | Fase |
 |---|---|---|---|---|
-| RF-001–RF-003 | Tenant/configuration en System TDD | AC-P04-001–003 | Unit + integración + aislamiento | 2, 4.1 |
+| RF-001–RF-003 | Tenant/configuration en System TDD | AC-P02-002–007, AC-P02-011–012, AC-P04-001–003 | Unit + integración + aislamiento | 2, 4.1 |
 | RF-004–RF-008 | Agent Harness y Context Compiler | AC-P04-004–008 | Unit + eval + autorización | 4.1, 4.2 |
 | RF-009–RF-013, RF-043 | Knowledge/RAG TDD | AC-P04-009–014 | Integración + eval + fuga | 4.1 |
 | RF-014–RF-018 | Appointment workflow TDD | AC-P04-020–027 | Unit + contrato + E2E | 4.2 |
 | RF-019–RF-023 | Lifecycle/workflow TDD | AC-P04-030–038 | E2E + resiliencia | 4.3 |
-| RF-024–RF-027 | MCP/contract TDD | AC-P03-010–018, AC-P05-001–008 | Contract tests + sandbox | 3, 5 |
+| RF-024–RF-027 | MCP/contract TDD | AC-P03-005–010, AC-P05-001–010 | Contract tests + sandbox | 3, 5 |
 | RF-028–RF-030 | Handoff TDD | AC-P04-040–046 | E2E + eval | 4.4 |
-| RF-031–RF-033 | Scheduling TDD | AC-P04-050–057 | Reloj falso + idempotencia | 4.5 |
+| RF-031–RF-033 | Scheduling TDD | AC-P04-050–058 | Reloj falso + idempotencia | 4.5 |
 | RF-034–RF-036, RF-044 | Observability/Security TDD | AC-P07-001–010 | Reconstrucción + sanitización | 4–7 |
 | RF-037–RF-039, RF-045 | Security/Onboarding TDD | AC-P08-001–010 | Seguridad + segundo tenant | 2, 8 |
 | RF-040 | Testing strategy | AC-P06-001–009 | Pipeline de evals | 6 |
@@ -58,4 +58,3 @@
 ## Regla de cierre
 
 Al implementar, cada celda de prueba se reemplaza o amplía con la ruta exacta del test y la evidencia de CI. Ningún requisito `must` puede quedar sin prueba antes del gate correspondiente.
-

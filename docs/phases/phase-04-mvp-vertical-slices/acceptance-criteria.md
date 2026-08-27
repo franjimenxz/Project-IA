@@ -75,4 +75,4 @@
 | AC-P04-055 | Respuesta afirmativa continúa confirm workflow |
 | AC-P04-056 | Error de canal reintenta según política y queda auditado |
 | AC-P04-057 | Job A nunca usa canal, turno o config B |
-
+| AC-P04-058 | Reprogramar reemplaza schedule y un claim de versión anterior se omite como stale |

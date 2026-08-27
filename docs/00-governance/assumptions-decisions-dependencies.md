@@ -6,6 +6,7 @@
 
 | ID | Confirmación | Fuente |
 |---|---|---|
+| C-000 | Plan maestro normalizado por este paquete; SHA-256 `a13eb0dea1140a9c64c9ca5b8332bd1e9b7facfe527b682fb6c015f1ad779816` | Texto entregado el 2026-08-27 |
 | C-001 | TDD significa Technical Design Document | Responsable del producto, 2026-08-27 |
 | C-002 | El backend utiliza Python con FastAPI | Responsable del producto, 2026-08-27 |
 | C-003 | El Core es multi-tenant y no contiene lógica institucional | Plan maestro |
@@ -55,4 +56,3 @@ Estas decisiones tienen un momento de resolución definido y no bloquean la docu
 ## Regla de actualización
 
 Una entrada cambia sólo mediante revisión documental. El cambio debe indicar motivo, impacto en requisitos, contratos, tareas, migraciones y pruebas.
-

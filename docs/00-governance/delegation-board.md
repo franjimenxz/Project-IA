@@ -29,20 +29,21 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P03-T02 | W2 | blocked | P03-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T02-appointment-contracts.md) |
 | P03-T03 | W2 | blocked | P02-T02 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T03-tool-registry.md) |
 | P03-T04 | W2 | blocked | P03-T02, P03-T03 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T04-fake-appointments.md) |
+| P03-T05 | W2 | blocked | P03-T03, P03-T04 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T05-tool-executor.md) |
 | P04-T01 | W3 | blocked | P02-T03, P02-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T01-conversation-runs.md) |
 | P04-T02 | W3 | blocked | P03-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T02-context-skills.md) |
 | P04-T03 | W3 | blocked | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T03-knowledge.md) |
 | P04-T04 | W3 | blocked | P04-T01–P04-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T04-faq-harness.md) |
 | P04-T05 | W3 | blocked | P04-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T05-faq-e2e.md) |
 | P04-T06 | W3 | blocked | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
-| P04-T07 | W3 | blocked | P04-T06, P03-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
+| P04-T07 | W3 | blocked | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
 | P04-T08 | W3 | blocked | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
 | P04-T09 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
 | P04-T10 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T10-reschedule-confirm.md) |
 | P04-T11 | W4 | blocked | P04-T04, P04-T06 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T11-handoff.md) |
 | P04-T12 | W5 | blocked | P04-T08, P04-T10 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T12-scheduler.md) |
 | P04-T13 | W5 | blocked | P04-T05, P04-T09–P04-T12 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T13-mvp-e2e.md) |
-| P05-T01 | W6 | blocked | EXT-001–EXT-003 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T01-api-intake.md) |
+| P05-T01 | W6 | blocked | P03-T05, P04-T10, EXT-001–EXT-003 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T01-api-intake.md) |
 | P05-T02 | W6 | blocked | P05-T01 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T02-transport-auth.md) |
 | P05-T03 | W6 | blocked | P05-T01, P05-T02 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T03-appointment-adapter.md) |
 | P05-T04 | W6 | blocked | P05-T03, EXT-002 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T04-sandbox-rollout.md) |
@@ -67,4 +68,3 @@ Delegar únicamente `P01-T01`. Después de implementación y dos revisiones, mar
 ## Actualización
 
 Sólo el coordinador edita estados. Cada transición cita commit y evidencia en una nota de revisión o PR. Una tarea bloqueada por `EXT` no se desbloquea por decisión técnica interna.
-

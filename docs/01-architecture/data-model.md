@@ -168,7 +168,7 @@ Tenant, id, conversation, workflow opcional, reason code, summary estructurado, 
 
 ### ScheduledJob
 
-Tenant, id, type, payload versionado, business key, scheduled time, status, attempts, lock owner/expiry, last error y timestamps. Unique por `(tenant_id, type, business_key)`.
+Tenant, id, type, payload versionado, business key, `scheduled_for`, `schedule_version`, status, attempts, lock owner/expiry, last error y timestamps. Para recordatorios, `business_key = (appointment_id, reminder_kind)` y el unique estable es `(tenant_id, type, business_key)`. Reprogramar actualiza `scheduled_for`, incrementa `schedule_version` y vuelve stale cualquier claim/outbox de una versión anterior.
 
 ### OutboxEvent
 

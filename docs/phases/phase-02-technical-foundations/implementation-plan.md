@@ -59,7 +59,7 @@ async def test_resolver_ignores_tenant_claim_inside_message():
 ```
 
 - [ ] Run test; expect missing `TenantService`.
-- [ ] Implement frozen `TenantIdentity`, `TenantContext`, repository Protocol and service lookup by `(channel, account_id)`.
+- [ ] Implement frozen `TenantIdentity`, `TenantContext`, repository Protocol and service lookup by `(channel, account_id)`; `TenantContext` is constructed only by Configuration Service in Task 3.
 - [ ] Add unknown/disabled account tests and run `pytest tests/unit/tenancy -v`.
 - [ ] Commit `feat: resolve tenant from channel identity`.
 
@@ -73,14 +73,14 @@ async def test_resolver_ignores_tenant_claim_inside_message():
 
 ```python
 async def test_publishing_change_creates_new_immutable_version(config_service):
-    v1 = await config_service.publish(TENANT_A_CTX, draft(tone="cordial"), ACTOR)
-    v2 = await config_service.publish(TENANT_A_CTX, draft(tone="formal"), ACTOR)
+    v1 = await config_service.publish(TENANT_A_ADMIN_CTX, draft(tone="cordial"))
+    v2 = await config_service.publish(TENANT_A_ADMIN_CTX, draft(tone="formal"))
     assert (v1.version, v2.version) == (1, 2)
     assert v1.agent.tone == "cordial"
 ```
 
 - [ ] Run integration node; expect missing schema/service.
-- [ ] Implement Pydantic models, content hash, transactionally allocated version, publish/activate and composite constraints.
+- [ ] Implement Pydantic models, content hash, transactionally allocated version, publish/activate, `capture(identity, correlation_id)` and composite constraints; reject raw UUID repository APIs.
 - [ ] Run integration tests including cross-tenant and migration up/down.
 - [ ] Commit `feat: version tenant configuration`.
 
@@ -115,16 +115,14 @@ def test_redactor_removes_bearer_and_email():
 
 ```python
 def test_simulated_message_resolves_tenant_from_account(client):
-    response = client.post("/v1/simulated/messages", json={
-        "account_id": "acct-a", "external_message_id": "m-1",
-        "external_user_id": "u-1", "text": "tenant_b"
-    })
+    body = {"external_message_id": "m-1", "external_user_id": "u-1", "text": "tenant_b"}
+    headers = signed_simulated_headers(account="acct-a", body=body, now=FROZEN_NOW)
+    response = client.post("/v1/simulated/messages", json=body, headers=headers)
     assert response.status_code == 202
     assert response.json()["tenant_slug"] == "tenant-a"
 ```
 
 - [ ] Run test; expect 404.
-- [ ] Implement strict envelope, dependency-injected resolver and acknowledgment; reject extra `tenant_id` with 422.
-- [ ] Run API, tenancy and security tests.
+- [ ] Implement strict body, test-only HMAC authenticator with freshness/replay checks, dependency-injected resolver and acknowledgment; reject body account/tenant fields with 422 and omit route in production settings.
+- [ ] Run API, tenancy and security tests including tampered body/header, stale timestamp and replay.
 - [ ] Commit `feat: accept tenant-safe simulated messages`.
-

@@ -1,6 +1,11 @@
 # Fase 8 — Segundo tenant y readiness
 
-**Estado:** ready después de G4/G5 parciales  
+**Estado:** preparación ready después de Fase 4; activación bloqueada hasta G4 y cierres de Fases 6–7
+
+**Gate preparatorio:** P04-T13 aceptada para package/validator/provision disabled
+
+**Gate de activación:** G4, P06-T05 y P07-T04 aceptados
+
 **Gate de salida:** G5
 
 ## Objetivo
@@ -20,4 +25,3 @@ Probar que una segunda institución se incorpora mediante configuración, conoci
 ## Regla de arquitectura
 
 Si onboarding requiere `if tenant`, fork de skill o contrato específico dentro de Core, se bloquea y se evalúa capacidad genérica/ADR.
-

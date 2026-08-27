@@ -86,7 +86,7 @@ Al crear: persistir handoff/outbox y cambiar conversación a `human_owned` en un
 
 ## 5. Slice 4.5 — Scheduler
 
-Al crear/actualizar turno se emite evento para calcular `scheduled_for` según timezone/policy, default 48 horas. Job key: tenant/appointment/reminder kind. Worker reclama con lock, consulta estado, omite confirmed/cancelled, crea outbox y marca dispatched.
+Al crear/actualizar turno se emite evento para calcular `scheduled_for` según timezone/policy, default 48 horas. La identidad estable es tenant/appointment/reminder kind. Una actualización reemplaza `scheduled_for`, incrementa `schedule_version` y cancela/invalida entregas de versiones anteriores. Worker reclama con lock y versión, consulta estado, omite claims stale/confirmed/cancelled, crea outbox versionado y marca dispatched.
 
 Clock es puerto. Delivery y command son idempotentes. Una respuesta del paciente entra por el canal normal y selecciona confirm workflow.
 
@@ -110,4 +110,3 @@ Cada slice ejecuta dos tenants, replay, error y reinicio. Fake LLM produce decis
 ## 9. Rollout
 
 Feature flags por tenant/slice. Primer tenant usa fake integrations; segundo tenant usa corpus/config diferente. Desactivar una slice elimina skill/tools del contexto sin borrar estado/audit.
-
