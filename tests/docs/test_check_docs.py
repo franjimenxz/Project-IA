@@ -23,7 +23,7 @@ def test_duplicate_definition_id_is_reported_but_narrative_references_are_valid(
     tmp_path: Path,
 ) -> None:
     """Removing duplicate detection from definition rows must fail this test."""
-    catalog = tmp_path / "catalog.md"
+    catalog = tmp_path / "requirements-catalog.md"
     catalog.write_text(
         "| ID | Requirement |\n"
         "| --- | --- |\n"
@@ -93,6 +93,22 @@ def test_identifier_references_in_a_non_catalog_table_are_not_definitions(
     assert check_unique_ids([matrix]) == []
 
 
+def test_identifier_references_in_an_id_header_non_catalog_table_are_not_definitions(
+    tmp_path: Path,
+) -> None:
+    """An ID column alone must not turn a matrix into a normative requirements catalog."""
+    matrix = tmp_path / "traceability-matrix.md"
+    matrix.write_text(
+        "| ID | Evidence |\n"
+        "| --- | --- |\n"
+        "| RF-001 | First reference |\n"
+        "| RF-001 | Second reference |\n",
+        encoding="utf-8",
+    )
+
+    assert check_unique_ids([matrix]) == []
+
+
 def test_broken_local_markdown_link_includes_source_and_line(tmp_path: Path) -> None:
     """Skipping relative Markdown destinations would hide a broken document link."""
     index = tmp_path / "index.md"
@@ -124,21 +140,26 @@ def test_code_fences_are_not_parsed_as_markdown_links(tmp_path: Path) -> None:
     assert check_local_links([source]) == []
 
 
-def test_template_tokens_and_placeholder_words_are_ignored_only_under_templates(
+def test_template_tokens_and_placeholder_words_are_ignored_only_under_docs_templates(
     tmp_path: Path,
 ) -> None:
-    """Allowing placeholders outside docs/templates would leave unfinished docs unchecked."""
-    template = tmp_path / "templates" / "brief.md"
-    template.parent.mkdir()
+    """Only docs/templates may contain unresolved template values."""
+    template = tmp_path / "docs" / "templates" / "brief.md"
+    template.parent.mkdir(parents=True)
     template.write_text("{{name}} TODO\n", encoding="utf-8")
-    draft = tmp_path / "brief.md"
+    draft = tmp_path / "docs" / "brief.md"
     draft.write_text("{{name}} TODO\n", encoding="utf-8")
+    nested_template = tmp_path / "docs" / "phases" / "phase-01" / "templates" / "draft.md"
+    nested_template.parent.mkdir(parents=True)
+    nested_template.write_text("{{name}} TODO\n", encoding="utf-8")
 
-    result = messages(check_placeholders([template, draft]))
+    result = messages(check_placeholders([template, draft, nested_template]))
 
     assert result == [
         f"{draft}:1: unresolved template token '{{{{name}}}}'",
         f"{draft}:1: unresolved placeholder word 'TODO'",
+        f"{nested_template}:1: unresolved template token '{{{{name}}}}'",
+        f"{nested_template}:1: unresolved placeholder word 'TODO'",
     ]
 
 
@@ -172,15 +193,36 @@ def test_complete_brief_with_combined_interface_tdd_section_is_valid(tmp_path: P
     brief = tmp_path / "P01-T99-complete.md"
     brief.write_text(
         "# P01-T99 — Complete\n"
-        "## Lectura obligatoria\ntext\n"
-        "## Archivos exactos\ntext\n"
-        "## Interfaces y TDD\ntext\n"
-        "## Verificación\npytest\n"
+        "## Lectura obligatoria\n`docs/README.md`\n"
+        "## Archivos exactos\n`scripts/check_docs.py`\n"
+        "## Interfaces y TDD\nProduce `validate(Path) -> Report`.\n"
+        "## Verificación\n`pytest tests/docs -v`\n"
         "Commit: `test: complete`\n",
         encoding="utf-8",
     )
 
     assert check_brief_sections([brief]) == []
+
+
+def test_brief_with_empty_interface_and_verification_headings_is_rejected(tmp_path: Path) -> None:
+    """Empty semantic headings must not satisfy executable contract requirements."""
+    brief = tmp_path / "P01-T99-empty-sections.md"
+    brief.write_text(
+        "# P01-T99 — Empty sections\n"
+        "## Lectura obligatoria\n`docs/README.md`\n"
+        "## Archivos permitidos\n`scripts/check_docs.py`\n"
+        "## Interfaces y TDD\n"
+        "## Verificación\n"
+        "Commit: `test: empty sections`.\n",
+        encoding="utf-8",
+    )
+
+    result = messages(check_brief_sections([brief]))
+
+    assert result == [
+        f"{brief}:1: missing required brief section 'Interfaces/TDD'",
+        f"{brief}:1: missing required brief section 'Verificación'",
+    ]
 
 
 def test_brief_accepts_inline_red_green_verification_after_combined_file_interface_scope(
@@ -210,9 +252,60 @@ def test_brief_accepts_cli_as_an_explicit_interface_without_an_interface_heading
         "# P01-T99 — CLI\n"
         "## Lectura obligatoria\ntext\n"
         "## Archivos permitidos\n`scripts/validate.py`\n"
-        "Ejecutar el CLI `python scripts/validate.py --all docs`.\n"
+        "Tests docs necesarios para CLI.\n"
         "## Verificación\n`python scripts/validate.py --all docs`\n"
         "## Handoff\nCommit `test: validate docs`.\n",
+        encoding="utf-8",
+    )
+
+    assert check_brief_sections([brief]) == []
+
+
+def test_brief_accepts_a_typed_signature_as_an_interface_contract(tmp_path: Path) -> None:
+    """A documented callable signature is an interface contract without implementation prose."""
+    brief = tmp_path / "P01-T99-signature.md"
+    brief.write_text(
+        "# P01-T99 — Signature\n"
+        "## Lectura obligatoria\n`docs/README.md`\n"
+        "## Archivos permitidos\n`scripts/validator.py`\n"
+        "## Interface\n`validate(catalog: str) -> set[str]`.\n"
+        "## Verificación\n`pytest tests/docs -v`\n"
+        "Commit: `test: typed signature`.\n",
+        encoding="utf-8",
+    )
+
+    assert check_brief_sections([brief]) == []
+
+
+def test_brief_accepts_a_tdd_red_green_sequence_as_its_contract(tmp_path: Path) -> None:
+    """A populated TDD section with a real command is a valid executable contract."""
+    brief = tmp_path / "P01-T99-tdd.md"
+    brief.write_text(
+        "# P01-T99 — TDD\n"
+        "## Lectura obligatoria\n`docs/README.md`\n"
+        "## Archivos permitidos\n`tests/docs/test_validator.py`\n"
+        "## TDD y evidencia\n"
+        "Rojo: el caso aislado falla. Verde: `pytest tests/docs/test_validator.py -v`.\n"
+        "Commit: `test: tdd contract`.\n",
+        encoding="utf-8",
+    )
+
+    assert check_brief_sections([brief]) == []
+
+
+def test_brief_accepts_documentary_red_green_evidence_without_a_shell_command(
+    tmp_path: Path,
+) -> None:
+    """A review-backed red/green evidence sequence is valid for a documentation-only brief."""
+    brief = tmp_path / "P01-T99-documentary.md"
+    brief.write_text(
+        "# P01-T99 — Documentary\n"
+        "## Lectura obligatoria\n`docs/README.md`\n"
+        "## Archivos e interfaces\n"
+        "Crear `mapping.md`; produce a cited capability decision.\n"
+        "## Verificación y evidencia\n"
+        "Rojo documental: mapping sin fuente falla review. Verde: cada decision tiene sign-off.\n"
+        "Commit: `docs: validate mapping`.\n",
         encoding="utf-8",
     )
 

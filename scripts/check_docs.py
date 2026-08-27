@@ -20,6 +20,21 @@ PLACEHOLDER_PATTERN = re.compile(r"\b(?:TODO|TBD|PLACEHOLDER)\b")
 GATE_DEFINITION_PATTERN = re.compile(r"^\s{0,3}#{1,6}\s+(G\d+)\b")
 GATE_REFERENCE_PATTERN = re.compile(r"\b(G\d+)\b")
 BRIEF_NAME_PATTERN = re.compile(r"^P\d{2}-T\d{2}-.+\.md$")
+MARKDOWN_HEADING_PATTERN = re.compile(r"^\s{0,3}#{1,6}\s+(.+)$")
+COMMAND_PATTERN = re.compile(r"\b(?:pytest|python|ruff|mypy|npm|pnpm|make)\b", re.IGNORECASE)
+SIGNATURE_PATTERN = re.compile(r"`[^`]*\([^`]*\)[^`]*`")
+RED_GREEN_PATTERN = re.compile(r"\brojo\b.*\bverde\b", re.IGNORECASE | re.DOTALL)
+DOCUMENTARY_EVIDENCE_PATTERN = re.compile(
+    r"\b(?:review|sign-off|signoff|falla|fail|fuente|source|criterio|acceptance)\b",
+    re.IGNORECASE,
+)
+IMPLEMENTATION_PATTERN = re.compile(
+    r"\b(?:produce|consume)\b\s+\S+|"
+    r"\b(?:implement[aá]|crear|creá)\b[^\n]*(?:`[^`]+`|"
+    r"\b(?:schema|models?|validator|registry|service|workflow|contract|adapter|"
+    r"catalog|catálogo|port|protocol|route|endpoint|cli)\b)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -74,7 +89,7 @@ def definition_id_occurrences(path: Path) -> list[DefinitionOccurrence]:
                 DefinitionOccurrence(path, line_number, heading_match.group(1), "heading")
             )
             continue
-        if "|" not in line:
+        if path.name != "requirements-catalog.md" or "|" not in line:
             in_definition_table = False
             continue
         first_column = line.strip().lstrip("|").split("|", maxsplit=1)[0].strip(" `")
@@ -185,7 +200,11 @@ def check_local_links(paths: Sequence[Path]) -> list[Finding]:
 
 
 def is_template(path: Path) -> bool:
-    return "templates" in path.parts
+    parts = path.resolve().parts
+    return any(
+        part == "docs" and index + 1 < len(parts) and parts[index + 1] == "templates"
+        for index, part in enumerate(parts)
+    )
 
 
 def check_placeholders(paths: Sequence[Path]) -> list[Finding]:
@@ -220,28 +239,74 @@ def heading_texts(lines: Sequence[str]) -> list[str]:
     return [
         match.group(1).strip().lower()
         for line in lines
-        if (match := re.match(r"^\s{0,3}#{1,6}\s+(.+)$", line))
+        if (match := MARKDOWN_HEADING_PATTERN.match(line))
     ]
 
 
-def has_implementation_contract(headings: Sequence[str], lines: Sequence[str]) -> bool:
-    """Recognize an explicit interface, TDD, or CLI contract without a fixed heading."""
-    if any("interfaz" in item or "interface" in item or "tdd" in item for item in headings):
-        return True
-    text = "\n".join(lines)
-    return re.search(r"\b(?:cli|produce|consume|implement[aá]|crear|creá)\b", text, re.IGNORECASE) is not None
+def markdown_sections(lines: Sequence[str]) -> list[tuple[str, str]]:
+    """Return normalized headings with the body that belongs to each one."""
+    sections: list[tuple[str, str]] = []
+    heading = ""
+    content: list[str] = []
+    for line in lines:
+        match = MARKDOWN_HEADING_PATTERN.match(line)
+        if match:
+            if heading:
+                sections.append((heading, "\n".join(content).strip()))
+            heading = match.group(1).strip().lower()
+            content = []
+        elif heading:
+            content.append(line)
+    if heading:
+        sections.append((heading, "\n".join(content).strip()))
+    return sections
 
 
-def has_verification_evidence(headings: Sequence[str], lines: Sequence[str]) -> bool:
-    """Recognize a verification section or an explicit executable red/green sequence."""
-    if any("verificaci" in item or "evidencia" in item for item in headings):
-        return True
-    text = "\n".join(lines)
-    return re.search(
-        r"\b(?:verificaci[oó]n|pruebas?|ejecutar|ejecutá|rojo|verde|evidence|evidencia)\b",
+def has_executable_contract(text: str) -> bool:
+    return SIGNATURE_PATTERN.search(text) is not None or IMPLEMENTATION_PATTERN.search(text) is not None or (
+        "cli" in text.lower() and COMMAND_PATTERN.search(text) is not None
+    )
+
+
+def has_implementation_contract(lines: Sequence[str]) -> bool:
+    """Require an explicit interface/TDD contract, not just matching vocabulary."""
+    sections = markdown_sections(lines)
+    named_sections = [
+        (heading, content)
+        for heading, content in sections
+        if "interfaz" in heading or "interface" in heading or "tdd" in heading
+    ]
+    if named_sections:
+        return any(
+            has_executable_contract(content)
+            or ("tdd" in heading and has_executable_evidence(content))
+            for heading, content in named_sections
+        )
+    return has_executable_contract("\n".join(content for _, content in sections))
+
+
+def has_executable_evidence(text: str) -> bool:
+    return COMMAND_PATTERN.search(text) is not None or re.search(
+        r"\b(?:ejecutar|ejecutá)\b[^\n]*`[^`]+`",
         text,
         re.IGNORECASE,
-    ) is not None
+    ) is not None or (
+        RED_GREEN_PATTERN.search(text) is not None
+        and DOCUMENTARY_EVIDENCE_PATTERN.search(text) is not None
+    )
+
+
+def has_verification_evidence(lines: Sequence[str]) -> bool:
+    """Require executable evidence under a relevant heading or inline sequence."""
+    sections = markdown_sections(lines)
+    named_sections = [
+        content
+        for heading, content in sections
+        if "verificaci" in heading or "evidencia" in heading
+    ]
+    if named_sections:
+        return any(has_executable_evidence(content) for content in named_sections)
+    return has_executable_evidence("\n".join(content for _, content in sections))
 
 
 def check_brief_sections(paths: Sequence[Path]) -> list[Finding]:
@@ -257,11 +322,11 @@ def check_brief_sections(paths: Sequence[Path]) -> list[Finding]:
             ("Archivos", any("archivo" in item for item in headings)),
             (
                 "Interfaces/TDD",
-                has_implementation_contract(headings, lines),
+                has_implementation_contract(lines),
             ),
             (
                 "Verificación",
-                has_verification_evidence(headings, lines),
+                has_verification_evidence(lines),
             ),
             ("Commit", any(re.search(r"\bcommit\b", line, re.IGNORECASE) for line in lines)),
         )
