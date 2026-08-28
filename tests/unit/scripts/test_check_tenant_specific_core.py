@@ -53,6 +53,7 @@ def test_allowed_package_test_and_adapter_changeset_passes() -> None:
             "scripts/check_tenant_specific_core.py": "print('ok')\n",
             "docs/phases/phase-08-second-tenant-onboarding/evidence/P08-T04.md": "# ok\n",
             "src/ia_mcp/knowledge/adapters/object_store.py": "class InMemoryObjectStore:\n    pass\n",
+            "src/ia_mcp/onboarding/cli.py": "def default_onboarding_service():\n    return None\n",
         }
     )
     assert findings == ()
@@ -70,5 +71,22 @@ def test_core_file_change_is_rejected_even_without_slug_branch() -> None:
 def test_classify_adapters_as_allowed_and_skills_as_core() -> None:
     assert classify_path("src/ia_mcp/knowledge/adapters/sqlalchemy.py") == "allowed"
     assert classify_path("src/ia_mcp/onboarding/cli.py") == "allowed"
+    assert classify_path("src/ia_mcp/skills/cli.py") == "core"
     assert classify_path("src/ia_mcp/skills/faq.py") == "core"
     assert classify_path("tenants/fixtures/tenant-b/tenant.yaml") == "allowed"
+
+
+def test_core_cli_outside_onboarding_is_still_scanned() -> None:
+    findings = review_changeset(
+        {
+            "src/ia_mcp/skills/cli.py": (
+                "def pick(tenant):\n"
+                '    if tenant.tenant_slug == "tenant-b":\n'
+                "        return 1\n"
+                "    return 0\n"
+            )
+        }
+    )
+    assert findings
+    assert any(item.code == "slug_branch" for item in findings)
+    assert any(item.path == "src/ia_mcp/skills/cli.py" for item in findings)
