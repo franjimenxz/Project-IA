@@ -16,6 +16,13 @@ from ia_mcp.workflows.adapters.sqlalchemy import SqlAlchemyWorkflowRepository
 from ia_mcp.workflows.definition import WorkflowDefinition
 from ia_mcp.workflows.engine import WorkflowEngine
 from ia_mcp.workflows.models import AdvanceCommand, StartWorkflow
+from ia_mcp.workflows.ports import WorkflowError
+from tests.fixtures.faults import (
+    InjectedFault,
+    instrument_workflow_repository,
+    new_controller,
+)
+from tests.unit.workflows.fakes import InMemoryWorkflowRepository
 
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
@@ -72,6 +79,7 @@ def _seed_tenants() -> None:
 
 @pytest.mark.anyio
 @pytest.mark.integration
+@pytest.mark.resilience
 async def test_crash_reload_preserves_state_and_duplicate_idempotency() -> None:
     _reset_schema()
     _seed_tenants()
@@ -132,3 +140,85 @@ async def test_crash_reload_preserves_state_and_duplicate_idempotency() -> None:
         assert reloaded.state == "executing"
     finally:
         await second_db.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.resilience
+async def test_in_memory_crash_before_cas_retries_once() -> None:
+    inner = InMemoryWorkflowRepository()
+    controller = new_controller(
+        InjectedFault(dependency="db", boundary="before", kind="unavailable")
+    )
+    engine = WorkflowEngine(
+        instrument_workflow_repository(inner, controller), WorkflowDefinition()
+    )
+    started = await engine.start(
+        TENANT_A_CTX,
+        StartWorkflow(command_id="start-1", workflow_type="generic", schema_version=1),
+    )
+    with pytest.raises(WorkflowError):
+        await engine.advance(
+            TENANT_A_CTX,
+            AdvanceCommand(
+                workflow_id=started.workflow_id,
+                command_id="cmd-1",
+                event_type="submit",
+            ),
+        )
+    recovered = await engine.advance(
+        TENANT_A_CTX,
+        AdvanceCommand(
+            workflow_id=started.workflow_id,
+            command_id="cmd-1",
+            event_type="submit",
+        ),
+    )
+    assert recovered.state == "awaiting_confirmation"
+    assert controller.side_effect_count("db.cas_advance") == 1
+    assert (
+        await inner.count_transitions(
+            TENANT_A_CTX, started.workflow_id, command_id="cmd-1"
+        )
+        == 1
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.resilience
+async def test_in_memory_crash_after_cas_replays_recorded_transition() -> None:
+    inner = InMemoryWorkflowRepository()
+    controller = new_controller(
+        InjectedFault(dependency="db", boundary="after", kind="unavailable")
+    )
+    engine = WorkflowEngine(
+        instrument_workflow_repository(inner, controller), WorkflowDefinition()
+    )
+    started = await engine.start(
+        TENANT_A_CTX,
+        StartWorkflow(command_id="start-1", workflow_type="generic", schema_version=1),
+    )
+    with pytest.raises(WorkflowError):
+        await engine.advance(
+            TENANT_A_CTX,
+            AdvanceCommand(
+                workflow_id=started.workflow_id,
+                command_id="cmd-1",
+                event_type="submit",
+            ),
+        )
+    assert controller.side_effect_count("db.cas_advance") == 1
+    recovered = await engine.advance(
+        TENANT_A_CTX,
+        AdvanceCommand(
+            workflow_id=started.workflow_id,
+            command_id="cmd-1",
+            event_type="submit",
+        ),
+    )
+    assert recovered.state == "awaiting_confirmation"
+    assert (
+        await inner.count_transitions(
+            TENANT_A_CTX, started.workflow_id, command_id="cmd-1"
+        )
+        == 1
+    )
