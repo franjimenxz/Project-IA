@@ -23,7 +23,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P02-T01 | W1 | accepted | P01-T03 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T01-bootstrap.md) |
 | P02-T02 | W1 | in_progress | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T02-tenancy.md) |
 | P02-T03 | W1 | blocked | P02-T02 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T03-configuration.md) |
-| P02-T04 | W1 | in_progress | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T04-observability-errors.md) |
+| P02-T04 | W1 | in_review | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T04-observability-errors.md) |
 | P02-T05 | W1 | blocked | P02-T02, P02-T04 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T05-simulated-channel.md) |
 | P03-T01 | W2 | ready | P02-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T01-common-contracts.md) |
 | P03-T02 | W2 | blocked | P03-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T02-appointment-contracts.md) |
@@ -87,3 +87,4 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P03-T01 | `blocked → ready` | dependencia P02-T01 aceptada | [P02-T01](../phases/phase-02-technical-foundations/evidence/P02-T01.md) |
 | P02-T02 | `ready → in_progress` | asignada a Implementador | — |
 | P02-T04 | `ready → in_progress` | asignada a Implementador 2 | — |
+| P02-T04 | `in_progress → in_review` | `52173b6` | https://github.com/franjimenxz/Project-IA/pull/3 |
