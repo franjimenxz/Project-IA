@@ -1,0 +1,216 @@
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field
+from typing import Any, Protocol
+from uuid import UUID
+
+from pydantic import ValidationError
+
+from ia_mcp.contracts.appointments import (
+    AppointmentCancelRequest,
+    AppointmentConfirmRequest,
+    AppointmentCreateRequest,
+    AppointmentGetRequest,
+    AppointmentRescheduleRequest,
+    AppointmentSearchRequest,
+)
+from ia_mcp.contracts.common import ToolResult
+from ia_mcp.contracts.errors import ToolError, ToolErrorCode
+from ia_mcp.mcp.capabilities.appointments import AppointmentCapability
+from ia_mcp.mcp.registry import ForbiddenTool, authorize
+from ia_mcp.tenancy.models import TenantContext
+
+_FORBIDDEN = ToolError(
+    code=ToolErrorCode.FORBIDDEN,
+    retryable=False,
+    safe_message="Action is not allowed.",
+)
+_INVALID = ToolError(
+    code=ToolErrorCode.VALIDATION_ERROR,
+    retryable=False,
+    safe_message="The request is invalid.",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCall:
+    name: str
+    arguments: Mapping[str, Any] = field(default_factory=dict)
+    idempotency_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class McpTarget:
+    server_id: str
+    allowed_tools: frozenset[str]
+    endpoint: str = ""
+    auth_reference: str = ""
+
+
+class McpResolver(Protocol):
+    async def resolve(self, tenant: TenantContext, capability: str) -> McpTarget: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ToolAuditEvent:
+    run_id: UUID
+    tenant_id: UUID
+    tool: str
+    allowed: bool
+    error_code: ToolErrorCode | None = None
+    mcp_server_id: str | None = None
+
+
+class ToolRegistry:
+    """Wraps registry.authorize with construction-time allowlists."""
+
+    def __init__(
+        self,
+        *,
+        server: Iterable[str],
+        tenant: Iterable[str],
+        skill: Iterable[str],
+    ) -> None:
+        self._server = frozenset(server)
+        self._tenant = frozenset(tenant)
+        self._skill = frozenset(skill)
+
+    def authorize(self, tool: str) -> str:
+        return authorize(
+            tool,
+            server=self._server,
+            tenant=self._tenant,
+            skill=self._skill,
+        )
+
+
+class ToolExecutor:
+    def __init__(
+        self,
+        *,
+        server: Iterable[str],
+        tenant: Iterable[str],
+        skill: Iterable[str],
+        capability: AppointmentCapability,
+        resolver: McpResolver | None = None,
+        audit_hook: Callable[[ToolAuditEvent], None] | None = None,
+    ) -> None:
+        self._registry = ToolRegistry(server=server, tenant=tenant, skill=skill)
+        self._capability = capability
+        self._resolver = resolver
+        self._audit_hook = audit_hook
+
+    async def execute(
+        self,
+        tenant: TenantContext,
+        run_id: UUID,
+        call: ToolCall,
+    ) -> ToolResult[Any]:
+        try:
+            self._registry.authorize(call.name)
+        except ForbiddenTool:
+            self._audit(
+                ToolAuditEvent(
+                    run_id=run_id,
+                    tenant_id=tenant.tenant_id,
+                    tool=call.name,
+                    allowed=False,
+                    error_code=ToolErrorCode.FORBIDDEN,
+                )
+            )
+            return ToolResult[Any](ok=False, error=_FORBIDDEN)
+
+        target: McpTarget | None = None
+        if self._resolver is not None:
+            capability_name = call.name.split(".", 1)[0]
+            target = await self._resolver.resolve(tenant, capability_name)
+            if call.name not in target.allowed_tools:
+                self._audit(
+                    ToolAuditEvent(
+                        run_id=run_id,
+                        tenant_id=tenant.tenant_id,
+                        tool=call.name,
+                        allowed=False,
+                        error_code=ToolErrorCode.FORBIDDEN,
+                        mcp_server_id=target.server_id,
+                    )
+                )
+                return ToolResult[Any](ok=False, error=_FORBIDDEN)
+
+        result = await self._dispatch(tenant, call)
+        self._audit(
+            ToolAuditEvent(
+                run_id=run_id,
+                tenant_id=tenant.tenant_id,
+                tool=call.name,
+                allowed=True,
+                error_code=None
+                if result.ok or result.error is None
+                else result.error.code,
+                mcp_server_id=None if target is None else target.server_id,
+            )
+        )
+        return result
+
+    def _audit(self, event: ToolAuditEvent) -> None:
+        if self._audit_hook is not None:
+            self._audit_hook(event)
+
+    async def _dispatch(
+        self,
+        tenant: TenantContext,
+        call: ToolCall,
+    ) -> ToolResult[Any]:
+        payload = dict(call.arguments)
+        try:
+            if call.name == "appointments.search":
+                request = AppointmentSearchRequest.model_validate(payload)
+                return await self._capability.search(tenant, request)
+            if call.name == "appointments.get":
+                request_get = AppointmentGetRequest.model_validate(payload)
+                return await self._capability.get(tenant, request_get)
+            if call.name == "appointments.create":
+                request_create = AppointmentCreateRequest.model_validate(payload)
+                return await self._capability.create(
+                    tenant,
+                    request_create,
+                    idempotency_key=self._require_idempotency_key(call),
+                )
+            if call.name == "appointments.cancel":
+                request_cancel = AppointmentCancelRequest.model_validate(payload)
+                return await self._capability.cancel(
+                    tenant,
+                    request_cancel,
+                    idempotency_key=self._require_idempotency_key(call),
+                )
+            if call.name == "appointments.reschedule":
+                request_reschedule = AppointmentRescheduleRequest.model_validate(
+                    payload
+                )
+                return await self._capability.reschedule(
+                    tenant,
+                    request_reschedule,
+                    idempotency_key=self._require_idempotency_key(call),
+                )
+            if call.name == "appointments.confirm":
+                request_confirm = AppointmentConfirmRequest.model_validate(payload)
+                return await self._capability.confirm(
+                    tenant,
+                    request_confirm,
+                    idempotency_key=self._require_idempotency_key(call),
+                )
+        except ValidationError:
+            return ToolResult[Any](ok=False, error=_INVALID)
+        except _MissingIdempotency:
+            return ToolResult[Any](ok=False, error=_INVALID)
+        return ToolResult[Any](ok=False, error=_FORBIDDEN)
+
+    @staticmethod
+    def _require_idempotency_key(call: ToolCall) -> str:
+        key = call.idempotency_key
+        if key is None:
+            raise _MissingIdempotency
+        return key
+
+
+class _MissingIdempotency(Exception):
+    pass
