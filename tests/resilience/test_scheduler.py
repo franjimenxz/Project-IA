@@ -147,7 +147,7 @@ def _stack(
 
 
 @pytest.mark.anyio
-@pytest.mark.resilience
+@pytest.mark.integration
 async def test_restarted_worker_resumes_claimed_job_after_clock_advance(
     db: AsyncEngine,
 ) -> None:
@@ -182,7 +182,7 @@ async def test_restarted_worker_resumes_claimed_job_after_clock_advance(
 
 
 @pytest.mark.anyio
-@pytest.mark.resilience
+@pytest.mark.integration
 async def test_channel_failure_retries_then_fails_with_audit(
     db: AsyncEngine,
 ) -> None:
@@ -219,7 +219,7 @@ async def test_channel_failure_retries_then_fails_with_audit(
 
 
 @pytest.mark.anyio
-@pytest.mark.resilience
+@pytest.mark.integration
 async def test_reschedule_makes_previous_claim_stale(db: AsyncEngine) -> None:
     scheduler, worker, _store, _clock, channel, lookup, _audit, _policy = _stack(
         db
@@ -248,7 +248,7 @@ async def test_reschedule_makes_previous_claim_stale(db: AsyncEngine) -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.resilience
+@pytest.mark.integration
 async def test_process_crash_new_engine_resumes_pending_job() -> None:
     _reset_schema()
     _seed_tenants()
@@ -298,7 +298,7 @@ async def test_process_crash_new_engine_resumes_pending_job() -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.resilience
+@pytest.mark.integration
 async def test_tenant_b_status_does_not_skip_tenant_a_job(
     db: AsyncEngine,
 ) -> None:
