@@ -88,6 +88,30 @@ def test_allowed_forbidden_source_overlap_fails_validation(tmp_path: Path) -> No
     assert any("source_overlap" in issue for issue in report.issues)
 
 
+def test_discovered_tool_name_is_not_rejected_as_unknown(tmp_path: Path) -> None:
+    dataset = write_dataset(
+        tmp_path / "discovered-tool.jsonl",
+        [
+            valid_case(
+                expected_skill="appointments",
+                allowed_tools=["crear_turno"],
+                forbidden_tools=["appointments.create"],
+                allowed_sources=[],
+                expected_outcome="completed",
+                expected_workflow_state="completed",
+                messages=[
+                    {"role": "user", "text": "quiero un turno"},
+                    {"role": "assistant", "text": "busco disponibilidad"},
+                ],
+            )
+        ],
+    )
+
+    report = validate_dataset(dataset)
+
+    assert not any(issue.startswith("unknown_tool:") for issue in report.issues)
+
+
 def test_allowed_forbidden_tool_overlap_fails_validation(tmp_path: Path) -> None:
     dataset = write_dataset(
         tmp_path / "tool-overlap.jsonl",

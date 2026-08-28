@@ -8,7 +8,6 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from ia_mcp.mcp.registry import KNOWN_TOOLS
 from ia_mcp.onboarding.loader import LoadedPackage, load_package
 from ia_mcp.onboarding.models import (
     PACKAGE_SCHEMA_VERSION,
@@ -261,15 +260,10 @@ def _cross_file_issues(
                 )
             )
 
-    known_tools = {str(tool) for tool in KNOWN_TOOLS}
     enabled_tools = frozenset(config.enabled_tools)
     for tool in enabled_tools:
         tool_skill = _skill_for_tool(tool)
-        if (
-            tool not in known_tools
-            or tool_skill is None
-            or tool_skill not in enabled_skills
-        ):
+        if tool_skill is not None and tool_skill not in enabled_skills:
             issues.append(
                 ValidationIssue(
                     path="config.yaml.enabled_tools",

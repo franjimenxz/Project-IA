@@ -3,6 +3,13 @@ from ia_mcp.mcp.registry import ToolName
 from ia_mcp.skills.base import FieldSpec, SkillResult, SkillTurn
 
 
+def configured_tool_allowlist(config: TenantConfig) -> frozenset[ToolName]:
+    raw = getattr(config, "enabled_tools", None)
+    if not raw:
+        return frozenset()
+    return frozenset(ToolName(str(name)) for name in raw)
+
+
 class AppointmentSkill:
     name: SkillName = "appointments"
 
@@ -13,8 +20,7 @@ class AppointmentSkill:
         )
 
     def allowed_tools(self, config: TenantConfig) -> frozenset[ToolName]:
-        del config
-        return frozenset({ToolName("appointments.search")})
+        return configured_tool_allowlist(config)
 
     async def route(self, turn: SkillTurn) -> SkillResult:
         del turn

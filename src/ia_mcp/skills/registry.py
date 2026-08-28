@@ -1,8 +1,7 @@
 from ia_mcp.configuration.models import SkillName, TenantConfig
-from ia_mcp.mcp.registry import KNOWN_TOOLS, ToolName
+from ia_mcp.mcp.registry import ToolName
+from ia_mcp.skills.appointments import configured_tool_allowlist
 from ia_mcp.skills.base import FieldSpec, Skill, SkillResult, SkillTurn
-
-_APPOINTMENT_TOOLS: frozenset[ToolName] = KNOWN_TOOLS
 
 
 class SkillNotAuthorized(Exception):
@@ -36,8 +35,7 @@ class _AppointmentsSkill:
         return ()
 
     def allowed_tools(self, config: TenantConfig) -> frozenset[ToolName]:
-        del config
-        return _APPOINTMENT_TOOLS
+        return configured_tool_allowlist(config)
 
     async def route(self, turn: SkillTurn) -> SkillResult:
         del turn

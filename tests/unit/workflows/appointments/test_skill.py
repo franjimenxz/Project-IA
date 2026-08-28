@@ -22,13 +22,22 @@ def _config(tenant_id: UUID, required: tuple[str, ...]) -> TenantConfig:
     )
 
 
-def test_allowed_tools_are_search_only() -> None:
+def test_allowed_tools_follow_tenant_allowlist() -> None:
     skill = AppointmentSkill()
     config = _config(TENANT_A, ("specialty", "date_from", "date_to"))
     assert skill.name == "appointments"
-    assert skill.allowed_tools(config) == frozenset({ToolName("appointments.search")})
-    assert ToolName("appointments.create") not in skill.allowed_tools(config)
-    assert ToolName("appointments.cancel") not in skill.allowed_tools(config)
+    assert skill.allowed_tools(config) == frozenset()
+    with_allowlist = TenantConfig(
+        tenant_id=TENANT_A,
+        version=1,
+        agent=AgentConfig(tone="cordial"),
+        enabled_skills=frozenset({"appointments"}),
+        enabled_tools=frozenset({"crear_turno", "appointments.search"}),
+        appointments=config.appointments,
+    )
+    allowed = skill.allowed_tools(with_allowlist)
+    assert ToolName("crear_turno") in allowed
+    assert ToolName("appointments.search") in allowed
 
 
 @pytest.mark.anyio

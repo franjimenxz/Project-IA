@@ -66,6 +66,29 @@ def test_package_rejects_duplicate_channel_mapping(tmp_path: Path) -> None:
     assert any("channel" in issue.message.lower() for issue in report.errors)
 
 
+def test_package_accepts_discovered_tool_name(tmp_path: Path) -> None:
+    package = write_package(
+        tmp_path,
+        config={
+            "enabled_skills": ["faq", "appointments"],
+            "enabled_tools": ["crear_turno", "appointments.search"],
+        },
+        integrations={
+            "integrations": [
+                {
+                    "kind": "mcp",
+                    "server_id": "fake-appointments-b",
+                    "credentials_reference": "sm://tenant-b/mcp/appointments",
+                    "capabilities": ["crear_turno", "appointments.search"],
+                }
+            ]
+        },
+    )
+    report = validate_package(package)
+    assert report.valid is True
+    assert report.errors == ()
+
+
 def test_package_rejects_tool_for_disabled_skill(tmp_path: Path) -> None:
     package = write_package(
         tmp_path,

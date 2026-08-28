@@ -6,10 +6,8 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from ia_mcp.evals.models import ADVERSARIAL_TAGS, DatasetValidationReport, EvalCase
-from ia_mcp.mcp.registry import KNOWN_TOOLS
 
 _REQUIRED_USE_CASES = tuple(f"UC-{index:02d}" for index in range(1, 11))
-_KNOWN_TOOL_NAMES = frozenset(str(name) for name in KNOWN_TOOLS)
 
 
 def default_source_catalog_path() -> Path:
@@ -94,9 +92,6 @@ def _case_issues(case: EvalCase, known_sources: frozenset[str]) -> list[str]:
     unknown_sources = (case.allowed_sources | case.forbidden_sources) - known_sources
     for source in sorted(unknown_sources):
         issues.append(f"unknown_source:{case.case_id}:{source}")
-    unknown_tools = (case.allowed_tools | case.forbidden_tools) - _KNOWN_TOOL_NAMES
-    for tool in sorted(unknown_tools):
-        issues.append(f"unknown_tool:{case.case_id}:{tool}")
     return issues
 
 
