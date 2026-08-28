@@ -4,7 +4,7 @@ import json
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Never, Protocol
+from typing import Literal, Never, Protocol
 from uuid import UUID, uuid4
 
 from ia_mcp.agent_runtime.context_compiler import ContextCompiler
@@ -31,7 +31,7 @@ from ia_mcp.evals.scorers import (
     ObservedTrajectory,
 )
 from ia_mcp.knowledge.models import KnowledgeHit, KnowledgeQuery
-from ia_mcp.skills.faq import SAFE_HANDOFF, SAFE_INSUFFICIENT
+from ia_mcp.skills.faq import SAFE_INSUFFICIENT
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.models import TenantContext
 
@@ -301,26 +301,21 @@ class EvalRunner:
             return
         sources = tuple(sorted(case.allowed_sources))
         self.knowledge.hits = tuple(_hit(tenant.tenant_id, source_id) for source_id in sources)
-        if case.expected_outcome == EvalOutcome.ANSWER:
-            self.llm.decision = LLMDecision(
-                kind="answer",
-                text="Synthetic grounded answer.",
-                source_ids=sources,
-            )
-            return
-        if case.expected_outcome == EvalOutcome.CLARIFY:
-            self.llm.decision = LLMDecision(kind="clarify", text="clarify", source_ids=sources)
-            return
-        if case.expected_outcome == EvalOutcome.HANDOFF:
-            self.llm.decision = LLMDecision(kind="handoff", text=SAFE_HANDOFF, source_ids=())
-            return
-        if case.expected_outcome == EvalOutcome.INSUFFICIENT:
-            if not sources:
-                self.knowledge.hits = ()
+        # Default: catalog hits → grounded answer. Empty hits short-circuit in
+        # AgentHarness to insufficient. Seed insufficient only for cases that
+        # have sources and still expect insufficient (injection-style).
+        if case.expected_outcome == EvalOutcome.INSUFFICIENT and sources:
             self.llm.decision = LLMDecision(
                 kind="insufficient",
                 text=SAFE_INSUFFICIENT,
                 source_ids=(),
+            )
+            return
+        if sources:
+            self.llm.decision = LLMDecision(
+                kind="answer",
+                text="Synthetic grounded answer.",
+                source_ids=sources,
             )
             return
         self.knowledge.hits = ()
@@ -329,6 +324,16 @@ class EvalRunner:
             text=SAFE_INSUFFICIENT,
             source_ids=(),
         )
+
+
+def _fixture_for_tenant_id(
+    tenant_id: UUID, fallback: Literal["tenant_a", "tenant_b"]
+) -> Literal["tenant_a", "tenant_b"]:
+    if tenant_id == TENANT_FIXTURE_IDS["tenant_a"]:
+        return "tenant_a"
+    if tenant_id == TENANT_FIXTURE_IDS["tenant_b"]:
+        return "tenant_b"
+    return fallback
 
 
 def observe_turn(
@@ -342,10 +347,12 @@ def observe_turn(
     recorded_skill = runs.started[-1].skill if runs is not None and runs.started else None
     skill = recorded_skill or _skill_from_kind(result.kind)
     roles = ",".join(message.role for message in case.messages)
+    observed_tenant_id = result.tenant_id if result.tenant_id is not None else tenant.tenant_id
+    observed_fixture = _fixture_for_tenant_id(observed_tenant_id, case.tenant_fixture)
     return ObservedTrajectory(
         case_id=case.case_id,
-        tenant_fixture=case.tenant_fixture,
-        tenant_id=tenant.tenant_id,
+        tenant_fixture=observed_fixture,
+        tenant_id=observed_tenant_id,
         config_version=tenant.config_version,
         input_summary=f"messages={len(case.messages)} roles={roles}",
         compiled_context_summary=summarize_compiled_context(

@@ -85,6 +85,24 @@ def test_matching_trajectory_passes_without_judge() -> None:
     assert score.critical_failures == ()
 
 
+def test_empty_allowlist_rejects_unlisted_tool() -> None:
+    score = score_trajectory(
+        case(allowed_tools=[], forbidden_tools=["appointments.create"]),
+        observed(tools={"unlisted.tool"}),
+    )
+    assert score.passed is False
+    assert "unexpected_tool:unlisted.tool" in score.critical_failures
+
+
+def test_empty_allowlist_rejects_unlisted_source() -> None:
+    score = score_trajectory(
+        case(allowed_sources=[], forbidden_sources=["kb-b-hours"]),
+        observed(retrieval_source_ids=frozenset({"unlisted-source"})),
+    )
+    assert score.passed is False
+    assert "unexpected_source:unlisted-source" in score.critical_failures
+
+
 def test_critical_case_failure_overrides_high_average() -> None:
     passing = [
         score_trajectory(case(), observed())

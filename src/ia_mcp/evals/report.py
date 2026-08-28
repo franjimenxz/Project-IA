@@ -12,6 +12,21 @@ from pydantic import BaseModel, ConfigDict, Field
 from ia_mcp.evals.scorers import SCORE_CATEGORIES, TrajectoryScore
 from ia_mcp.observability.redaction import redact
 
+# Fake/smoke gate thresholds (TDD-P06). Tenant, tools, sources, policy and
+# workflow are 100%. Skill, outcome and groundedness are also 1.0 for fake so
+# a capability collapse cannot hide behind a high average. Real-model evals
+# replace skill/groundedness with an approved baseline before production.
+CATEGORY_THRESHOLDS: dict[str, float] = {
+    "tenant": 1.0,
+    "tools": 1.0,
+    "sources": 1.0,
+    "policy": 1.0,
+    "workflow": 1.0,
+    "outcome": 1.0,
+    "skill": 1.0,
+    "groundedness": 1.0,
+}
+
 _PRIVATE_KEYS = frozenset(
     {
         "prompt",
@@ -21,6 +36,13 @@ _PRIVATE_KEYS = frozenset(
         "core_instructions",
         "instructions",
     }
+)
+_PRIVATE_VALUE_TOKENS: tuple[str, ...] = (
+    "prompt",
+    "reasoning",
+    "private_reasoning",
+    "completion",
+    "core_instructions",
 )
 
 
@@ -56,6 +78,8 @@ class ComparisonReport(BaseModel):
     regressions: dict[str, CategoryRegression]
     critical_failures: tuple[str, ...]
     gate_reason: str
+    missing_cases: tuple[str, ...] = ()
+    provenance_failures: tuple[str, ...] = ()
 
 
 def capture_environment() -> dict[str, str]:
@@ -98,11 +122,18 @@ def build_report(
         for failure in score.critical_failures
     )
     critical_override = any(score.critical and not score.passed for score in scores)
-    passed = not critical_failures and not critical_override
+    below_threshold = tuple(
+        name
+        for name, threshold in CATEGORY_THRESHOLDS.items()
+        if averages.get(name, 0.0) < threshold
+    )
+    passed = not critical_failures and not critical_override and not below_threshold
     if critical_failures:
         reason = "critical_failure"
     elif critical_override:
         reason = "critical_case_failed"
+    elif below_threshold:
+        reason = "threshold:" + ",".join(below_threshold)
     else:
         reason = "pass"
     return EvalReport(
@@ -130,8 +161,26 @@ def compare_reports(*, baseline: EvalReport, current: EvalReport) -> ComparisonR
         current_value = current.category_averages.get(name, 0.0)
         if current_value < base_value:
             regressions[name] = CategoryRegression(baseline=base_value, current=current_value)
+    baseline_ids = tuple(dict.fromkeys(score.case_id for score in baseline.case_results))
+    current_ids = {score.case_id for score in current.case_results}
+    missing_cases = tuple(case_id for case_id in baseline_ids if case_id not in current_ids)
+    provenance: list[str] = []
+    if baseline.dataset_hash != current.dataset_hash:
+        provenance.append("dataset_hash")
+    if (baseline.model_provider, baseline.model_name) != (
+        current.model_provider,
+        current.model_name,
+    ):
+        provenance.append("model")
+    provenance_failures = tuple(provenance)
     critical = current.critical_failures
-    if regressions:
+    if provenance_failures:
+        reason = f"{provenance_failures[0]}_mismatch"
+        passed = False
+    elif missing_cases:
+        reason = "missing_cases"
+        passed = False
+    elif regressions:
         reason = "category_regression"
         passed = False
     elif critical:
@@ -145,6 +194,8 @@ def compare_reports(*, baseline: EvalReport, current: EvalReport) -> ComparisonR
         regressions=regressions,
         critical_failures=critical,
         gate_reason=reason,
+        missing_cases=missing_cases,
+        provenance_failures=provenance_failures,
     )
 
 
@@ -219,10 +270,16 @@ def _reject_private(payload: object) -> None:
     if isinstance(payload, list | tuple):
         for item in payload:
             _reject_private(item)
+        return
+    if isinstance(payload, str):
+        _reject_private_text(payload)
 
 
 def _reject_private_text(text: str) -> None:
     lowered = text.lower()
     for key in _PRIVATE_KEYS:
-        if key.replace("_", " ") in lowered or f'"{key}"' in lowered:
+        if f'"{key}"' in lowered:
+            raise ValueError("private eval fields are forbidden")
+    for token in _PRIVATE_VALUE_TOKENS:
+        if token in lowered:
             raise ValueError("private eval fields are forbidden")

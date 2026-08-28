@@ -126,6 +126,16 @@ def _comparison_text(comparison: ComparisonReport) -> str:
             lines.append(f"  {failure}")
     else:
         lines.append("critical_failures: none")
+    if comparison.missing_cases:
+        lines.append("missing_cases:")
+        for case_id in comparison.missing_cases:
+            lines.append(f"  {case_id}")
+    else:
+        lines.append("missing_cases: none")
+    if comparison.provenance_failures:
+        lines.append(
+            "provenance_failures: " + ",".join(comparison.provenance_failures)
+        )
     return "\n".join(lines) + "\n"
 
 

@@ -4,10 +4,10 @@ from uuid import UUID
 from ia_mcp.agent_runtime.harness import AgentHarness
 from ia_mcp.agent_runtime.models import AgentTurnResult
 from ia_mcp.evals.models import EvalCase, EvalOutcome
-from ia_mcp.evals.runner import EvalRunner, summarize_compiled_context
-from ia_mcp.evals.scorers import TENANT_FIXTURE_IDS
+from ia_mcp.evals.runner import EvalRunner, observe_turn, summarize_compiled_context
+from ia_mcp.evals.scorers import TENANT_FIXTURE_IDS, score_trajectory
 from ia_mcp.tenancy.models import TenantContext
-from tests.evals.unit.test_scorers import case
+from tests.evals.unit.test_scorers import TENANT_B, case
 
 
 def test_runner_omits_private_prompt_and_reasoning() -> None:
@@ -55,6 +55,32 @@ def test_runner_requires_tenant_context_and_calls_harness() -> None:
     assert observed.retrieval_source_ids == frozenset({"kb-a-hours"})
     assert observed.skill == "faq"
     assert observed.handoff is False
+
+
+def test_observe_turn_records_result_tenant_not_requested() -> None:
+    requested = TenantContext(
+        tenant_id=TENANT_FIXTURE_IDS["tenant_a"],
+        tenant_slug="tenant-a",
+        config_version=1,
+        correlation_id=TENANT_FIXTURE_IDS["tenant_a"],
+    )
+    result = AgentTurnResult(
+        kind="answer",
+        text="Hours are 8 to 16.",
+        source_ids=("kb-a-hours",),
+        tenant_id=TENANT_B,
+        run_id=None,
+        trajectory=("receive",),
+        tool_names=(),
+    )
+
+    observed = observe_turn(case(), requested, result)
+
+    assert observed.tenant_id == TENANT_B
+    assert observed.tenant_id != requested.tenant_id
+    score = score_trajectory(case(), observed)
+    assert score.passed is False
+    assert "tenant_mismatch" in score.critical_failures
 
 
 def test_compiled_context_summary_excludes_instruction_text() -> None:

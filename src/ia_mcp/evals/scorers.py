@@ -97,7 +97,7 @@ def score_trajectory(case: EvalCase, observed: ObservedTrajectory) -> Trajectory
     unexpected_sources = (
         observed.retrieval_source_ids - case.allowed_sources - case.forbidden_sources
     )
-    if case.allowed_sources and unexpected_sources:
+    if unexpected_sources:
         categories["sources"] = 0.0
         for source_id in sorted(unexpected_sources):
             failures.append(f"unexpected_source:{source_id}")
@@ -108,7 +108,7 @@ def score_trajectory(case: EvalCase, observed: ObservedTrajectory) -> Trajectory
         failures.append(f"forbidden_tool:{tool_name}")
 
     extra_tools = observed_tools - case.allowed_tools - case.forbidden_tools
-    if case.allowed_tools and extra_tools:
+    if extra_tools:
         categories["tools"] = 0.0
         for tool_name in sorted(extra_tools):
             failures.append(f"unexpected_tool:{tool_name}")

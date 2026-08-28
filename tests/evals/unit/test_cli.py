@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from ia_mcp.evals.cli import main
@@ -43,7 +42,7 @@ def test_report_reproduces_commit_dataset_model_and_environment() -> None:
         environment={"python": "3.13.12", "platform": "darwin"},
     )
     markdown = report_to_markdown(report)
-    payload = json.loads(report_to_json(report))
+    json_text = report_to_json(report)
     assert report.commit == "deadbeef"
     assert report.dataset_hash == "a" * 64
     assert report.model_provider == "fake"
@@ -52,9 +51,10 @@ def test_report_reproduces_commit_dataset_model_and_environment() -> None:
     assert report.environment["python"] == "3.13.12"
     assert "deadbeef" in markdown
     assert "evals/datasets/mvp.jsonl" in markdown
-    assert payload["commit"] == "deadbeef"
-    assert "prompt" not in payload
-    assert "reasoning" not in payload
+    assert '"commit": "deadbeef"' in json_text
+    for token in ("prompt", "reasoning", "completion", "core_instructions"):
+        assert token not in json_text
+        assert token not in markdown
     env = capture_environment()
     assert "python" in env
     assert "platform" in env
@@ -81,6 +81,39 @@ def test_compare_cli_passes_when_current_matches_baseline(tmp_path: Path) -> Non
     code = main(["compare", "--baseline", str(baseline), "--current", str(current)])
 
     assert code == 0
+
+
+def test_compare_cli_exits_nonzero_when_dataset_hash_changes(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    current = tmp_path / "current.json"
+    baseline.write_text(report_to_json(_report(tools=1.0)), encoding="utf-8")
+    current.write_text(
+        report_to_json(_report(tools=1.0, dataset_hash="e" * 64)),
+        encoding="utf-8",
+    )
+
+    code = main(["compare", "--baseline", str(baseline), "--current", str(current)])
+
+    assert code == 1
+
+
+def test_compare_cli_exits_nonzero_when_cases_shrink(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    current = tmp_path / "current.json"
+    baseline.write_text(
+        report_to_json(
+            _report(case_ids=("uc-08-tenant-a-hours", "uc-01-tenant-a-start"))
+        ),
+        encoding="utf-8",
+    )
+    current.write_text(
+        report_to_json(_report(case_ids=("uc-08-tenant-a-hours",))),
+        encoding="utf-8",
+    )
+
+    code = main(["compare", "--baseline", str(baseline), "--current", str(current)])
+
+    assert code == 1
 
 
 def test_validate_cli_still_accepts_mvp_dataset() -> None:
