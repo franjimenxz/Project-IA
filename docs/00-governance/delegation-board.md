@@ -172,4 +172,4 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P06-T04 | `in_progress → in_review` | `5c47db7`, `06b9a01` | https://github.com/franjimenxz/Project-IA/pull/29 |
 | P06-T04 | `in_review → accepted` | `06b9a01` merged `c411002` | https://github.com/franjimenxz/Project-IA/pull/29 |
 | P07-T01 | `in_progress → in_review → accepted` | `349a3d5` merged `e2cb470` | https://github.com/franjimenxz/Project-IA/pull/32 |
-| P07-T02 | `blocked/ready → ready` | P07-T01 accepted; conflicto `src/ia_mcp/observability` y `tests/security/test_observability.py` liberado | [P07-T01](../phases/phase-07-operability-and-observability/evidence/P07-T01.md) |
+| P07-T02 | remains `ready` | P07-T01 accepted; conflicto `src/ia_mcp/observability` y `tests/security/test_observability.py` liberado | [P07-T01](../phases/phase-07-operability-and-observability/evidence/P07-T01.md) |
