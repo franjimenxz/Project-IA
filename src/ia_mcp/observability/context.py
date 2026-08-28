@@ -8,8 +8,8 @@ from starlette.responses import Response
 
 from ia_mcp.observability.propagation import (
     bind_telemetry,
-    extract,
     inject,
+    new_server_context,
     reset_telemetry,
     start_span,
 )
@@ -42,12 +42,20 @@ def parse_correlation_id(raw: str | None) -> UUID:
 
 
 class CorrelationMiddleware(BaseHTTPMiddleware):
+    """Public HTTP boundary: always mint server correlation/trace.
+
+    Unauthenticated callers cannot attach to another tenant's trace by sending
+    `traceparent` or `X-Correlation-ID`. Authenticated adapters (e.g. signed
+    simulated channel) may adopt a client correlation after verifying the
+    caller, independent of this middleware.
+    """
+
     async def dispatch(
         self,
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        context = extract(request.headers)
+        context = new_server_context()
         request.state.correlation_id = context.correlation_id
         telemetry_token = bind_telemetry(context)
         token = bind_correlation_id(context.correlation_id)

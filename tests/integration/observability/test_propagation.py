@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
@@ -22,7 +22,8 @@ from ia_mcp.observability.propagation import (
     bind_telemetry,
     configure_telemetry,
     extract,
-    inject_payload,
+    extract_payload,
+    flush_telemetry,
     recorded_spans,
     reset_telemetry,
     reset_telemetry_context,
@@ -35,7 +36,11 @@ from ia_mcp.observability.semconv import (
     SPAN_SCHEDULER_DISPATCH,
     SPAN_TOOL_EXECUTE,
 )
-from ia_mcp.scheduling.models import AppointmentScheduledEvent, SchedulingPolicy
+from ia_mcp.scheduling.models import (
+    AppointmentScheduledEvent,
+    ScheduledJob,
+    SchedulingPolicy,
+)
 from ia_mcp.scheduling.service import ReminderScheduler
 from ia_mcp.scheduling.worker import JobWorker
 from ia_mcp.tenancy.models import TenantContext
@@ -65,26 +70,48 @@ class _StaticResolver:
         return McpTarget(server_id="mcp-appointments", allowed_tools=TOOLS)
 
 
+class _CorrelationAudit(InMemoryAuditSink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.correlation_ids: list[UUID] = []
+
+    async def record(
+        self,
+        tenant: TenantContext,
+        *,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        outcome: str,
+        reason: str | None = None,
+        metadata: Mapping[str, object] | None = None,
+    ) -> None:
+        self.correlation_ids.append(tenant.correlation_id)
+        await super().record(
+            tenant,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            outcome=outcome,
+            reason=reason,
+            metadata=metadata,
+        )
+
+
 def test_single_trace_links_http_outbox_worker_and_mcp() -> None:
     configure_telemetry()
-    correlation_id = uuid4()
     run_id = uuid4()
     client = TestClient(create_app())
-    response = client.get(
-        "/health/live",
-        headers={CORRELATION_HEADER: str(correlation_id)},
-    )
+    response = client.get("/health/live")
     assert response.status_code == 200
-    assert response.headers[CORRELATION_HEADER] == str(correlation_id)
     assert TRACEPARENT_HEADER in response.headers
-
+    correlation_id = UUID(response.headers[CORRELATION_HEADER])
     http_ctx = extract(response.headers)
+    assert http_ctx.correlation_id == correlation_id
     reset_telemetry_context()
 
     outbox = ChannelOutbox()
-    delivery = asyncio.run(
-        _put_outbox(http_ctx, outbox, correlation_id, run_id)
-    )
+    delivery = asyncio.run(_put_outbox(http_ctx, outbox, correlation_id, run_id))
     outbox_carrier = dict(outbox.carrier_for(delivery))
     reset_telemetry_context()
     outbox_ctx = extract(outbox_carrier)
@@ -97,18 +124,19 @@ def test_single_trace_links_http_outbox_worker_and_mcp() -> None:
     channel = FakeChannelAdapter()
     lookup = FakeAppointmentLookup()
     lookup.set_status(TENANT.tenant_id, "appt-1", "scheduled")
+    audit = _CorrelationAudit()
     worker = JobWorker(
         store=store,
         clock=clock,
         channel=channel,
         lookup=lookup,
         policy=SchedulingPolicy(),
-        audit=InMemoryAuditSink(),
+        audit=audit,
         owner="worker-1",
         lock_ttl=timedelta(minutes=5),
     )
-    asyncio.run(
-        _dispatch_job(scheduler, worker, store, outbox_carrier)
+    dispatched = asyncio.run(
+        _upsert_and_dispatch(scheduler, worker, store, outbox_carrier)
     )
     reset_telemetry_context()
     events = store.outbox_for(TENANT.tenant_id)
@@ -117,6 +145,11 @@ def test_single_trace_links_http_outbox_worker_and_mcp() -> None:
     worker_ctx = extract(worker_carrier)
     assert worker_ctx.trace_id == http_ctx.trace_id
     assert worker_ctx.correlation_id == correlation_id
+    payload_ctx = extract_payload(dispatched.payload)
+    assert payload_ctx.correlation_id == correlation_id
+    assert payload_ctx.trace_id == http_ctx.trace_id
+    assert audit.correlation_ids
+    assert set(audit.correlation_ids) == {correlation_id}
 
     mcp_carrier = dict(worker_carrier)
     result = asyncio.run(_execute_mcp(mcp_carrier, run_id))
@@ -125,6 +158,7 @@ def test_single_trace_links_http_outbox_worker_and_mcp() -> None:
     assert mcp_ctx.trace_id == http_ctx.trace_id
     assert mcp_ctx.correlation_id == correlation_id
 
+    flush_telemetry()
     spans = recorded_spans()
     names = {span.name for span in spans}
     assert SPAN_CHANNEL_RECEIVE in names
@@ -172,27 +206,30 @@ async def _put_outbox(
         reset_telemetry(token)
 
 
-async def _dispatch_job(
+async def _upsert_and_dispatch(
     scheduler: ReminderScheduler,
     worker: JobWorker,
     store: InMemoryJobStore,
     carrier: dict[str, str],
-) -> None:
-    job = await scheduler.upsert(
-        TENANT,
-        AppointmentScheduledEvent(appointment_id="appt-1", starts_at=STARTS_AT),
-    )
+) -> ScheduledJob:
     token = bind_telemetry(extract(carrier))
     try:
-        job = replace(job, payload=inject_payload(job.payload))
-        await store.save(job)
+        job = await scheduler.upsert(
+            TENANT,
+            AppointmentScheduledEvent(appointment_id="appt-1", starts_at=STARTS_AT),
+        )
     finally:
         reset_telemetry(token)
+    assert "telemetry" in job.payload
+    loaded = await store.get(TENANT, job.id)
+    assert loaded is not None
+    assert extract_payload(loaded.payload).trace_id == extract(carrier).trace_id
     reset_telemetry_context()
     claim = await worker.claim()
     assert claim is not None
     result = await worker.dispatch(claim)
     assert result.status == "dispatched"
+    return result.job
 
 
 async def _execute_mcp(carrier: dict[str, str], run_id: UUID) -> ToolResult[object]:

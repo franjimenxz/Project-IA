@@ -159,7 +159,7 @@ class ToolExecutor:
             capability_name = call.name.split(".", 1)[0]
             with start_span(SPAN_MCP_RESOLVE) as span:
                 target = await self._resolver.resolve(tenant, capability_name)
-                span.attributes["mcp_server_id"] = target.server_id
+                span.set_attribute("mcp_server_id", target.server_id)
             if call.name not in target.allowed_tools:
                 self._audit(
                     ToolAuditEvent(

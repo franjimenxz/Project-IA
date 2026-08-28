@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
+from ia_mcp.observability.propagation import inject_payload
 from ia_mcp.scheduling.models import (
     JOB_TYPE,
     AppointmentScheduledEvent,
@@ -173,7 +174,7 @@ class ReminderScheduler:
         now = self._clock.now()
         scheduled_for = event.starts_at - timedelta(hours=self._policy.lead_hours)
         business_key = _business_key(event)
-        payload = _event_payload(tenant, event)
+        payload = inject_payload(_event_payload(tenant, event))
         existing = await self._store.get_by_identity(tenant, JOB_TYPE, business_key)
         if existing is None:
             job = ScheduledJob(

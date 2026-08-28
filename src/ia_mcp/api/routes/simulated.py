@@ -81,9 +81,7 @@ def get_tenant_service(request: Request) -> TenantResolver:
 
 
 def _correlation_id(request: Request) -> UUID:
-    state_value = getattr(request.state, "correlation_id", None)
-    if isinstance(state_value, UUID):
-        return state_value
+    # Signed simulated channel: correlation may come from the authenticated caller.
     return parse_correlation_id(request.headers.get(CORRELATION_HEADER))
 
 

@@ -18,13 +18,14 @@ def test_correlation_id_is_generated_when_missing():
     assert response.status_code == 200
 
 
-def test_correlation_id_is_reused_when_supplied():
+def test_unauthenticated_request_does_not_reuse_client_correlation():
     supplied = str(uuid4())
     response = TestClient(app_with_observability()).get(
         "/health/live",
         headers={CORRELATION_HEADER: supplied},
     )
-    assert response.headers[CORRELATION_HEADER] == supplied
+    assert response.headers[CORRELATION_HEADER] != supplied
+    UUID(response.headers[CORRELATION_HEADER])
 
 
 def test_problem_details_shares_generated_correlation_id():
@@ -47,7 +48,7 @@ def test_problem_details_shares_generated_correlation_id():
     assert "secret-token" not in response.text
 
 
-def test_current_correlation_id_matches_supplied_header():
+def test_current_correlation_id_matches_server_generated_header():
     supplied = uuid4()
     app = app_with_observability()
     seen: dict[str, UUID] = {}
@@ -61,6 +62,6 @@ def test_current_correlation_id_matches_supplied_header():
         "/_test/correlation",
         headers={CORRELATION_HEADER: str(supplied)},
     )
-    assert seen["id"] == supplied
-    assert response.json()["correlation_id"] == str(supplied)
-    assert response.headers[CORRELATION_HEADER] == str(supplied)
+    assert seen["id"] != supplied
+    assert response.json()["correlation_id"] == str(seen["id"])
+    assert response.headers[CORRELATION_HEADER] == str(seen["id"])

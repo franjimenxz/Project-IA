@@ -1,11 +1,18 @@
-"""AC-P07-008: metric cardinality and span sanitization."""
+"""AC-P07-008: metric cardinality, span sanitization, inbound trust."""
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+from fastapi.testclient import TestClient
+
+from ia_mcp.api.app import create_app
+from ia_mcp.observability.context import CORRELATION_HEADER
 from ia_mcp.observability.propagation import (
+    TRACEPARENT_HEADER,
     configure_telemetry,
+    extract,
+    flush_telemetry,
     recorded_spans,
     reset_telemetry_context,
     sanitized_span_tree,
@@ -53,8 +60,13 @@ def test_spans_omit_content_payload_and_secrets() -> None:
             "status": "ok",
             "error_detail": "Bearer secret-token for patient@example.com",
         },
-    ):
-        pass
+    ) as span:
+        span.set_attribute(
+            "status",
+            "Basic dXNlcjpwYXNz api_key=sk-live-secret +54 11 4444-5555",
+        )
+        span.set_attribute("prompt", "should-not-land")
+    flush_telemetry()
     spans = recorded_spans()
     assert len(spans) == 1
     attrs = spans[0].attributes
@@ -67,6 +79,9 @@ def test_spans_omit_content_payload_and_secrets() -> None:
     assert "secret-token" not in dumped
     assert "patient@example.com" not in dumped
     assert "30111222" not in dumped
+    assert "dXNlcjpwYXNz" not in dumped
+    assert "sk-live-secret" not in dumped
+    assert "4444-5555" not in dumped
     assert "Bearer" not in dumped or "[REDACTED]" in dumped
     sanitized = span_attributes(
         {
@@ -76,3 +91,25 @@ def test_spans_omit_content_payload_and_secrets() -> None:
     )
     assert "authorization" not in sanitized
     assert sanitized["tool_name"] == "appointments.search"
+
+
+def test_unauthenticated_request_ignores_foreign_correlation() -> None:
+    """Inbound traceparent/correlation are not trusted at the public HTTP boundary."""
+    configure_telemetry()
+    tenant_b = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    foreign_trace = "00-" + ("b" * 32) + "-" + ("c" * 16) + "-01"
+    client = TestClient(create_app())
+    response = client.get(
+        "/health/live",
+        headers={
+            CORRELATION_HEADER: str(tenant_b),
+            TRACEPARENT_HEADER: foreign_trace,
+        },
+    )
+    assert response.status_code == 200
+    returned = UUID(response.headers[CORRELATION_HEADER])
+    assert returned != tenant_b
+    ctx = extract(response.headers)
+    assert ctx.correlation_id != tenant_b
+    assert ctx.trace_id != "b" * 32
+    assert "b" * 32 not in response.headers[TRACEPARENT_HEADER]

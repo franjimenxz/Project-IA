@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import queue
 import re
-from collections import deque
+import threading
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
@@ -24,10 +25,6 @@ _TRACEPARENT_PATTERN = r"^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$"
 class MutableCarrier(Protocol):
     def __setitem__(self, key: str, value: str) -> None: ...
 
-_telemetry: ContextVar[TelemetryContext | None] = ContextVar(
-    "ia_mcp_telemetry", default=None
-)
-
 
 @dataclass(frozen=True, slots=True)
 class TelemetryContext:
@@ -36,6 +33,11 @@ class TelemetryContext:
     correlation_id: UUID
     trace_flags: str = "01"
     parent_span_id: str | None = None
+
+
+_telemetry: ContextVar[TelemetryContext | None] = ContextVar(
+    "ia_mcp_telemetry", default=None
+)
 
 
 @dataclass(slots=True)
@@ -48,6 +50,9 @@ class SpanRecord:
     attributes: dict[str, object]
     links: tuple[tuple[str, str], ...] = ()
 
+    def set_attribute(self, key: str, value: object) -> None:
+        self.attributes.update(span_attributes({key: value}))
+
 
 class SpanExporter:
     def export(self, spans: Sequence[SpanRecord]) -> None:
@@ -56,10 +61,16 @@ class SpanExporter:
 
 class InMemorySpanExporter(SpanExporter):
     def __init__(self) -> None:
+        self._lock = threading.Lock()
         self.spans: list[SpanRecord] = []
 
     def export(self, spans: Sequence[SpanRecord]) -> None:
-        self.spans.extend(spans)
+        with self._lock:
+            self.spans.extend(spans)
+
+    def snapshot(self) -> tuple[SpanRecord, ...]:
+        with self._lock:
+            return tuple(self.spans)
 
 
 class FailingSpanExporter(SpanExporter):
@@ -76,36 +87,61 @@ class BoundedExporter:
         metrics: dict[str, int] | None = None,
     ) -> None:
         self._inner = inner
-        self._max_queue = max_queue
-        self._queue: deque[SpanRecord] = deque()
+        self._queue: queue.Queue[SpanRecord] = queue.Queue(maxsize=max_queue)
         self.metrics = metrics if metrics is not None else {
             "telemetry_exporter_failure": 0,
             "telemetry_exporter_dropped": 0,
         }
+        self._metrics_lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run, name="ia-mcp-telemetry", daemon=True
+        )
+        self._thread.start()
+
+    def _bump(self, name: str) -> None:
+        with self._metrics_lock:
+            self.metrics[name] = self.metrics.get(name, 0) + 1
 
     def emit(self, span: SpanRecord) -> None:
         try:
-            if len(self._queue) >= self._max_queue:
-                self.metrics["telemetry_exporter_dropped"] = (
-                    self.metrics.get("telemetry_exporter_dropped", 0) + 1
-                )
-                return
-            self._queue.append(span)
-            self._flush()
+            self._queue.put_nowait(span)
+        except queue.Full:
+            self._bump("telemetry_exporter_dropped")
         except Exception:  # noqa: BLE001 - exporter must never block callers
-            self.metrics["telemetry_exporter_failure"] = (
-                self.metrics.get("telemetry_exporter_failure", 0) + 1
-            )
+            self._bump("telemetry_exporter_failure")
 
-    def _flush(self) -> None:
-        while self._queue:
-            item = self._queue.popleft()
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                item = self._queue.get(timeout=0.05)
+            except queue.Empty:
+                continue
             try:
                 self._inner.export((item,))
             except Exception:  # noqa: BLE001 - local metric, no business abort
-                self.metrics["telemetry_exporter_failure"] = (
-                    self.metrics.get("telemetry_exporter_failure", 0) + 1
-                )
+                self._bump("telemetry_exporter_failure")
+            finally:
+                self._queue.task_done()
+
+    def flush(self, timeout: float = 2.0) -> None:
+        done = threading.Event()
+
+        def wait() -> None:
+            self._queue.join()
+            done.set()
+
+        threading.Thread(target=wait, name="ia-mcp-telemetry-flush", daemon=True).start()
+        if not done.wait(timeout):
+            raise TimeoutError("telemetry exporter flush exceeded timeout")
+
+    def snapshot_metrics(self) -> dict[str, int]:
+        with self._metrics_lock:
+            return dict(self.metrics)
+
+    def shutdown(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=1.0)
 
 
 @dataclass
@@ -130,27 +166,33 @@ def configure_telemetry(
     exporter: SpanExporter | None = None,
     max_queue: int = 256,
 ) -> BoundedExporter:
+    global _runtime
+    if _runtime is not None:
+        _runtime.exporter.shutdown()
     inner = exporter if exporter is not None else InMemorySpanExporter()
     metrics = {
         "telemetry_exporter_failure": 0,
         "telemetry_exporter_dropped": 0,
     }
     bounded = BoundedExporter(inner, max_queue=max_queue, metrics=metrics)
-    global _runtime
     _runtime = _Runtime(exporter=bounded, inner=inner, metrics=metrics)
     reset_telemetry_context()
     return bounded
 
 
+def flush_telemetry(timeout: float = 2.0) -> None:
+    _ensure_runtime().exporter.flush(timeout=timeout)
+
+
 def recorded_spans() -> tuple[SpanRecord, ...]:
     inner = _ensure_runtime().inner
     if isinstance(inner, InMemorySpanExporter):
-        return tuple(inner.spans)
+        return inner.snapshot()
     return ()
 
 
 def exporter_metrics() -> dict[str, int]:
-    return dict(_ensure_runtime().metrics)
+    return _ensure_runtime().exporter.snapshot_metrics()
 
 
 def current_telemetry() -> TelemetryContext | None:
@@ -210,6 +252,11 @@ def _new_context(correlation_id: UUID) -> TelemetryContext:
     )
 
 
+def new_server_context() -> TelemetryContext:
+    """Mint a correlation/trace that is not derived from untrusted inbound headers."""
+    return _new_context(uuid4())
+
+
 def extract(carrier: Mapping[str, object]) -> TelemetryContext:
     correlation_id = _parse_correlation(
         _carrier_value(carrier, CORRELATION_HEADER)
@@ -252,7 +299,12 @@ def inject_payload(payload: Mapping[str, object]) -> dict[str, object]:
     carrier: dict[str, str] = {}
     inject(carrier)
     out = dict(payload)
+    if not carrier:
+        return out
     out[TELEMETRY_PAYLOAD_KEY] = carrier
+    current = _telemetry.get()
+    if current is not None:
+        out["correlation_id"] = str(current.correlation_id)
     return out
 
 

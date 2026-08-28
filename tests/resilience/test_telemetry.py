@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from datetime import datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -11,12 +13,15 @@ from ia_mcp.mcp.executor import ToolCall, ToolExecutor
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
 from ia_mcp.observability.propagation import (
     FailingSpanExporter,
+    SpanRecord,
     configure_telemetry,
     exporter_metrics,
+    flush_telemetry,
     recorded_spans,
     reset_telemetry_context,
+    start_span,
 )
-from ia_mcp.observability.semconv import SPAN_SCHEDULER_DISPATCH
+from ia_mcp.observability.semconv import SPAN_CHANNEL_RECEIVE, SPAN_SCHEDULER_DISPATCH
 from ia_mcp.scheduling.models import AppointmentScheduledEvent, SchedulingPolicy
 from ia_mcp.scheduling.service import ReminderScheduler
 from ia_mcp.scheduling.worker import JobWorker
@@ -39,6 +44,25 @@ BA = ZoneInfo("America/Argentina/Buenos_Aires")
 STARTS_AT = datetime(2026, 9, 3, 12, 0, tzinfo=BA)
 DUE_AT = datetime(2026, 9, 1, 12, 0, tzinfo=BA)
 TOOLS = frozenset({"appointments.search"})
+_SLOW_EXPORT_SECONDS = 0.15
+_SPAN_COUNT = 8
+
+
+class SlowSpanExporter:
+    def export(self, spans: tuple[SpanRecord, ...] | list[SpanRecord]) -> None:
+        del spans
+        time.sleep(_SLOW_EXPORT_SECONDS)
+
+
+class GateSpanExporter:
+    def __init__(self) -> None:
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def export(self, spans: tuple[SpanRecord, ...] | list[SpanRecord]) -> None:
+        del spans
+        self.entered.set()
+        self.release.wait(timeout=5)
 
 
 def test_exporter_failure_does_not_change_dispatch_or_tool_result() -> None:
@@ -64,6 +88,7 @@ def test_exporter_failure_does_not_change_dispatch_or_tool_result() -> None:
     assert dispatch.status == "dispatched"
     assert tool.ok is True
     assert channel.deliveries_for(TENANT)
+    flush_telemetry()
     metrics = exporter_metrics()
     assert metrics["telemetry_exporter_failure"] >= 1
 
@@ -90,6 +115,7 @@ def test_retry_spans_share_trace_and_link_previous_attempt() -> None:
     first, second = asyncio.run(_retry_then_succeed(scheduler, worker))
     assert first.status == "retry"
     assert second.status == "dispatched"
+    flush_telemetry()
     dispatch_spans = [
         span for span in recorded_spans() if span.name == SPAN_SCHEDULER_DISPATCH
     ]
@@ -99,6 +125,31 @@ def test_retry_spans_share_trace_and_link_previous_attempt() -> None:
     first_span = dispatch_spans[0]
     assert retry_span.attributes.get("retry_count") == 1
     assert (first_span.trace_id, first_span.span_id) in retry_span.links
+
+
+def test_slow_exporter_does_not_block_caller() -> None:
+    configure_telemetry(exporter=SlowSpanExporter())
+    reset_telemetry_context()
+    started = time.monotonic()
+    for _ in range(_SPAN_COUNT):
+        with start_span(SPAN_CHANNEL_RECEIVE):
+            pass
+    elapsed = time.monotonic() - started
+    assert elapsed < _SLOW_EXPORT_SECONDS * _SPAN_COUNT * 0.5
+
+
+def test_exporter_overflow_drops_and_records_metric() -> None:
+    gate = GateSpanExporter()
+    configure_telemetry(exporter=gate, max_queue=2)
+    reset_telemetry_context()
+    for _ in range(6):
+        with start_span(SPAN_CHANNEL_RECEIVE):
+            pass
+    assert gate.entered.wait(timeout=1)
+    dropped = exporter_metrics()["telemetry_exporter_dropped"]
+    gate.release.set()
+    flush_telemetry()
+    assert dropped >= 1
 
 
 async def _run_business(

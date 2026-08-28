@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from ia_mcp.observability.context import bind_correlation_id, reset_correlation_id
 from ia_mcp.observability.propagation import (
@@ -57,11 +57,7 @@ def _tenant_from_job(job: ScheduledJob) -> TenantContext:
     slug = _payload_str(payload, "tenant_slug", "unknown")
     raw_version = payload.get("config_version")
     config_version = raw_version if isinstance(raw_version, int) else 1
-    raw_corr = payload.get("correlation_id")
-    try:
-        correlation_id = UUID(str(raw_corr)) if raw_corr is not None else job.id
-    except ValueError:
-        correlation_id = job.id
+    correlation_id = extract_payload(payload).correlation_id
     return TenantContext(
         tenant_id=job.tenant_id,
         tenant_slug=slug,
@@ -141,7 +137,7 @@ class JobWorker:
                 links=links,
             ) as span:
                 result = await self._dispatch_job(claim)
-                span.attributes["status"] = result.status
+                span.set_attribute("status", result.status)
                 return result
         finally:
             reset_correlation_id(correlation_token)
