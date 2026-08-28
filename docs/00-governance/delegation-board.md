@@ -41,8 +41,8 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P04-T09 | W4 | accepted | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
 | P04-T10 | W4 | accepted | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T10-reschedule-confirm.md) |
 | P04-T11 | W4 | accepted | P04-T04, P04-T06 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T11-handoff.md) |
-| P04-T12 | W5 | in_review | P04-T08, P04-T10 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T12-scheduler.md) |
-| P04-T13 | W5 | blocked | P04-T05, P04-T09–P04-T12 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T13-mvp-e2e.md) |
+| P04-T12 | W5 | accepted | P04-T08, P04-T10 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T12-scheduler.md) |
+| P04-T13 | W5 | ready | P04-T05, P04-T09–P04-T12 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T13-mvp-e2e.md) |
 | P05-T01 | W6-intake | blocked | P03-T05, P04-T10, EXT-001 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T01-api-intake.md) |
 | P05-T02 | W6-build | blocked | P05-T01, EXT-003 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T02-transport-auth.md) |
 | P05-T03 | W6-build | blocked | P05-T01, P05-T02 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T03-appointment-adapter.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P04-T12 in_review (conformidad PASS, calidad PASS). Imp1–3 idle. P04-T13 sigue blocked hasta accepted.
+P04-T12 accepted (PR #21). Ready: P04-T13, P06-T01. Imp1–3 idle.
 
 ## Actualización
 
@@ -152,3 +152,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P04-T12 | `blocked → ready → in_progress` | dependencias P04-T08 y P04-T10 aceptadas | asignada a Implementador 2 |
 | P04-T09 | `in_review → accepted` | `dfe1595` merged PR #20 | https://github.com/franjimenxz/Project-IA/pull/20 |
 | P04-T12 | `in_progress → in_review` | `5870605`, `a8fa8bc` | https://github.com/franjimenxz/Project-IA/pull/21 |
+| P04-T12 | `in_review → accepted` | `b7d7625` merged `d79c41d` | https://github.com/franjimenxz/Project-IA/pull/21 |
+| P04-T13 | `blocked → ready` | dependencia P04-T12 aceptada | [P04-T12](../phases/phase-04-mvp-vertical-slices/evidence/P04-T12.md) |
