@@ -57,13 +57,13 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P07-T03 | W6 | blocked | P07-T02 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T03-admin-view.md) |
 | P07-T04 | W6 | blocked | P07-T01–P07-T03 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T04-runbooks-alerts.md) |
 | P08-T01 | W7 | accepted | P04-T13 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T01-package-validator.md) |
-| P08-T02 | W7 | in_progress | P08-T01 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T02-provision-service.md) |
-| P08-T03 | W7 | blocked | P08-T02, P06-T05, P07-T04 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T03-preflight-activation.md) |
+| P08-T02 | W7 | accepted | P08-T01 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T02-provision-service.md) |
+| P08-T03 | W7 | ready | P08-T02, P06-T05, P07-T04 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T03-preflight-activation.md) |
 | P08-T04 | W7 | blocked | P08-T03, P05-T04 para integración real | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T04-second-tenant.md) |
 
 ## Primer paso
 
-P07-T01 accepted (PR #32). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T02 accepted (PR #35). P06-T03 accepted (PR #37). Residual no bloqueante: ReDoS quadratic `_KEY` en `redaction.py` (escalado; no FAIL de re-review). Append-only DB, allowlist prod y SAST CI siguen escalados. P08-T01 accepted (PR #28). En curso: `P06-T05`, `P07-T02`, `P08-T02`.
+P07-T01 accepted (PR #32). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T02 accepted (PR #35). P06-T03 accepted (PR #37). P08-T01 accepted (PR #28). P08-T02 accepted (PR #41). P08-T03 ready (not started). Residual no bloqueante P08-T02: `token=` not in `redact()`; service-layer disable trusts TenantAdminContext (enforcement in adapter); lock no longer solely load-bearing. Residual P06-T03: ReDoS quadratic `_KEY` en `redaction.py` (escalado; no FAIL de re-review). Append-only DB, allowlist prod y SAST CI siguen escalados. En curso: `P06-T05`, `P07-T02`.
 
 ## Actualización
 
@@ -180,3 +180,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P06-T03 | `in_progress → in_review → accepted` | `6719d11` rebased `e1a6dda` merged `9cba6b4` | https://github.com/franjimenxz/Project-IA/pull/37 |
 | P06-T05 | `blocked → ready` | dependencias P06-T02, P06-T03 y P06-T04 aceptadas | [P06-T03](../phases/phase-06-verification-and-evals/evidence/P06-T03.md) |
 | P06-T05 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P06-T05-performance`, branch `implementation/P06-T05-performance` |
+| P08-T02 | `in_progress → in_review → accepted` | `d6d9306` rebased `6065834` merged `5f41ccf` | https://github.com/franjimenxz/Project-IA/pull/41 |
+| P08-T03 | `blocked → ready` | dependencia P08-T02 aceptada | [P08-T02](../phases/phase-08-second-tenant-onboarding/evidence/P08-T02.md) |
