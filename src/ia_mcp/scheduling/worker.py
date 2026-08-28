@@ -3,6 +3,16 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
+from ia_mcp.observability.context import bind_correlation_id, reset_correlation_id
+from ia_mcp.observability.propagation import (
+    bind_telemetry,
+    extract_payload,
+    inject_payload,
+    last_span_id_from_payload,
+    reset_telemetry,
+    start_span,
+)
+from ia_mcp.observability.semconv import SPAN_SCHEDULER_DISPATCH
 from ia_mcp.scheduling.models import (
     JOB_TYPE,
     DispatchResult,
@@ -117,6 +127,27 @@ class JobWorker:
         )
 
     async def dispatch(self, claim: JobClaim) -> DispatchResult:
+        context = extract_payload(claim.job.payload)
+        telemetry_token = bind_telemetry(context)
+        correlation_token = bind_correlation_id(context.correlation_id)
+        previous = last_span_id_from_payload(claim.job.payload)
+        links: tuple[tuple[str, str], ...] = ()
+        if claim.job.attempts > 0 and previous is not None:
+            links = ((context.trace_id, previous),)
+        try:
+            with start_span(
+                SPAN_SCHEDULER_DISPATCH,
+                attributes={"retry_count": claim.job.attempts},
+                links=links,
+            ) as span:
+                result = await self._dispatch_job(claim)
+                span.attributes["status"] = result.status
+                return result
+        finally:
+            reset_correlation_id(correlation_token)
+            reset_telemetry(telemetry_token)
+
+    async def _dispatch_job(self, claim: JobClaim) -> DispatchResult:
         now = self._clock.now()
         tenant = _tenant_from_job(claim.job)
         job = await self._store.get(tenant, claim.job.id)
@@ -157,7 +188,7 @@ class JobWorker:
                     job_id=job.id,
                     schedule_version=job.schedule_version,
                     kind=JOB_TYPE,
-                    payload=dict(job.payload),
+                    payload=inject_payload(dict(job.payload)),
                     external_message_id=external_id,
                     created_at=now,
                 )
@@ -176,6 +207,7 @@ class JobWorker:
                 lock_owner=None,
                 lock_expires_at=None,
                 updated_at=now,
+                payload=inject_payload(dict(job.payload)),
             )
             saved = await self._store.save(saved)
             await self._record(tenant, saved, outcome="retry", reason=last_error)

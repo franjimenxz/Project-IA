@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 from uuid import UUID
@@ -17,6 +17,14 @@ from ia_mcp.contracts.common import ToolResult
 from ia_mcp.contracts.errors import ToolError, ToolErrorCode
 from ia_mcp.mcp.capabilities.appointments import AppointmentCapability
 from ia_mcp.mcp.registry import ForbiddenTool, authorize
+from ia_mcp.observability.propagation import (
+    bind_telemetry,
+    extract,
+    inject,
+    reset_telemetry,
+    start_span,
+)
+from ia_mcp.observability.semconv import SPAN_MCP_RESOLVE, SPAN_TOOL_EXECUTE
 from ia_mcp.tenancy.models import TenantContext
 
 _FORBIDDEN = ToolError(
@@ -104,6 +112,33 @@ class ToolExecutor:
         tenant: TenantContext,
         run_id: UUID,
         call: ToolCall,
+        carrier: MutableMapping[str, str] | None = None,
+    ) -> ToolResult[Any]:
+        token = None
+        if carrier:
+            token = bind_telemetry(extract(carrier))
+        try:
+            with start_span(
+                SPAN_TOOL_EXECUTE,
+                attributes={
+                    "tool_name": call.name,
+                    "run_id": str(run_id),
+                    "tenant_id": str(tenant.tenant_id),
+                },
+            ):
+                result = await self._execute_authorized(tenant, run_id, call)
+                if carrier is not None:
+                    inject(carrier)
+                return result
+        finally:
+            if token is not None:
+                reset_telemetry(token)
+
+    async def _execute_authorized(
+        self,
+        tenant: TenantContext,
+        run_id: UUID,
+        call: ToolCall,
     ) -> ToolResult[Any]:
         try:
             self._registry.authorize(call.name)
@@ -122,7 +157,9 @@ class ToolExecutor:
         target: McpTarget | None = None
         if self._resolver is not None:
             capability_name = call.name.split(".", 1)[0]
-            target = await self._resolver.resolve(tenant, capability_name)
+            with start_span(SPAN_MCP_RESOLVE) as span:
+                target = await self._resolver.resolve(tenant, capability_name)
+                span.attributes["mcp_server_id"] = target.server_id
             if call.name not in target.allowed_tools:
                 self._audit(
                     ToolAuditEvent(
