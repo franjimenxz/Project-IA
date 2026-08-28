@@ -266,7 +266,7 @@ async def test_sql_tenant_a_job_does_not_use_tenant_b(harness: Harness) -> None:
     assert result.status == "dispatched"
     assert harness.channel.tenant_ids_used() == (TENANT_A,)
     assert harness.lookup.lookups == [(TENANT_A, "appt-shared")]
-    assert await harness.store.get(TENANT_B, job.id) is None
+    assert await harness.store.get(TENANT_B_CTX, job.id) is None
     async with harness.db.connect() as connection:
         foreign = await connection.scalar(
             select(func.count())

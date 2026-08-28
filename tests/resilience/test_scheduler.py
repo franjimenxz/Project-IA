@@ -203,7 +203,7 @@ async def test_channel_failure_retries_then_fails_with_audit(
         result = await worker.dispatch(claim)
         statuses.append(result.status)
     assert statuses == ["retry", "retry", "failed"]
-    loaded = await store.get(TENANT_A, job.id)
+    loaded = await store.get(TENANT_A_CTX, job.id)
     assert loaded is not None
     assert loaded.status == "failed"
     assert loaded.attempts == 3
@@ -329,6 +329,6 @@ async def test_tenant_b_status_does_not_skip_tenant_a_job(
     assert by_tenant[TENANT_A].status == "dispatched"
     assert by_tenant[TENANT_B].status == "skipped"
     assert channel.tenant_ids_used() == (TENANT_A,)
-    assert await store.get(TENANT_B, job_a.id) is None
-    assert await store.get(TENANT_A, job_b.id) is None
+    assert await store.get(TENANT_B_CTX, job_a.id) is None
+    assert await store.get(TENANT_A_CTX, job_b.id) is None
     assert channel.deliveries_for(TENANT_B_CTX) == ()

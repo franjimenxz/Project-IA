@@ -36,9 +36,11 @@ class InMemoryJobStore:
         self._by_identity: dict[tuple[UUID, str, str], UUID] = {}
         self._outbox: dict[tuple[UUID, UUID, int], SchedulingOutbox] = {}
 
-    async def get(self, tenant_id: UUID, job_id: UUID) -> ScheduledJob | None:
+    async def get(
+        self, tenant: TenantContext, job_id: UUID
+    ) -> ScheduledJob | None:
         async with self._lock:
-            return self._jobs.get((tenant_id, job_id))
+            return self._jobs.get((tenant.tenant_id, job_id))
 
     async def get_by_identity(
         self, tenant: TenantContext, job_type: str, business_key: str
@@ -115,10 +117,10 @@ class InMemoryJobStore:
             return True
 
     async def has_outbox(
-        self, tenant_id: UUID, job_id: UUID, schedule_version: int
+        self, tenant: TenantContext, job_id: UUID, schedule_version: int
     ) -> bool:
         async with self._lock:
-            return (tenant_id, job_id, schedule_version) in self._outbox
+            return (tenant.tenant_id, job_id, schedule_version) in self._outbox
 
     def outbox_for(self, tenant_id: UUID) -> tuple[SchedulingOutbox, ...]:
         return tuple(
@@ -127,9 +129,16 @@ class InMemoryJobStore:
 
 
 class FakeChannelAdapter:
-    def __init__(self, *, fail_times: int = 0, fail_forever: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_times: int = 0,
+        fail_forever: bool = False,
+        error: str = "channel_unavailable",
+    ) -> None:
         self.fail_times = fail_times
         self.fail_forever = fail_forever
+        self.error = error
         self._failures_left = fail_times
         self.attempts: list[tuple[UUID, OutboundReminder]] = []
         self.deliveries: dict[tuple[UUID, str], OutboundReminder] = {}
@@ -141,7 +150,7 @@ class FakeChannelAdapter:
         if self.fail_forever or self._failures_left > 0:
             if self._failures_left > 0:
                 self._failures_left -= 1
-            return DeliveryResult(ok=False, error="channel_unavailable")
+            return DeliveryResult(ok=False, error=self.error)
         key = (tenant.tenant_id, message.external_message_id)
         self.deliveries.setdefault(key, message)
         return DeliveryResult(

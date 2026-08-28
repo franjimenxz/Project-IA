@@ -233,13 +233,15 @@ class SqlAlchemyJobStore:
     def __init__(self, engine: AsyncEngine) -> None:
         self._session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    async def get(self, tenant_id: UUID, job_id: UUID) -> ScheduledJob | None:
+    async def get(
+        self, tenant: TenantContext, job_id: UUID
+    ) -> ScheduledJob | None:
         async with self._session_factory() as session:
             row = (
                 (
                     await session.execute(
                         select(scheduled_job_table).where(
-                            scheduled_job_table.c.tenant_id == tenant_id,
+                            scheduled_job_table.c.tenant_id == tenant.tenant_id,
                             scheduled_job_table.c.id == job_id,
                         )
                     )
@@ -383,13 +385,13 @@ class SqlAlchemyJobStore:
             return False
 
     async def has_outbox(
-        self, tenant_id: UUID, job_id: UUID, schedule_version: int
+        self, tenant: TenantContext, job_id: UUID, schedule_version: int
     ) -> bool:
         async with self._session_factory() as session:
             value = (
                 await session.execute(
                     select(scheduling_outbox_table.c.id).where(
-                        scheduling_outbox_table.c.tenant_id == tenant_id,
+                        scheduling_outbox_table.c.tenant_id == tenant.tenant_id,
                         scheduling_outbox_table.c.job_id == job_id,
                         scheduling_outbox_table.c.schedule_version
                         == schedule_version,

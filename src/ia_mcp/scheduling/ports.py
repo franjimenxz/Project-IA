@@ -43,7 +43,9 @@ class AuditSink(Protocol):
 
 
 class JobStore(Protocol):
-    async def get(self, tenant_id: UUID, job_id: UUID) -> ScheduledJob | None: ...
+    async def get(
+        self, tenant: TenantContext, job_id: UUID
+    ) -> ScheduledJob | None: ...
 
     async def get_by_identity(
         self, tenant: TenantContext, job_type: str, business_key: str
@@ -60,5 +62,5 @@ class JobStore(Protocol):
     async def put_outbox(self, event: SchedulingOutbox) -> bool: ...
 
     async def has_outbox(
-        self, tenant_id: UUID, job_id: UUID, schedule_version: int
+        self, tenant: TenantContext, job_id: UUID, schedule_version: int
     ) -> bool: ...

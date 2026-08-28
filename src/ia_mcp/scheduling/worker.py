@@ -24,6 +24,15 @@ from ia_mcp.tenancy.models import TenantContext
 
 _SKIP_STATUSES = frozenset({"confirmed", "cancelled"})
 _ACTION = "appointment_reminder.dispatch"
+_ERROR_MAX_LEN = 512
+
+
+def _bound_error(error: str | None) -> str | None:
+    if error is None:
+        return None
+    if len(error) <= _ERROR_MAX_LEN:
+        return error
+    return error[:_ERROR_MAX_LEN]
 
 
 def _payload_str(payload: Mapping[str, object], key: str, default: str) -> str:
@@ -109,23 +118,28 @@ class JobWorker:
 
     async def dispatch(self, claim: JobClaim) -> DispatchResult:
         now = self._clock.now()
-        job = await self._store.get(claim.job.tenant_id, claim.job.id)
+        tenant = _tenant_from_job(claim.job)
+        job = await self._store.get(tenant, claim.job.id)
         if job is None or job.schedule_version != claim.schedule_version:
             return DispatchResult(
                 status="stale",
                 job=job if job is not None else claim.job,
                 reason="stale_schedule_version",
             )
-        tenant = _tenant_from_job(job)
         if await self._store.has_outbox(
-            job.tenant_id, job.id, job.schedule_version
+            tenant, job.id, job.schedule_version
         ):
             saved = await self._finish(job, "dispatched", now)
             return DispatchResult(status="dispatched", job=saved, reason="replay")
-        if job.status == "cancelled":
-            saved = await self._finish(job, "skipped", now)
-            await self._record(tenant, saved, outcome="skipped", reason="cancelled")
-            return DispatchResult(status="skipped", job=saved, reason="cancelled")
+        lock_expired = (
+            job.lock_expires_at is None or job.lock_expires_at <= now
+        )
+        if (
+            job.lock_owner != claim.owner
+            or lock_expired
+            or job.status != "claimed"
+        ):
+            return DispatchResult(status="stale", job=job, reason="stale_claim")
         appointment_id = _appointment_id(job.payload)
         appt_status = await self._lookup.status(tenant, appointment_id)
         if _is_skip_status(appt_status):
@@ -152,7 +166,7 @@ class JobWorker:
             await self._record(tenant, saved, outcome="dispatched")
             return DispatchResult(status="dispatched", job=saved)
         attempts = job.attempts + 1
-        last_error = result.error or "channel_unavailable"
+        last_error = _bound_error(result.error or "channel_unavailable")
         if attempts < self._policy.max_attempts:
             saved = replace(
                 job,

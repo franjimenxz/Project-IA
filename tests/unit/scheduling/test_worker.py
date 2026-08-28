@@ -85,6 +85,25 @@ def _stack(
 
 
 @pytest.mark.anyio
+async def test_get_and_has_outbox_are_scoped_to_tenant_context() -> None:
+    scheduler, worker, store, _clock, _channel, lookup, _audit, _policy = _stack()
+    lookup.set_status(TENANT_A, "appt-1", "scheduled")
+    job = await scheduler.upsert(
+        TENANT_A_CTX,
+        AppointmentScheduledEvent(appointment_id="appt-1", starts_at=STARTS_AT),
+    )
+    claim = await worker.claim()
+    assert claim is not None
+    await worker.dispatch(claim)
+    loaded = await store.get(TENANT_A_CTX, job.id)
+    assert loaded is not None
+    assert loaded.id == job.id
+    assert await store.get(TENANT_B_CTX, job.id) is None
+    assert await store.has_outbox(TENANT_A_CTX, job.id, 1) is True
+    assert await store.has_outbox(TENANT_B_CTX, job.id, 1) is False
+
+
+@pytest.mark.anyio
 async def test_stale_schedule_version_claim_is_omitted() -> None:
     scheduler, worker, _store, _clock, channel, lookup, _audit, _policy = (
         _stack()
@@ -154,7 +173,42 @@ async def test_replay_of_same_job_version_does_not_duplicate_delivery() -> None:
     assert second.reason == "replay"
     assert len(channel.deliveries_for(TENANT_A_CTX)) == 1
     assert len(channel.attempts) == 1
-    assert await store.has_outbox(TENANT_A, job.id, 1) is True
+    assert await store.has_outbox(TENANT_A_CTX, job.id, 1) is True
+
+
+@pytest.mark.anyio
+async def test_hung_worker_expired_claim_does_not_send() -> None:
+    scheduler, worker, store, clock, channel, lookup, audit, policy = _stack(
+        lock_ttl=timedelta(minutes=1)
+    )
+    lookup.set_status(TENANT_A, "appt-1", "scheduled")
+    await scheduler.upsert(
+        TENANT_A_CTX,
+        AppointmentScheduledEvent(appointment_id="appt-1", starts_at=STARTS_AT),
+    )
+    original = await worker.claim()
+    assert original is not None
+    assert original.owner == "worker-1"
+    clock.advance(timedelta(minutes=1))
+    restarted = JobWorker(
+        store=store,
+        clock=clock,
+        channel=channel,
+        lookup=lookup,
+        policy=policy,
+        audit=audit,
+        owner="worker-2",
+        lock_ttl=timedelta(minutes=1),
+    )
+    resumed = await restarted.claim()
+    assert resumed is not None
+    assert resumed.owner == "worker-2"
+    stale = await worker.dispatch(original)
+    assert stale.status == "stale"
+    assert channel.attempts == []
+    result = await restarted.dispatch(resumed)
+    assert result.status == "dispatched"
+    assert len(channel.deliveries_for(TENANT_A_CTX)) == 1
 
 
 @pytest.mark.anyio
@@ -190,6 +244,31 @@ async def test_restarted_worker_resumes_pending_job() -> None:
 
 
 @pytest.mark.anyio
+async def test_channel_error_longer_than_512_is_truncated() -> None:
+    long_error = "e" * 600
+    channel = FakeChannelAdapter(fail_forever=True, error=long_error)
+    scheduler, worker, store, _clock, channel, lookup, audit, _policy = _stack(
+        policy=SchedulingPolicy(max_attempts=1), channel=channel
+    )
+    lookup.set_status(TENANT_A, "appt-1", "scheduled")
+    job = await scheduler.upsert(
+        TENANT_A_CTX,
+        AppointmentScheduledEvent(appointment_id="appt-1", starts_at=STARTS_AT),
+    )
+    claim = await worker.claim()
+    assert claim is not None
+    result = await worker.dispatch(claim)
+    assert result.status == "failed"
+    loaded = await store.get(TENANT_A_CTX, job.id)
+    assert loaded is not None
+    assert loaded.last_error is not None
+    assert len(loaded.last_error) == 512
+    assert loaded.last_error == long_error[:512]
+    assert audit.entries[-1]["reason"] == loaded.last_error
+    assert audit.entries[-1]["reason"] != long_error
+
+
+@pytest.mark.anyio
 async def test_channel_failure_retries_then_fails_and_is_audited() -> None:
     policy = SchedulingPolicy(max_attempts=3)
     channel = FakeChannelAdapter(fail_forever=True)
@@ -208,7 +287,7 @@ async def test_channel_failure_retries_then_fails_and_is_audited() -> None:
         result = await worker.dispatch(claim)
         statuses.append(result.status)
     assert statuses == ["retry", "retry", "failed"]
-    loaded = await store.get(TENANT_A, job.id)
+    loaded = await store.get(TENANT_A_CTX, job.id)
     assert loaded is not None
     assert loaded.status == "failed"
     assert loaded.attempts == 3
