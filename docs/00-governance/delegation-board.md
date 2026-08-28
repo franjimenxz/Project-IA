@@ -36,7 +36,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P04-T04 | W3 | accepted | P04-T01–P04-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T04-faq-harness.md) |
 | P04-T05 | W3 | accepted | P04-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T05-faq-e2e.md) |
 | P04-T06 | W3 | accepted | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
-| P04-T07 | W3 | in_progress | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
+| P04-T07 | W3 | in_review | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
 | P04-T08 | W3 | blocked | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
 | P04-T09 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
 | P04-T10 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T10-reschedule-confirm.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P04-T05 accepted (PR #15) and P04-T06 accepted (PR #14). En curso: `P04-T07` (Implementador 2), `P04-T11` (Implementador 3). Implementador idle.
+P04-T05 accepted (PR #15) and P04-T06 accepted (PR #14). En curso: `P04-T07` in_review PR #17, `P04-T11` in_review PR #16. Implementador idle.
 
 ## Actualización
 
@@ -138,3 +138,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P04-T06 | `in_review → accepted` | `9363eb7` merged `0c157ad` | https://github.com/franjimenxz/Project-IA/pull/14 |
 | P04-T07 | `blocked → ready → in_progress` | dependencias P04-T06 y P03-T05 aceptadas | asignada a Implementador 2 |
 | P04-T11 | `blocked → ready → in_progress` | dependencias P04-T04 y P04-T06 aceptadas | asignada a Implementador 3 |
+| P04-T07 | `in_progress → in_review` | `38a9158` | https://github.com/franjimenxz/Project-IA/pull/17 |
+| P04-T11 | `in_progress → in_review` | `ed308d3` | https://github.com/franjimenxz/Project-IA/pull/16 |
