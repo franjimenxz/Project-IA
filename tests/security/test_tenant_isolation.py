@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from alembic.config import Config
+from pydantic import SecretStr
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -15,6 +16,14 @@ from ia_mcp.agent_runtime.run_repository import SqlAlchemyAgentRunRepository
 from ia_mcp.configuration.adapters.sqlalchemy import (
     channel_integration_table,
     tenant_table,
+)
+from ia_mcp.configuration.models import AgentConfig, AppointmentPolicy, TenantConfig
+from ia_mcp.contracts.appointments import (
+    AppointmentCreateRequest,
+    AppointmentGetRequest,
+    AppointmentSlot,
+    AppointmentStatus,
+    PatientRef,
 )
 from ia_mcp.conversation.adapters.sqlalchemy import SqlAlchemyConversationRepository
 from ia_mcp.conversation.models import InboundMessage
@@ -26,8 +35,13 @@ from ia_mcp.knowledge.adapters.sqlalchemy import SqlAlchemyKnowledgeRepository
 from ia_mcp.knowledge.models import DocumentSource, KnowledgeQuery
 from ia_mcp.knowledge.ports import KnowledgeError
 from ia_mcp.knowledge.service import KnowledgeService
+from ia_mcp.mcp.executor import ToolExecutor
+from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
 from ia_mcp.tenancy.models import TenantContext
+from ia_mcp.workflows.appointments.cancel import CancelAppointmentDefinition
+from ia_mcp.workflows.engine import WorkflowEngine
 from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
+from tests.unit.workflows.fakes import InMemoryWorkflowRepository
 
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
@@ -303,3 +317,117 @@ async def test_operator_of_a_does_not_receive_case_b(
         assert b_cases[0].conversation_id == received_b.conversation.id
     finally:
         await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+async def test_tenant_a_cannot_cancel_tenant_b_appointment() -> None:
+    capability = FakeAppointmentCapability(
+        clock=lambda: datetime(2026, 9, 1, 12, tzinfo=UTC),
+        id_factory=lambda: "appt-b-1",
+        initial_slots={
+            TENANT_B: (
+                AppointmentSlot(
+                    slot_id="slot-b-1",
+                    starts_at=datetime(2026, 9, 1, 13, 0, tzinfo=UTC),
+                    ends_at=datetime(2026, 9, 1, 13, 30, tzinfo=UTC),
+                    specialty="cardiologia",
+                    practitioner="Dr. Bravo Exclusive",
+                    location="sede-norte-b",
+                    booking_token=SecretStr("tok-b-secret"),
+                ),
+            )
+        },
+    )
+    seeded = await capability.create(
+        TENANT_B_CTX,
+        AppointmentCreateRequest(
+            slot_id="slot-b-1",
+            booking_token=SecretStr("tok-b-secret"),
+            patient=PatientRef(name="Bravo Patient", email="bravo@example.com"),
+        ),
+        idempotency_key="seed-b",
+    )
+    assert seeded.ok
+    repository = InMemoryWorkflowRepository()
+    definition = CancelAppointmentDefinition()
+    engine = WorkflowEngine(repository, definition)
+    executor = ToolExecutor(
+        server=frozenset(
+            {
+                "appointments.search",
+                "appointments.get",
+                "appointments.create",
+                "appointments.cancel",
+                "appointments.reschedule",
+                "appointments.confirm",
+            }
+        ),
+        tenant=frozenset(
+            {
+                "appointments.search",
+                "appointments.get",
+                "appointments.create",
+                "appointments.cancel",
+                "appointments.reschedule",
+                "appointments.confirm",
+            }
+        ),
+        skill=frozenset({"appointments.get", "appointments.cancel"}),
+        capability=capability,
+    )
+    config = TenantConfig(
+        tenant_id=TENANT_A,
+        version=1,
+        agent=AgentConfig(tone="cordial"),
+        enabled_skills=frozenset({"appointments"}),
+        appointments=AppointmentPolicy(),
+    )
+    started = await definition.start(
+        engine,
+        TENANT_A_CTX,
+        command_id="start-cross",
+        config=config,
+        appointment_id="appt-b-1",
+    )
+    looked = await definition.lookup(
+        engine,
+        executor,
+        TENANT_A_CTX,
+        started.workflow_id,
+        command_id="lookup-cross",
+        run_id=uuid4(),
+        config=config,
+    )
+    missing_started = await definition.start(
+        engine,
+        TENANT_A_CTX,
+        command_id="start-missing",
+        config=config,
+        appointment_id="appt-missing-id",
+    )
+    missing = await definition.lookup(
+        engine,
+        executor,
+        TENANT_A_CTX,
+        missing_started.workflow_id,
+        command_id="lookup-missing",
+        run_id=uuid4(),
+        config=config,
+    )
+    assert looked.state == "failed"
+    assert missing.state == "failed"
+    assert looked.data.get("error") == missing.data.get("error")
+    assert looked.error == missing.error
+    blob = repr(looked.data) + repr(looked.error)
+    assert str(TENANT_B) not in blob
+    assert "Dr. Bravo Exclusive" not in blob
+    assert "sede-norte-b" not in blob
+    assert "Bravo Patient" not in blob
+    assert "traceback" not in blob.lower()
+    current = await capability.get(
+        TENANT_B_CTX, AppointmentGetRequest(appointment_id="appt-b-1")
+    )
+    assert current.ok
+    assert current.value is not None
+    assert current.value.status is AppointmentStatus.SCHEDULED
