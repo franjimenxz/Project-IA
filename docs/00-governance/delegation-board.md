@@ -51,7 +51,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P06-T02 | W6 | accepted | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
 | P06-T03 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
 | P06-T04 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
-| P06-T05 | W6 | in_progress | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
+| P06-T05 | W6 | accepted | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
 | P07-T01 | W6 | accepted | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
 | P07-T02 | W6 | accepted | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
 | P07-T03 | W6 | in_progress | P07-T02 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T03-admin-view.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P07-T01 accepted (PR #32). P07-T02 accepted (PR #40). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T02 accepted (PR #35). P06-T03 accepted (PR #37). P08-T01 accepted (PR #28). P08-T02 accepted (PR #41). Residual no bloqueante P07-T02: `audit_event` sin `run_id`; nombres en texto libre quedan con owner de `redaction.py`. Residual P08-T02: `token=` not in `redact()`; service-layer disable trusts TenantAdminContext (enforcement in adapter); lock no longer solely load-bearing. Residual P06-T03: ReDoS quadratic `_KEY` en `redaction.py` (escalado; no FAIL de re-review). Append-only DB, allowlist prod y SAST CI siguen escalados. En curso: `P06-T05`, `P07-T03`, `P08-T03`.
+P07-T01 accepted (PR #32). P07-T02 accepted (PR #40). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T02 accepted (PR #35). P06-T03 accepted (PR #37). P06-T05 accepted (PR #46). Fase 6 T01–T05 accepted. P08-T01 accepted (PR #28). P08-T02 accepted (PR #41). Residual no bloqueante P07-T02: `audit_event` sin `run_id`; nombres en texto libre quedan con owner de `redaction.py`. Residual P08-T02: `token=` not in `redact()`; service-layer disable trusts TenantAdminContext (enforcement in adapter); lock no longer solely load-bearing. Residual P06-T03: ReDoS quadratic `_KEY` en `redaction.py` (escalado; no FAIL de re-review). Residual P06-T05: EXT-007 SLO; unused spans `channel.receive`/`channel.send`/`tool.execute`; synthetic latencies. Append-only DB, allowlist prod y SAST CI siguen escalados. En curso: `P07-T03`, `P08-T03`.
 
 ## Actualización
 
@@ -186,3 +186,4 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P07-T03 | `blocked → ready` | dependencia P07-T02 aceptada | [P07-T02](../phases/phase-07-operability-and-observability/evidence/P07-T02.md) |
 | P07-T03 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P07-T03-admin-view`, branch `implementation/P07-T03-admin-view` |
 | P08-T03 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P08-T03-preflight`, branch `implementation/P08-T03-preflight` |
+| P06-T05 | `in_progress → in_review → accepted` | `187bfb7` rebased `2900e26` merged `e22d8de` | https://github.com/franjimenxz/Project-IA/pull/46 |
