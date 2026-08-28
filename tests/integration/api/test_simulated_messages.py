@@ -114,7 +114,9 @@ def make_client(
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    app = create_app()
+    # "test" keeps the ACK contract: the app must not auto-wire a harness even
+    # when the developer's shell exports DATABASE_URL.
+    app = create_app(environment="test")
     repo = FakeChannelRepository({("simulated", "acct-a"): TENANT_A})
     recorder = RecordingTenantService(TenantService(repo))
     app.state.tenant_service = recorder
