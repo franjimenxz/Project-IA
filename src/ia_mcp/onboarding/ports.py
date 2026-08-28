@@ -3,7 +3,8 @@ from typing import Protocol
 from ia_mcp.configuration.models import TenantAdminContext
 from ia_mcp.onboarding.commands import Principal, ProvisionedTenant
 from ia_mcp.onboarding.models import TenantPackage
-from ia_mcp.tenancy.models import ChannelIntegration, TenantIdentity
+from ia_mcp.onboarding.preflight import PreflightReport
+from ia_mcp.tenancy.models import ChannelIntegration, TenantContext, TenantIdentity
 
 
 class TenantOnboardingStore(Protocol):
@@ -12,6 +13,15 @@ class TenantOnboardingStore(Protocol):
     async def provision(
         self, package: TenantPackage, actor: Principal
     ) -> ProvisionedTenant: ...
+
+    async def preflight(
+        self,
+        tenant: TenantContext,
+        *,
+        content_hash: str,
+    ) -> PreflightReport: ...
+
+    async def activate(self, admin: TenantAdminContext, report_hash: str) -> None: ...
 
     async def disable(self, admin: TenantAdminContext, reason: str) -> None: ...
 
