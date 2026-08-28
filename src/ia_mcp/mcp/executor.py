@@ -17,7 +17,7 @@ from ia_mcp.contracts.appointments import (
 from ia_mcp.contracts.common import ToolResult
 from ia_mcp.contracts.errors import ToolError, ToolErrorCode
 from ia_mcp.mcp.capabilities.appointments import AppointmentCapability
-from ia_mcp.mcp.registry import ForbiddenTool, authorize
+from ia_mcp.mcp.registry import KNOWN_TOOLS, ForbiddenTool, authorize
 from ia_mcp.observability.propagation import (
     bind_telemetry,
     extract,
@@ -57,6 +57,16 @@ class McpTarget:
 
 class McpResolver(Protocol):
     async def resolve(self, tenant: TenantContext, capability: str) -> McpTarget: ...
+
+
+class McpTransportClient(Protocol):
+    async def call_tool(
+        self,
+        tenant: TenantContext,
+        target: McpTarget,
+        name: str,
+        arguments: Mapping[str, Any],
+    ) -> ToolResult[Any]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +144,7 @@ class ToolExecutor:
         resolver: McpResolver | None = None,
         audit_hook: Callable[[ToolAuditEvent], None] | None = None,
         allowed_hosts: Iterable[str] | None = None,
+        transport: McpTransportClient | None = None,
     ) -> None:
         if allowed_hosts is not None and resolver is None:
             # Only a resolved target carries an endpoint. Accepting the allowlist
@@ -148,6 +159,7 @@ class ToolExecutor:
         self._resolver = resolver
         self._audit_hook = audit_hook
         self._hosts = None if allowed_hosts is None else HostAllowlist(allowed_hosts)
+        self._transport = transport
 
     async def execute(
         self,
@@ -218,7 +230,7 @@ class ToolExecutor:
                 )
                 return ToolResult[Any](ok=False, error=_FORBIDDEN)
 
-        result = await self._dispatch(tenant, call)
+        result = await self._dispatch(tenant, call, target)
         self._audit(
             ToolAuditEvent(
                 run_id=run_id,
@@ -238,6 +250,23 @@ class ToolExecutor:
             self._audit_hook(event)
 
     async def _dispatch(
+        self,
+        tenant: TenantContext,
+        call: ToolCall,
+        target: McpTarget | None,
+    ) -> ToolResult[Any]:
+        if call.name in KNOWN_TOOLS:
+            return await self._dispatch_capability(tenant, call)
+        if self._transport is not None and target is not None:
+            return await self._transport.call_tool(
+                tenant,
+                target,
+                call.name,
+                dict(call.arguments),
+            )
+        return ToolResult[Any](ok=False, error=_FORBIDDEN)
+
+    async def _dispatch_capability(
         self,
         tenant: TenantContext,
         call: ToolCall,
