@@ -2,6 +2,8 @@ import os
 
 from fastapi import FastAPI
 
+from ia_mcp.channels.outbox import ChannelOutbox
+
 _NON_PRODUCTION_ENVIRONMENTS = frozenset({"test", "development"})
 
 
@@ -13,6 +15,7 @@ def _resolve_environment(environment: str | None) -> str:
 
 def create_app(*, environment: str | None = None) -> FastAPI:
     app = FastAPI()
+    app.state.outbox = ChannelOutbox()
 
     @app.get("/health/live")
     def liveness() -> dict[str, str]:
