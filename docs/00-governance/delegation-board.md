@@ -32,10 +32,10 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P03-T05 | W2 | accepted | P03-T03, P03-T04 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T05-tool-executor.md) |
 | P04-T01 | W3 | accepted | P02-T03, P02-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T01-conversation-runs.md) |
 | P04-T02 | W3 | accepted | P03-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T02-context-skills.md) |
-| P04-T03 | W3 | in_review | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T03-knowledge.md) |
-| P04-T04 | W3 | blocked | P04-T01–P04-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T04-faq-harness.md) |
+| P04-T03 | W3 | accepted | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T03-knowledge.md) |
+| P04-T04 | W3 | in_review | P04-T01–P04-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T04-faq-harness.md) |
 | P04-T05 | W3 | blocked | P04-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T05-faq-e2e.md) |
-| P04-T06 | W3 | ready | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
+| P04-T06 | W3 | in_progress | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
 | P04-T07 | W3 | blocked | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
 | P04-T08 | W3 | blocked | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
 | P04-T09 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P04-T01 accepted (PR #10) and P03-T05 accepted (PR #11). En curso: `P04-T03` in_review PR #12. Ready: `P04-T06` (wait 0003). Implementador 2 y 3 idle.
+P04-T03 accepted (PR #12). En curso: `P04-T04` in_review PR #13, `P04-T06` (Implementador 2). Implementador 3 idle.
 
 ## Actualización
 
@@ -126,3 +126,7 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P03-T05 | `in_review → accepted` | `bd30100` merged `02a1b77` | https://github.com/franjimenxz/Project-IA/pull/11 |
 | P04-T03 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P04-T03-knowledge` |
 | P04-T03 | `in_progress → in_review` | `0f3ff05` | https://github.com/franjimenxz/Project-IA/pull/12 |
+| P04-T03 | `in_review → accepted` | `0f3ff05` merged `48e7413` | https://github.com/franjimenxz/Project-IA/pull/12 |
+| P04-T04 | `blocked → ready → in_progress` | dependencias P04-T01–T03 aceptadas | asignada a Implementador |
+| P04-T06 | `ready → in_progress` | asignada a Implementador 2 | worktree `.worktrees/P04-T06-workflow-engine` |
+| P04-T04 | `in_progress → in_review` | `0141138` | https://github.com/franjimenxz/Project-IA/pull/13 |
