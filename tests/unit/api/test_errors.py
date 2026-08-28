@@ -1,11 +1,11 @@
 from fastapi.testclient import TestClient
 
-from ia_mcp.api.app import create_app
 from ia_mcp.shared.errors import DomainError, TenantIsolationViolation
+from tests.unit.api.observability_app import app_with_observability
 
 
 def test_problem_details_omits_nested_sensitive_details():
-    app = create_app()
+    app = app_with_observability()
 
     @app.get("/_test/error")
     def boom() -> None:
@@ -31,7 +31,7 @@ def test_problem_details_omits_nested_sensitive_details():
 
 
 def test_unhandled_error_hides_stack():
-    app = create_app()
+    app = app_with_observability()
 
     @app.get("/_test/crash")
     def crash() -> None:
@@ -51,7 +51,7 @@ def test_unhandled_error_hides_stack():
 
 
 def test_error_log_redacts_token_and_email(caplog):
-    app = create_app()
+    app = app_with_observability()
 
     @app.get("/_test/error")
     def boom() -> None:
@@ -73,7 +73,7 @@ def test_error_log_redacts_token_and_email(caplog):
 
 
 def test_tenant_isolation_violation_hides_foreign_resource():
-    app = create_app()
+    app = app_with_observability()
 
     @app.get("/_test/isolation")
     def boom() -> None:

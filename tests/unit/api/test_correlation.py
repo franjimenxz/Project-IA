@@ -2,15 +2,15 @@ from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
-from ia_mcp.api.app import create_app
 from ia_mcp.observability.context import current_correlation_id
 from ia_mcp.shared.errors import DomainError
+from tests.unit.api.observability_app import app_with_observability
 
 CORRELATION_HEADER = "X-Correlation-ID"
 
 
 def test_correlation_id_is_generated_when_missing():
-    response = TestClient(create_app()).get("/health/live")
+    response = TestClient(app_with_observability()).get("/health/live")
     raw = response.headers[CORRELATION_HEADER]
     UUID(raw)
     payload_ok = response.json() == {"status": "alive"}
@@ -20,7 +20,7 @@ def test_correlation_id_is_generated_when_missing():
 
 def test_correlation_id_is_reused_when_supplied():
     supplied = str(uuid4())
-    response = TestClient(create_app()).get(
+    response = TestClient(app_with_observability()).get(
         "/health/live",
         headers={CORRELATION_HEADER: supplied},
     )
@@ -28,7 +28,7 @@ def test_correlation_id_is_reused_when_supplied():
 
 
 def test_problem_details_shares_generated_correlation_id():
-    app = create_app()
+    app = app_with_observability()
 
     @app.get("/_test/error")
     def boom() -> None:
@@ -49,7 +49,7 @@ def test_problem_details_shares_generated_correlation_id():
 
 def test_current_correlation_id_matches_supplied_header():
     supplied = uuid4()
-    app = create_app()
+    app = app_with_observability()
     seen: dict[str, UUID] = {}
 
     @app.get("/_test/correlation")
