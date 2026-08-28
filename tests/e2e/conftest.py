@@ -40,6 +40,14 @@ from ia_mcp.tenancy.service import TenantService
 from tests.integration.api.test_simulated_messages import signed_simulated_headers
 from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
 
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    marker = pytest.mark.e2e
+    for item in items:
+        if item.get_closest_marker("e2e") is None:
+            item.add_marker(marker)
+
+
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
