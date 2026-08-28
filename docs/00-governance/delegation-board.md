@@ -48,22 +48,22 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P05-T03 | W6-build | blocked | P05-T01, P05-T02 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T03-appointment-adapter.md) |
 | P05-T04 | W6-sandbox | blocked | P05-T03, EXT-002 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T04-sandbox-rollout.md) |
 | P06-T01 | W6 | accepted | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
-| P06-T02 | W6 | ready | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
+| P06-T02 | W6 | in_progress | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
 | P06-T03 | W6 | in_progress | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
 | P06-T04 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
 | P06-T05 | W6 | blocked | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
 | P07-T01 | W6 | accepted | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
-| P07-T02 | W6 | ready | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
+| P07-T02 | W6 | in_progress | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
 | P07-T03 | W6 | blocked | P07-T02 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T03-admin-view.md) |
 | P07-T04 | W6 | blocked | P07-T01–P07-T03 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T04-runbooks-alerts.md) |
 | P08-T01 | W7 | accepted | P04-T13 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T01-package-validator.md) |
-| P08-T02 | W7 | ready | P08-T01 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T02-provision-service.md) |
+| P08-T02 | W7 | in_progress | P08-T01 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T02-provision-service.md) |
 | P08-T03 | W7 | blocked | P08-T02, P06-T05, P07-T04 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T03-preflight-activation.md) |
 | P08-T04 | W7 | blocked | P08-T03, P05-T04 para integración real | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T04-second-tenant.md) |
 
 ## Primer paso
 
-P07-T01 accepted (PR #32). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T05 stays blocked until P06-T02 and P06-T03 also accepted. P08-T01 accepted (PR #28). En curso: `P06-T03`. Ready: `P06-T02`, `P07-T02`, `P08-T02`.
+P07-T01 accepted (PR #32). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T05 stays blocked until P06-T02 and P06-T03 also accepted. P08-T01 accepted (PR #28). En curso: `P06-T02`, `P06-T03`, `P07-T02`, `P08-T02`.
 
 ## Actualización
 
@@ -173,3 +173,6 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P06-T04 | `in_review → accepted` | `06b9a01` merged `c411002` | https://github.com/franjimenxz/Project-IA/pull/29 |
 | P07-T01 | `in_progress → in_review → accepted` | `349a3d5` merged `e2cb470` | https://github.com/franjimenxz/Project-IA/pull/32 |
 | P07-T02 | remains `ready` | P07-T01 accepted; conflicto `src/ia_mcp/observability` y `tests/security/test_observability.py` liberado | [P07-T01](../phases/phase-07-operability-and-observability/evidence/P07-T01.md) |
+| P06-T02 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P06-T02-eval-runner`, branch `implementation/P06-T02-eval-runner` |
+| P07-T02 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P07-T02-run-query`, branch `implementation/P07-T02-run-query` |
+| P08-T02 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P08-T02-provision`, branch `implementation/P08-T02-provision` |
