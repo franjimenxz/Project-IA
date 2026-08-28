@@ -128,6 +128,14 @@ class ToolExecutor:
         audit_hook: Callable[[ToolAuditEvent], None] | None = None,
         allowed_hosts: Iterable[str] | None = None,
     ) -> None:
+        if allowed_hosts is not None and resolver is None:
+            # Only a resolved target carries an endpoint. Accepting the allowlist
+            # here would advertise a network restriction that never runs, so the
+            # wiring error fails closed instead of dispatching every call.
+            raise ValueError(
+                "allowed_hosts requires a resolver: without one there is no "
+                "endpoint to validate and the allowlist would never apply"
+            )
         self._registry = ToolRegistry(server=server, tenant=tenant, skill=skill)
         self._capability = capability
         self._resolver = resolver

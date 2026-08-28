@@ -13,8 +13,12 @@ _BEARER_RE = re.compile(r"(?i)(Bearer)\s+\S+")
 _CONNECTION_STRING_RE = re.compile(
     r"(?i)\b([a-z][a-z0-9+.\-]{1,20})://[^\s/@:]+:[^\s/@]+@[^\s/?#,;\"']+"
 )
-_ASSIGNMENT_RE = re.compile(rf"(?i)(?P<key>{_KEY})[\"']?\s*[:=]\s*[\"']?{_VALUE}")
+_ASSIGNMENT_RE = re.compile(
+    rf"(?i)(?P<key>{_KEY})(?P<separator>[\"']?\s*[:=]\s*[\"']?)(?P<value>{_VALUE})"
+)
 _REFERENCE_KEY_RE = re.compile(r"(?i)(reference|_ref)$")
+# The spared part of a reference value is its first whitespace-free token.
+_FIRST_TOKEN_RE = re.compile(r"(?s)^(?P<token>\S*)(?P<gap>\s*)(?P<rest>.*)$")
 _LABELLED_DOCUMENT_RE = re.compile(
     r"(?i)\b(dni|documento|document_number|cuit|cuil|c[eé]dula|pasaporte)\b\W{0,4}"
     r"\d{1,3}(?:[.\s-]?\d{3}){1,3}"
@@ -30,11 +34,21 @@ _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
 def _mask_assignment(match: re.Match[str]) -> str:
     key = match.group("key")
-    if _REFERENCE_KEY_RE.search(key):
-        # `credentials_reference` names a secret; it is not the secret itself and
-        # stays readable so operators can correlate an integration.
+    if not _REFERENCE_KEY_RE.search(key):
+        return f"{key}=[REDACTED]"
+    # `credentials_reference` names a secret; it is not the secret itself and
+    # stays readable so operators can correlate an integration. The immunity
+    # covers one token only: on an unquoted line the value runs to the end, so
+    # sparing all of it would shield whatever shares the line. The remainder is
+    # scanned again, which is what stops `reference=... password=...`.
+    parts = _FIRST_TOKEN_RE.match(match.group("value"))
+    if parts is None or not parts.group("rest"):
         return match.group(0)
-    return f"{key}=[REDACTED]"
+    remainder = _ASSIGNMENT_RE.sub(_mask_assignment, parts.group("rest"))
+    return (
+        f"{key}{match.group('separator')}{parts.group('token')}"
+        f"{parts.group('gap')}{remainder}"
+    )
 
 
 # T01 (P07-T01) patterns kept in union with T03 assignment/connection-string redaction.

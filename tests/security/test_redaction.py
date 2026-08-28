@@ -17,7 +17,7 @@ from ia_mcp.configuration.models import AgentConfig, AppointmentPolicy, TenantCo
 from ia_mcp.conversation.adapters.sqlalchemy import SqlAlchemyConversationRepository
 from ia_mcp.conversation.models import InboundMessage
 from ia_mcp.handoff.adapters.fake import FakeHandoffAdapter
-from ia_mcp.handoff.models import HandoffRequest
+from ia_mcp.handoff.models import HandoffRequest, sanitize_text
 from ia_mcp.handoff.service import (
     HandoffService,
     SqlAlchemyHandoffRepository,
@@ -47,6 +47,10 @@ from tests.fixtures.security_matrix import (
     PII_DOCUMENT_DIGITS,
     PII_EMAIL,
     PII_PHONE,
+    REF_SUFFIX_LEAK_LINE,
+    REFERENCE_LEAK_LINE,
+    SECRET_AFTER_REFERENCE,
+    SECRET_REFERENCE_A,
     SECRET_VALUE,
     SSRF_ENDPOINT,
     TENANT_A,
@@ -58,6 +62,7 @@ from tests.fixtures.security_matrix import (
 
 SECRET_CANARIES = (
     SECRET_VALUE,
+    SECRET_AFTER_REFERENCE,
     "s3cr3t-db-pass",
     "canary-access-token",
     "canary-session",
@@ -96,6 +101,43 @@ def test_redactor_removes_credentials_pii_and_connection_strings() -> None:
     # Non-sensitive content survives so operators keep usable context.
     assert redact("specialty=cardiologia") == "specialty=cardiologia"
     assert "cardiologia" in redact("specialty=cardiologia and api_key=abc")
+
+
+@pytest.mark.security
+def test_reference_key_never_shields_a_later_credential() -> None:
+    """A spared reference must not extend its immunity to the rest of the line.
+
+    `credentials_reference` is readable on purpose, but the redacted value ends
+    at the reference token: an unquoted `password=` sharing the same line is
+    still a credential and must not ride along.
+    """
+    for line in (REFERENCE_LEAK_LINE, REF_SUFFIX_LEAK_LINE):
+        redacted = redact(line)
+        assert SECRET_AFTER_REFERENCE not in redacted, line
+        assert "[REDACTED]" in redacted, line
+        # The carve-out still holds: the reference itself stays correlatable.
+        assert SECRET_REFERENCE_A in redacted, line
+    # A reference alone is untouched, quotes or not.
+    assert redact(f"credentials_reference={SECRET_REFERENCE_A}") == (
+        f"credentials_reference={SECRET_REFERENCE_A}"
+    )
+    assert redact(f'"credentials_reference": "{SECRET_REFERENCE_A}"') == (
+        f'"credentials_reference": "{SECRET_REFERENCE_A}"'
+    )
+    # Two references in a row spare both and still redact the trailing secret.
+    chained = redact(
+        f"credentials_reference={SECRET_REFERENCE_A} "
+        f"auth_token_ref={SECRET_REFERENCE_A} "
+        f"password={SECRET_AFTER_REFERENCE}"
+    )
+    assert SECRET_AFTER_REFERENCE not in chained
+    assert chained.count(SECRET_REFERENCE_A) == 2
+    # `sanitize_text` is the product path that carries handoff notes into the
+    # summary, the outbox and the provider payload.
+    notes = sanitize_text(REFERENCE_LEAK_LINE)
+    assert notes is not None
+    assert SECRET_AFTER_REFERENCE not in notes
+    assert SECRET_REFERENCE_A in notes
 
 
 @pytest.mark.anyio

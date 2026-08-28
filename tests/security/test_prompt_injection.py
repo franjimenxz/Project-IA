@@ -305,6 +305,46 @@ async def test_endpoint_outside_host_allowlist_is_rejected_before_capability() -
 
 @pytest.mark.security
 @pytest.mark.anyio
+async def test_allowlist_without_resolver_cannot_build_a_silently_open_executor() -> None:
+    """An allowlist with no resolver has no endpoint to police, so it must not build.
+
+    Accepting the argument and skipping the check is the worst outcome: the
+    caller believes egress is restricted while every call dispatches. The
+    misconfiguration is a wiring error and fails closed at construction.
+    """
+    capability = RecordingCapability()
+
+    def build(hosts: frozenset[str]) -> ToolExecutor:
+        return ToolExecutor(
+            server=ALL_TOOLS,
+            tenant=ALL_TOOLS,
+            skill=ALL_TOOLS,
+            capability=capability,
+            allowed_hosts=hosts,
+        )
+
+    for hosts in (ALLOWED_MCP_HOSTS, frozenset()):
+        with pytest.raises(ValueError) as caught:
+            build(hosts)
+        assert "resolver" in str(caught.value)
+    assert capability.calls == []
+
+    # Without an allowlist the executor keeps working exactly as before.
+    unrestricted = ToolExecutor(
+        server=ALL_TOOLS,
+        tenant=ALL_TOOLS,
+        skill=ALL_TOOLS,
+        capability=capability,
+    )
+    result = await unrestricted.execute(
+        TENANT_A_CTX, uuid4(), ToolCall(name="appointments.search", arguments=SEARCH_ARGS)
+    )
+    assert result.ok is True
+    assert capability.calls == [(TENANT_A, "search")]
+
+
+@pytest.mark.security
+@pytest.mark.anyio
 async def test_resolver_allowlist_narrows_registry_decision() -> None:
     capability = RecordingCapability()
     events: list[ToolAuditEvent] = []

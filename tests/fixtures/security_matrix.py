@@ -104,6 +104,17 @@ CANARY_A_BOOKING_TOKEN = "tok-a-secret"
 SECRET_REFERENCE_A = "secret://mcp/tenant-a"
 SECRET_REFERENCE_B = "secret://mcp/tenant-b"
 SECRET_VALUE = "sk-live-must-never-be-stored"
+# A reference key names a secret and stays readable, so it is spared by the
+# redactor. Anything sharing the line with it must still be redacted: these
+# canaries exist to catch a carve-out that shields its neighbours.
+SECRET_AFTER_REFERENCE = "sk-live-hidden-behind-a-reference"
+REFERENCE_LEAK_LINE = (
+    f"integracion credentials_reference={SECRET_REFERENCE_A} "
+    f"password={SECRET_AFTER_REFERENCE}"
+)
+REF_SUFFIX_LEAK_LINE = (
+    f"mcp auth_token_ref={SECRET_REFERENCE_A} api_key={SECRET_AFTER_REFERENCE}"
+)
 CONNECTION_STRING = "postgresql://admin:s3cr3t-db-pass@db.internal:5432/ia_mcp"
 COOKIE_HEADER = "Cookie: session=eyJhbGciOiJIUzI1NiJ9.canary-session"
 AUTHORIZATION_HEADER = "Authorization: Bearer canary-access-token"
@@ -253,6 +264,13 @@ SECURITY_MATRIX: tuple[MatrixRow, ...] = (
     ),
     MatrixRow(
         leg="tool",
+        threat="SSRF",
+        boundary="executor construction",
+        module="tests.security.test_prompt_injection",
+        test="test_allowlist_without_resolver_cannot_build_a_silently_open_executor",
+    ),
+    MatrixRow(
+        leg="tool",
         threat="Tool escalation",
         boundary="MCP resolver",
         module="tests.security.test_prompt_injection",
@@ -271,6 +289,13 @@ SECURITY_MATRIX: tuple[MatrixRow, ...] = (
         boundary="central redactor",
         module="tests.security.test_redaction",
         test="test_redactor_removes_credentials_pii_and_connection_strings",
+    ),
+    MatrixRow(
+        leg="secret",
+        threat="Secret leakage",
+        boundary="reference-key carve-out",
+        module="tests.security.test_redaction",
+        test="test_reference_key_never_shields_a_later_credential",
     ),
     MatrixRow(
         leg="secret",
