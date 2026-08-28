@@ -52,7 +52,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P06-T03 | W6 | in_progress | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
 | P06-T04 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
 | P06-T05 | W6 | blocked | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
-| P07-T01 | W6 | in_progress | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
+| P07-T01 | W6 | accepted | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
 | P07-T02 | W6 | ready | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
 | P07-T03 | W6 | blocked | P07-T02 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T03-admin-view.md) |
 | P07-T04 | W6 | blocked | P07-T01–P07-T03 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T04-runbooks-alerts.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P06-T04 accepted (PR #29). P06-T05 stays blocked until P06-T02 and P06-T03 also accepted. P08-T01 accepted (PR #28). P06-T01 in_review (PR #26). En curso: `P06-T03`, `P07-T01`. Ready: `P07-T02` (espera P07-T01; conflicto `src/ia_mcp/observability`, `tests/security/test_observability.py`), `P08-T02`.
+P07-T01 accepted (PR #32). P06-T04 accepted (PR #29). P06-T05 stays blocked until P06-T02 and P06-T03 also accepted. P08-T01 accepted (PR #28). P06-T01 in_review (PR #26). En curso: `P06-T03`. Ready: `P07-T02`, `P08-T02`.
 
 ## Actualización
 
@@ -169,3 +169,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P07-T01 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P07-T01-telemetry` |
 | P06-T04 | `in_progress → in_review` | `5c47db7`, `06b9a01` | https://github.com/franjimenxz/Project-IA/pull/29 |
 | P06-T04 | `in_review → accepted` | `06b9a01` merged `c411002` | https://github.com/franjimenxz/Project-IA/pull/29 |
+| P07-T01 | `in_progress → in_review → accepted` | `349a3d5` merged `e2cb470` | https://github.com/franjimenxz/Project-IA/pull/32 |
+| P07-T02 | remains `ready` | P07-T01 accepted; conflicto `src/ia_mcp/observability` y `tests/security/test_observability.py` liberado | [P07-T01](../phases/phase-07-operability-and-observability/evidence/P07-T01.md) |
