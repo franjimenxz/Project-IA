@@ -122,6 +122,32 @@ def test_secret_reference_is_validated_without_printing_value(tmp_path: Path) ->
     assert any("secret" in issue.message.lower() for issue in report.errors)
 
 
+def test_content_hash_changes_when_secret_reference_uri_changes(tmp_path: Path) -> None:
+    package_a = write_package(tmp_path / "a")
+    package_b = write_package(
+        tmp_path / "b",
+        integrations={
+            "channels": [
+                {
+                    "channel": "simulated",
+                    "external_account_id": "tenant-b-simulated",
+                    "secret_reference": "sm://tenant-b/channel/simulated-alt",
+                }
+            ]
+        },
+    )
+    report_a = validate_package(package_a)
+    report_b = validate_package(package_b)
+    assert report_a.valid is True
+    assert report_b.valid is True
+    assert report_a.content_hash is not None
+    assert report_b.content_hash is not None
+    assert report_a.content_hash != report_b.content_hash
+    dumped = report_a.model_dump_json() + report_b.model_dump_json()
+    assert "plain-secret" not in dumped
+    assert "sk-live-" not in dumped
+
+
 def test_fixture_tenant_b_package_is_valid() -> None:
     report = validate_package(FIXTURE_TENANT_B)
     assert report.valid is True

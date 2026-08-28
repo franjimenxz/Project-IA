@@ -347,8 +347,8 @@ def _skill_for_tool(tool: str) -> str | None:
 def _content_hash(loaded: LoadedPackage) -> str:
     payload = {
         "tenant": loaded.tenant,
-        "config": loaded.config,
-        "integrations": _redact_references(loaded.integrations),
+        "config": _omit_secret_literals(loaded.config),
+        "integrations": _omit_secret_literals(loaded.integrations),
         "knowledge": loaded.knowledge,
         "policies": loaded.policies,
         "evals": loaded.evals,
@@ -357,15 +357,15 @@ def _content_hash(loaded: LoadedPackage) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _redact_references(node: Any) -> Any:
+def _omit_secret_literals(node: Any) -> Any:
     if isinstance(node, dict):
-        redacted: dict[str, Any] = {}
+        omitted: dict[str, Any] = {}
         for key, value in node.items():
-            if str(key) in REFERENCE_KEYS or _is_secret_key(str(key)):
-                redacted[key] = "[redacted-reference]"
+            if _is_secret_key(str(key)):
+                omitted[key] = "[omitted-literal]"
             else:
-                redacted[key] = _redact_references(value)
-        return redacted
+                omitted[key] = _omit_secret_literals(value)
+        return omitted
     if isinstance(node, list):
-        return [_redact_references(item) for item in node]
+        return [_omit_secret_literals(item) for item in node]
     return node
