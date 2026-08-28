@@ -1,0 +1,23 @@
+{
+  "schema": "ia-mcp.observability.alert/v1",
+  "id": "isolation-violation",
+  "title": "Tenant isolation violation",
+  "owner": "platform-security",
+  "severity": "critical",
+  "window": "5m",
+  "threshold": {
+    "metric": "isolation_violation_count",
+    "operator": ">=",
+    "value": 1
+  },
+  "dedupe": {
+    "key": ["alert_id", "tenant_id"],
+    "window": "30m"
+  },
+  "runbook": "docs/runbooks/isolation.md",
+  "signal": {
+    "metric": "isolation_violation_count",
+    "description": "Count of tenant_isolation_violation events from audit and typed errors",
+    "labels": ["error_code", "tenant_id"]
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "ia-mcp.observability.dashboard/v1",
+  "id": "health-dependencies",
+  "title": "Health and dependencies",
+  "access": "platform-operator",
+  "panels": [
+    {
+      "title": "Request rate",
+      "metric": "http_request_rate",
+      "labels": ["status"]
+    },
+    {
+      "title": "Request errors",
+      "metric": "http_request_error_rate",
+      "labels": ["status"]
+    },
+    {
+      "title": "Request duration",
+      "metric": "http_request_duration_ms",
+      "labels": ["status"]
+    },
+    {
+      "title": "Database pool",
+      "metric": "db_pool_checked_out",
+      "labels": ["status"]
+    },
+    {
+      "title": "Redis errors",
+      "metric": "redis_error_count",
+      "labels": ["status"]
+    },
+    {
+      "title": "Object store errors",
+      "metric": "object_store_error_count",
+      "labels": ["status"]
+    },
+    {
+      "title": "Worker heartbeat",
+      "metric": "worker_heartbeat_age_seconds",
+      "labels": ["status"]
+    },
+    {
+      "title": "Telemetry exporter failure",
+      "metric": "telemetry_exporter_failure",
+      "labels": ["status"]
+    }
+  ]
+}

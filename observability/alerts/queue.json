@@ -1,0 +1,23 @@
+{
+  "schema": "ia-mcp.observability.alert/v1",
+  "id": "queue-backlog",
+  "title": "Queue backlog",
+  "owner": "platform-oncall",
+  "severity": "medium",
+  "window": "15m",
+  "threshold": {
+    "metric": "queue_age_seconds",
+    "operator": ">=",
+    "value": 300
+  },
+  "dedupe": {
+    "key": ["alert_id", "tenant_id"],
+    "window": "30m"
+  },
+  "runbook": "docs/runbooks/queue.md",
+  "signal": {
+    "metric": "queue_age_seconds",
+    "description": "Age of the oldest pending or claimed job or outbox event; companion signal is queue_depth",
+    "labels": ["status", "tenant_id"]
+  }
+}

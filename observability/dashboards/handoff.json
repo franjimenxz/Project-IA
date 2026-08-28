@@ -1,0 +1,18 @@
+{
+  "schema": "ia-mcp.observability.dashboard/v1",
+  "id": "handoff",
+  "title": "Handoff",
+  "access": "rbac-tenant-assignment",
+  "panels": [
+    {
+      "title": "Handoff rate",
+      "metric": "handoff_rate",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Handoff reason",
+      "metric": "handoff_count",
+      "labels": ["status", "tenant_id"]
+    }
+  ]
+}

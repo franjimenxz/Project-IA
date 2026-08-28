@@ -1,0 +1,38 @@
+{
+  "schema": "ia-mcp.observability.dashboard/v1",
+  "id": "workflows-tools",
+  "title": "Workflows and tools",
+  "access": "rbac-tenant-assignment",
+  "panels": [
+    {
+      "title": "Workflow starts",
+      "metric": "workflow_start_count",
+      "labels": ["workflow_type", "tenant_id"]
+    },
+    {
+      "title": "Workflow completions",
+      "metric": "workflow_completion_count",
+      "labels": ["workflow_type", "status", "tenant_id"]
+    },
+    {
+      "title": "Manual review rate",
+      "metric": "workflow_manual_review_rate",
+      "labels": ["workflow_type", "tenant_id"]
+    },
+    {
+      "title": "Unknown mutation outcomes",
+      "metric": "unknown_mutation_outcome_count",
+      "labels": ["workflow_type", "tool_name", "error_code", "tenant_id"]
+    },
+    {
+      "title": "Tool calls",
+      "metric": "tool_call_count",
+      "labels": ["tool_name", "status", "mcp_server_id", "tenant_id"]
+    },
+    {
+      "title": "Tool errors",
+      "metric": "tool_error_ratio",
+      "labels": ["tool_name", "error_code", "mcp_server_id", "tenant_id"]
+    }
+  ]
+}

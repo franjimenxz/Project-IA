@@ -1,0 +1,23 @@
+{
+  "schema": "ia-mcp.observability.alert/v1",
+  "id": "unknown-mutation-outcome",
+  "title": "Unknown mutation outcome",
+  "owner": "workflow-oncall",
+  "severity": "high",
+  "window": "10m",
+  "threshold": {
+    "metric": "unknown_mutation_outcome_count",
+    "operator": ">=",
+    "value": 1
+  },
+  "dedupe": {
+    "key": ["alert_id", "tenant_id", "workflow_type"],
+    "window": "30m"
+  },
+  "runbook": "docs/runbooks/unknown-outcome.md",
+  "signal": {
+    "metric": "unknown_mutation_outcome_count",
+    "description": "Workflows that leave executing after a mutating tool with upstream_timeout or unknown outcome and enter manual_review_required",
+    "labels": ["workflow_type", "tool_name", "error_code", "tenant_id"]
+  }
+}

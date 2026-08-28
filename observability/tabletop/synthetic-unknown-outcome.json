@@ -1,0 +1,46 @@
+{
+  "incident_id": "tabletop-unknown-outcome-001",
+  "alert_id": "unknown-mutation-outcome",
+  "run": {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+    "conversation_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1",
+    "correlation_id": "cccccccc-cccc-4ccc-8ccc-ccccccccccc1",
+    "config_version": 3,
+    "skill": "appointments.create",
+    "status": "completed",
+    "error_code": "upstream_timeout",
+    "started_at": "2026-08-28T16:20:00+00:00",
+    "finished_at": "2026-08-28T16:20:08+00:00"
+  },
+  "workflow": {
+    "id": "dddddddd-dddd-4ddd-8ddd-ddddddddddd1",
+    "type": "create_appointment",
+    "state": "manual_review_required",
+    "status": "manual_review_required",
+    "schema_version": 1
+  },
+  "tools": [
+    {
+      "tool_name": "appointments.search",
+      "mcp_server_id": "mcp-appointments",
+      "status": "ok",
+      "error_code": null,
+      "retry_count": 0
+    },
+    {
+      "tool_name": "appointments.create",
+      "mcp_server_id": "mcp-appointments",
+      "status": "timeout",
+      "error_code": "upstream_timeout",
+      "retry_count": 1
+    }
+  ],
+  "timeline": [
+    {"occurred_at": "2026-08-28T16:20:00+00:00", "kind": "run_started", "label": "run_started"},
+    {"occurred_at": "2026-08-28T16:20:02+00:00", "kind": "tool", "label": "appointments.search"},
+    {"occurred_at": "2026-08-28T16:20:04+00:00", "kind": "tool", "label": "appointments.create", "error_code": "upstream_timeout"},
+    {"occurred_at": "2026-08-28T16:20:05+00:00", "kind": "retry", "label": "appointments.create"},
+    {"occurred_at": "2026-08-28T16:20:07+00:00", "kind": "transition", "label": "executing -> manual_review_required"},
+    {"occurred_at": "2026-08-28T16:20:08+00:00", "kind": "run_finished", "label": "run_finished"}
+  ]
+}
