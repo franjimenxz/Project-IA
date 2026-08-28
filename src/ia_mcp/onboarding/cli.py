@@ -8,7 +8,11 @@ from uuid import UUID
 
 from ia_mcp.observability.redaction import redact
 from ia_mcp.onboarding.commands import OnboardingError, Principal, load_tenant_package
-from ia_mcp.onboarding.service import TenantOnboardingService, admin_context_for
+from ia_mcp.onboarding.service import (
+    TenantOnboardingService,
+    admin_context_for,
+    tenant_context_for,
+)
 from ia_mcp.onboarding.validator import validate_package
 from ia_mcp.shared.errors import TenantIsolationViolation
 
@@ -31,6 +35,15 @@ def main(
     disable_parser.add_argument("--principal-id", type=UUID, required=True)
     disable_parser.add_argument("--role", action="append", default=[])
     disable_parser.add_argument("--reason", required=True)
+    preflight_parser = subparsers.add_parser("preflight")
+    preflight_parser.add_argument("package", type=Path)
+    preflight_parser.add_argument("--principal-id", type=UUID, required=True)
+    preflight_parser.add_argument("--role", action="append", default=[])
+    activate_parser = subparsers.add_parser("activate")
+    activate_parser.add_argument("slug")
+    activate_parser.add_argument("--report-hash", required=True)
+    activate_parser.add_argument("--principal-id", type=UUID, required=True)
+    activate_parser.add_argument("--role", action="append", default=[])
     args = parser.parse_args(list(argv) if argv is not None else None)
     if args.command == "validate":
         report = validate_package(args.package)
@@ -68,6 +81,39 @@ async def _dispatch(args: argparse.Namespace, service: TenantOnboardingService) 
                 args.reason,
             )
             print(redact(f"disabled slug={args.slug}"))
+            return 0
+        if args.command == "preflight":
+            validation = validate_package(args.package)
+            if not validation.valid or validation.content_hash is None:
+                print("tenant package is not valid")
+                return 1
+            package = load_tenant_package(args.package)
+            tenant = await service.get_by_slug(package.tenant.slug)
+            if tenant is None:
+                print("tenant is not available")
+                return 1
+            admin_context_for(principal, tenant)
+            report = await service.preflight(
+                tenant_context_for(tenant),
+                content_hash=validation.content_hash,
+            )
+            print(
+                redact(
+                    f"preflight slug={tenant.identity.tenant_slug} "
+                    f"passed={report.passed} hash={report.report_hash}"
+                )
+            )
+            return 0 if report.passed else 1
+        if args.command == "activate":
+            tenant = await service.get_by_slug(args.slug)
+            if tenant is None:
+                print("tenant is not available")
+                return 1
+            await service.activate(
+                admin_context_for(principal, tenant),
+                args.report_hash,
+            )
+            print(redact(f"activated slug={args.slug}"))
             return 0
     except OnboardingError as exc:
         print(redact(exc.safe_message))

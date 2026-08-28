@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Column,
@@ -16,6 +17,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -35,6 +37,8 @@ from ia_mcp.configuration.models import (
     TenantConfigDraft,
 )
 from ia_mcp.observability.redaction import redact
+from ia_mcp.observability.run_query import RunInvestigationQuery
+from ia_mcp.onboarding.activation import assert_report_allows_activation
 from ia_mcp.onboarding.commands import (
     ConfigLifecycleStatus,
     OnboardingError,
@@ -43,9 +47,19 @@ from ia_mcp.onboarding.commands import (
     TenantLifecycleStatus,
 )
 from ia_mcp.onboarding.models import TenantPackage
+from ia_mcp.onboarding.preflight import (
+    CheckOutcome,
+    PreflightCheckPort,
+    PreflightReport,
+    collect_check_outcomes,
+    default_preflight_checks,
+    preflight_report_table,
+    report_from_outcomes,
+    tenant_onboarding_state_table,
+)
 from ia_mcp.scheduling.service import scheduled_job_table
 from ia_mcp.shared.errors import TenantIsolationViolation
-from ia_mcp.tenancy.models import ChannelIntegration, TenantIdentity
+from ia_mcp.tenancy.models import ChannelIntegration, TenantContext, TenantIdentity
 
 PLATFORM_ADMIN = "platform_admin"
 TENANT_ADMIN = "tenant_admin"
@@ -355,6 +369,233 @@ class SqlAlchemyOnboardingStore:
                 enabled=row.status == "active",
             )
 
+    async def preflight(
+        self,
+        tenant: TenantContext,
+        *,
+        content_hash: str,
+        checks: Sequence[PreflightCheckPort],
+    ) -> PreflightReport:
+        if len(content_hash) != 64:
+            raise OnboardingError("invalid_preflight", "A content hash is required.")
+        async with self._sessions() as session, session.begin():
+            row = (
+                (
+                    await session.execute(
+                        select(tenant_table)
+                        .where(tenant_table.c.id == tenant.tenant_id)
+                        .with_for_update()
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if row is None or row["slug"] != tenant.tenant_slug:
+                raise TenantIsolationViolation()
+            config = (
+                await session.execute(
+                    select(tenant_config_table.c.content_hash)
+                    .where(tenant_config_table.c.tenant_id == tenant.tenant_id)
+                    .order_by(tenant_config_table.c.version.desc())
+                    .limit(1)
+                )
+            ).first()
+            if config is None:
+                raise OnboardingError(
+                    "invalid_preflight",
+                    "Tenant configuration is missing.",
+                )
+            config_hash = str(config.content_hash)
+        outcomes = await collect_check_outcomes(tenant, checks)
+        report = report_from_outcomes(
+            tenant_id=tenant.tenant_id,
+            content_hash=content_hash,
+            config_hash=config_hash,
+            checks=outcomes,
+        )
+        return await self._persist_report(tenant, report)
+
+    async def activate(self, admin: TenantAdminContext, report_hash: str) -> None:
+        async with self._sessions() as session, session.begin():
+            row = (
+                (
+                    await session.execute(
+                        select(tenant_table)
+                        .where(tenant_table.c.id == admin.identity.tenant_id)
+                        .with_for_update()
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if row is None or row["slug"] != admin.identity.tenant_slug:
+                raise TenantIsolationViolation()
+            report_row = (
+                (
+                    await session.execute(
+                        select(preflight_report_table).where(
+                            preflight_report_table.c.report_hash == report_hash
+                        )
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if report_row is None:
+                raise OnboardingError(
+                    "stale_preflight",
+                    "Preflight evidence is not available.",
+                )
+            report = _report_from_row(report_row)
+            if report.tenant_id != admin.identity.tenant_id:
+                raise TenantIsolationViolation()
+            config = (
+                await session.execute(
+                    select(
+                        tenant_config_table.c.content_hash,
+                        tenant_config_table.c.version,
+                    )
+                    .where(tenant_config_table.c.tenant_id == admin.identity.tenant_id)
+                    .order_by(tenant_config_table.c.version.desc())
+                    .limit(1)
+                )
+            ).first()
+            if config is None:
+                raise OnboardingError(
+                    "invalid_preflight",
+                    "Tenant configuration is missing.",
+                )
+            current_content = (
+                await session.execute(
+                    select(tenant_onboarding_state_table.c.package_content_hash).where(
+                        tenant_onboarding_state_table.c.tenant_id
+                        == admin.identity.tenant_id
+                    )
+                )
+            ).scalar_one_or_none()
+            if current_content is None:
+                raise OnboardingError(
+                    "stale_preflight",
+                    "Preflight evidence is not available.",
+                )
+            assert_report_allows_activation(
+                report,
+                content_hash=str(current_content),
+                config_hash=str(config.content_hash),
+            )
+            if row["status"] == "active":
+                return
+            now = _now()
+            await session.execute(
+                tenant_table.update()
+                .where(tenant_table.c.id == admin.identity.tenant_id)
+                .values(
+                    status="active",
+                    active_config_version=int(config.version),
+                    updated_at=now,
+                )
+            )
+            await session.execute(
+                channel_integration_table.update()
+                .where(
+                    channel_integration_table.c.tenant_id == admin.identity.tenant_id
+                )
+                .values(status="active")
+            )
+            await session.execute(
+                integration_table.update()
+                .where(integration_table.c.tenant_id == admin.identity.tenant_id)
+                .values(status="active")
+            )
+            await session.execute(
+                audit_event_table.insert().values(
+                    id=uuid4(),
+                    tenant_id=admin.identity.tenant_id,
+                    actor_id=admin.principal_id,
+                    action="activate",
+                    version=int(config.version),
+                    payload={
+                        "report_hash": redact(report.report_hash),
+                        "content_hash": redact(report.content_hash),
+                        "config_hash": redact(report.config_hash),
+                    },
+                    created_at=now,
+                )
+            )
+
+    async def _persist_report(
+        self, tenant: TenantContext, report: PreflightReport
+    ) -> PreflightReport:
+        now = _now()
+        try:
+            async with self._sessions() as session, session.begin():
+                existing = (
+                    (
+                        await session.execute(
+                            select(preflight_report_table).where(
+                                preflight_report_table.c.report_hash
+                                == report.report_hash
+                            )
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                persisted = report
+                if existing is None:
+                    await session.execute(
+                        preflight_report_table.insert().values(
+                            id=uuid4(),
+                            tenant_id=report.tenant_id,
+                            report_hash=report.report_hash,
+                            content_hash=report.content_hash,
+                            config_hash=report.config_hash,
+                            passed=report.passed,
+                            checks=[
+                                item.model_dump(mode="json") for item in report.checks
+                            ],
+                            created_at=report.created_at,
+                        )
+                    )
+                else:
+                    persisted = _report_from_row(existing)
+                await session.execute(
+                    pg_insert(tenant_onboarding_state_table)
+                    .values(
+                        tenant_id=tenant.tenant_id,
+                        package_content_hash=report.content_hash,
+                        updated_at=now,
+                    )
+                    .on_conflict_do_update(
+                        index_elements=["tenant_id"],
+                        set_={
+                            "package_content_hash": report.content_hash,
+                            "updated_at": now,
+                        },
+                    )
+                )
+                return persisted
+        except IntegrityError:
+            async with self._sessions() as session:
+                existing = (
+                    (
+                        await session.execute(
+                            select(preflight_report_table).where(
+                                preflight_report_table.c.report_hash
+                                == report.report_hash
+                            )
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+            if existing is None:
+                raise OnboardingError(
+                    "invalid_preflight",
+                    "Preflight evidence could not be stored.",
+                )
+            return _report_from_row(existing)
+
     async def _load_by_slug(
         self, session: AsyncSession, slug: str
     ) -> ProvisionedTenant | None:
@@ -382,9 +623,38 @@ class SqlAlchemyOnboardingStore:
         return _provisioned(tenant, int(version_row.version), str(version_row.status))
 
 
+def _report_from_row(row: Any) -> PreflightReport:
+    checks = tuple(CheckOutcome.model_validate(item) for item in row["checks"])
+    created_at = row["created_at"]
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    return PreflightReport(
+        report_hash=str(row["report_hash"]),
+        tenant_id=row["tenant_id"],
+        content_hash=str(row["content_hash"]),
+        config_hash=str(row["config_hash"]),
+        passed=bool(row["passed"]),
+        checks=checks,
+        created_at=created_at,
+    )
+
+
 class TenantOnboardingService:
-    def __init__(self, engine: AsyncEngine) -> None:
+    def __init__(
+        self,
+        engine: AsyncEngine,
+        *,
+        checks: Sequence[PreflightCheckPort] | None = None,
+        investigation_query: RunInvestigationQuery | None = None,
+    ) -> None:
         self._store = SqlAlchemyOnboardingStore(engine)
+        self._checks: tuple[PreflightCheckPort, ...] = (
+            tuple(checks)
+            if checks is not None
+            else default_preflight_checks(
+                engine, investigation_query=investigation_query
+            )
+        )
 
     async def get_by_slug(self, slug: str) -> ProvisionedTenant | None:
         return await self._store.get_by_slug(slug)
@@ -394,6 +664,17 @@ class TenantOnboardingService:
     ) -> ProvisionedTenant:
         _require_platform_admin(actor.roles)
         return await self._store.provision(package, actor)
+
+    async def preflight(
+        self, tenant: TenantContext, *, content_hash: str
+    ) -> PreflightReport:
+        return await self._store.preflight(
+            tenant, content_hash=content_hash, checks=self._checks
+        )
+
+    async def activate(self, admin: TenantAdminContext, report_hash: str) -> None:
+        _require_disable_role(admin)
+        await self._store.activate(admin, report_hash)
 
     async def disable(self, admin: TenantAdminContext, reason: str) -> None:
         if not reason.strip():
@@ -406,6 +687,17 @@ class TenantOnboardingService:
 
     async def get(self, channel: str, account_id: str) -> ChannelIntegration | None:
         return await self._store.get(channel, account_id)
+
+
+def tenant_context_for(
+    tenant: ProvisionedTenant, *, correlation_id: UUID | None = None
+) -> TenantContext:
+    return TenantContext(
+        tenant_id=tenant.identity.tenant_id,
+        tenant_slug=tenant.identity.tenant_slug,
+        config_version=tenant.config_version,
+        correlation_id=correlation_id or uuid4(),
+    )
 
 
 def admin_context_for(
