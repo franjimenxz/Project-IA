@@ -36,7 +36,7 @@ from tests.unit.scheduling.fakes import (
     InMemoryAuditSink,
 )
 
-pytestmark = [pytest.mark.anyio, pytest.mark.resilience]
+pytestmark = [pytest.mark.anyio, pytest.mark.integration]
 
 
 async def test_restarted_workflow_and_job_resume() -> None:

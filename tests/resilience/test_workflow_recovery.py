@@ -79,7 +79,6 @@ def _seed_tenants() -> None:
 
 @pytest.mark.anyio
 @pytest.mark.integration
-@pytest.mark.resilience
 async def test_crash_reload_preserves_state_and_duplicate_idempotency() -> None:
     _reset_schema()
     _seed_tenants()
