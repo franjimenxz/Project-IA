@@ -22,20 +22,20 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P01-T03 | W0 | accepted | P01-T01, P01-T02 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T03-docs-ci.md) |
 | P02-T01 | W1 | accepted | P01-T03 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T01-bootstrap.md) |
 | P02-T02 | W1 | accepted | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T02-tenancy.md) |
-| P02-T03 | W1 | in_progress | P02-T02 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T03-configuration.md) |
+| P02-T03 | W1 | accepted | P02-T02 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T03-configuration.md) |
 | P02-T04 | W1 | accepted | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T04-observability-errors.md) |
-| P02-T05 | W1 | in_progress | P02-T02, P02-T04 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T05-simulated-channel.md) |
+| P02-T05 | W1 | accepted | P02-T02, P02-T04 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T05-simulated-channel.md) |
 | P03-T01 | W2 | accepted | P02-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T01-common-contracts.md) |
 | P03-T02 | W2 | accepted | P03-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T02-appointment-contracts.md) |
 | P03-T03 | W2 | accepted | P02-T02 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T03-tool-registry.md) |
-| P03-T04 | W2 | in_progress | P03-T02, P03-T03 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T04-fake-appointments.md) |
-| P03-T05 | W2 | blocked | P03-T03, P03-T04 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T05-tool-executor.md) |
-| P04-T01 | W3 | blocked | P02-T03, P02-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T01-conversation-runs.md) |
-| P04-T02 | W3 | ready | P03-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T02-context-skills.md) |
-| P04-T03 | W3 | blocked | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T03-knowledge.md) |
+| P03-T04 | W2 | accepted | P03-T02, P03-T03 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T04-fake-appointments.md) |
+| P03-T05 | W2 | in_progress | P03-T03, P03-T04 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T05-tool-executor.md) |
+| P04-T01 | W3 | in_progress | P02-T03, P02-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T01-conversation-runs.md) |
+| P04-T02 | W3 | in_progress | P03-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T02-context-skills.md) |
+| P04-T03 | W3 | ready | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T03-knowledge.md) |
 | P04-T04 | W3 | blocked | P04-T01–P04-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T04-faq-harness.md) |
 | P04-T05 | W3 | blocked | P04-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T05-faq-e2e.md) |
-| P04-T06 | W3 | blocked | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
+| P04-T06 | W3 | ready | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
 | P04-T07 | W3 | blocked | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
 | P04-T08 | W3 | blocked | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
 | P04-T09 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P03-T03 accepted (`f4ec30d`, PR #5). En curso: `P02-T03` (Implementador), `P02-T05` (Implementador 3), `P03-T04` (Implementador 2). Ready: `P04-T02`.
+P03-T04 accepted (PR #8). En curso: `P04-T01` (Implementador 3), `P04-T02` PR #9 (Implementador), `P03-T05` (Implementador 2). Ready: `P04-T03`, `P04-T06`.
 
 ## Actualización
 
@@ -106,3 +106,15 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P03-T03 | `in_review → accepted` | `3e41f4f` merged `f4ec30d` | https://github.com/franjimenxz/Project-IA/pull/5 |
 | P03-T04 | `blocked → ready → in_progress` | dependencias P03-T02 y P03-T03 aceptadas | asignada a Implementador 2 |
 | P04-T02 | `blocked → ready` | dependencia P03-T03 aceptada | — |
+| P02-T03 | `in_progress → in_review` | `062b7f8` | https://github.com/franjimenxz/Project-IA/pull/6 |
+| P02-T03 | `in_review → accepted` | `062b7f8` merged `ea2934d` | https://github.com/franjimenxz/Project-IA/pull/6 |
+| P04-T01 | `blocked → ready` | dependencias P02-T03 y P02-T04 aceptadas | — |
+| P04-T03 | `blocked → ready` | dependencia P02-T03 aceptada | — |
+| P04-T06 | `blocked → ready` | dependencia P02-T03 aceptada | — |
+| P04-T02 | `ready → in_progress` | asignada a Implementador | — |
+| P02-T05 | `in_progress → in_review` | `bdf4915` | https://github.com/franjimenxz/Project-IA/pull/7 |
+| P02-T05 | `in_review → accepted` | `bdf4915` merged `ef09ffa` | https://github.com/franjimenxz/Project-IA/pull/7 |
+| P04-T01 | `ready → in_progress` | asignada a Implementador 3 | — |
+| P03-T04 | `in_progress → in_review` | `f5c32da` | https://github.com/franjimenxz/Project-IA/pull/8 |
+| P03-T04 | `in_review → accepted` | `f5c32da` | https://github.com/franjimenxz/Project-IA/pull/8 |
+| P03-T05 | `blocked → ready → in_progress` | dependencias P03-T03 y P03-T04 aceptadas | asignada a Implementador 2 |
