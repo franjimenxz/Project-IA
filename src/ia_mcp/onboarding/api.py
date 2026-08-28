@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from ia_mcp.configuration.models import TenantAdminContext
-from ia_mcp.onboarding.commands import OnboardingError, Principal, ProvisionedTenant
-from ia_mcp.onboarding.service import TenantOnboardingService
+from ia_mcp.onboarding.commands import (
+    OnboardingError,
+    Principal,
+    ProvisionedTenant,
+    load_tenant_package,
+)
+from ia_mcp.onboarding.service import (
+    PLATFORM_ADMIN,
+    TenantOnboardingService,
+    admin_context_for,
+)
 from ia_mcp.shared.errors import TenantIsolationViolation
 
 
@@ -18,8 +26,35 @@ class DisableRequest(BaseModel):
     reason: str = Field(min_length=1)
 
 
+class ProvisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    package_path: str = Field(min_length=1)
+
+
 def create_onboarding_router() -> APIRouter:
     router = APIRouter()
+
+    @router.post("/v1/admin/tenants/provision")
+    async def provision_tenant(
+        payload: ProvisionRequest,
+        service: Annotated[TenantOnboardingService, Depends(_get_service)],
+        principal: Annotated[Principal, Depends(_get_principal)],
+    ) -> dict[str, str]:
+        if PLATFORM_ADMIN not in principal.roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Administrator is not allowed to perform this action.",
+            )
+        try:
+            package = load_tenant_package(Path(payload.package_path))
+            tenant = await service.provision(package, principal)
+        except OnboardingError as exc:
+            raise HTTPException(
+                status_code=_status_for(exc),
+                detail=exc.safe_message,
+            ) from exc
+        return _tenant_body(tenant)
 
     @router.get("/v1/admin/tenants/{slug}")
     async def get_tenant(
@@ -27,13 +62,19 @@ def create_onboarding_router() -> APIRouter:
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
         principal: Annotated[Principal, Depends(_get_principal)],
     ) -> dict[str, str]:
-        del principal
         tenant = await service.get_by_slug(slug)
         if tenant is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Resource not found",
             )
+        try:
+            admin_context_for(principal, tenant)
+        except (OnboardingError, TenantIsolationViolation) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found",
+            ) from exc
         return _tenant_body(tenant)
 
     @router.post("/v1/admin/tenants/{slug}/disable")
@@ -49,13 +90,8 @@ def create_onboarding_router() -> APIRouter:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Resource not found",
             )
-        admin = TenantAdminContext(
-            identity=tenant.identity,
-            principal_id=principal.principal_id,
-            roles=principal.roles,
-            correlation_id=uuid4(),
-        )
         try:
+            admin = admin_context_for(principal, tenant)
             await service.disable(admin, payload.reason)
         except OnboardingError as exc:
             raise HTTPException(

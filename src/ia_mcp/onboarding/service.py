@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -34,6 +34,7 @@ from ia_mcp.configuration.models import (
     TenantAdminContext,
     TenantConfigDraft,
 )
+from ia_mcp.observability.redaction import redact
 from ia_mcp.onboarding.commands import (
     ConfigLifecycleStatus,
     OnboardingError,
@@ -48,6 +49,7 @@ from ia_mcp.tenancy.models import ChannelIntegration, TenantIdentity
 
 PLATFORM_ADMIN = "platform_admin"
 TENANT_ADMIN = "tenant_admin"
+type ProvisionIntegrity = Literal["slug_race", "channel_conflict"]
 
 metadata = MetaData()
 
@@ -65,6 +67,23 @@ integration_table = Table(
     UniqueConstraint("id", "tenant_id"),
     UniqueConstraint("tenant_id", "kind", "credentials_reference"),
 )
+
+
+def classify_provision_integrity(exc: IntegrityError) -> ProvisionIntegrity:
+    orig = exc.orig
+    name = ""
+    diag = getattr(orig, "diag", None)
+    if diag is not None:
+        name = str(getattr(diag, "constraint_name", "") or "")
+    message = str(orig) if orig is not None else str(exc)
+    blob = f"{name} {message}".lower()
+    if "tenant_slug" in blob or "key (slug)" in blob:
+        return "slug_race"
+    return "channel_conflict"
+
+
+class _SlugRace(Exception):
+    pass
 
 
 def _now() -> datetime:
@@ -136,89 +155,103 @@ class SqlAlchemyOnboardingStore:
         self, package: TenantPackage, actor: Principal
     ) -> ProvisionedTenant:
         slug = package.tenant.slug
-        async with self._sessions() as session, session.begin():
-            await session.execute(
-                text("SELECT pg_advisory_xact_lock(hashtext(:slug))"),
-                {"slug": slug},
-            )
-            existing = await self._load_by_slug(session, slug)
-            if existing is not None:
-                return existing
-            tenant_id = uuid4()
-            now = _now()
-            draft = _draft_from_package(package)
-            payload = draft.model_dump(mode="json")
-            try:
+        try:
+            async with self._sessions() as session, session.begin():
+                # hashtext is int4; collisions are possible. Unique slug + replay is authoritative.
                 await session.execute(
-                    tenant_table.insert().values(
-                        id=tenant_id,
-                        slug=slug,
-                        status="disabled",
-                        active_config_version=None,
-                        created_at=now,
-                        updated_at=now,
-                    )
+                    text("SELECT pg_advisory_xact_lock(hashtext(:slug))"),
+                    {"slug": slug},
                 )
-                await session.execute(
-                    tenant_config_table.insert().values(
-                        tenant_id=tenant_id,
-                        version=int(package.config.version),
-                        schema_version=draft.schema_version,
-                        status="draft",
-                        payload=payload,
-                        content_hash=payload_hash(payload),
-                        created_by=actor.principal_id,
-                        created_at=now,
-                        published_at=None,
-                    )
-                )
-                for channel in package.integrations.channels:
+                existing = await self._load_by_slug(session, slug)
+                if existing is not None:
+                    return existing
+                tenant_id = uuid4()
+                now = _now()
+                draft = _draft_from_package(package)
+                payload = draft.model_dump(mode="json")
+                try:
                     await session.execute(
-                        channel_integration_table.insert().values(
-                            id=uuid4(),
-                            tenant_id=tenant_id,
-                            channel=channel.channel,
-                            external_account_id=channel.external_account_id,
-                            secret_reference=channel.secret_reference,
+                        tenant_table.insert().values(
+                            id=tenant_id,
+                            slug=slug,
                             status="disabled",
+                            active_config_version=None,
+                            created_at=now,
+                            updated_at=now,
                         )
                     )
-                for binding in package.integrations.integrations:
                     await session.execute(
-                        integration_table.insert().values(
-                            id=uuid4(),
+                        tenant_config_table.insert().values(
                             tenant_id=tenant_id,
-                            kind=binding.kind,
-                            server_id=binding.server_id,
-                            credentials_reference=binding.credentials_reference,
-                            capabilities=list(binding.capabilities),
-                            status="disabled",
+                            version=int(package.config.version),
+                            schema_version=draft.schema_version,
+                            status="draft",
+                            payload=payload,
+                            content_hash=payload_hash(payload),
+                            created_by=actor.principal_id,
+                            created_at=now,
+                            published_at=None,
                         )
                     )
-                await session.execute(
-                    audit_event_table.insert().values(
-                        id=uuid4(),
-                        tenant_id=tenant_id,
-                        actor_id=actor.principal_id,
-                        action="provision",
-                        version=int(package.config.version),
-                        created_at=now,
+                    for channel in package.integrations.channels:
+                        await session.execute(
+                            channel_integration_table.insert().values(
+                                id=uuid4(),
+                                tenant_id=tenant_id,
+                                channel=channel.channel,
+                                external_account_id=channel.external_account_id,
+                                secret_reference=channel.secret_reference,
+                                status="disabled",
+                            )
+                        )
+                    for binding in package.integrations.integrations:
+                        await session.execute(
+                            integration_table.insert().values(
+                                id=uuid4(),
+                                tenant_id=tenant_id,
+                                kind=binding.kind,
+                                server_id=binding.server_id,
+                                credentials_reference=binding.credentials_reference,
+                                capabilities=list(binding.capabilities),
+                                status="disabled",
+                            )
+                        )
+                    await session.execute(
+                        audit_event_table.insert().values(
+                            id=uuid4(),
+                            tenant_id=tenant_id,
+                            actor_id=actor.principal_id,
+                            action="provision",
+                            version=int(package.config.version),
+                            created_at=now,
+                        )
                     )
+                except IntegrityError as exc:
+                    if classify_provision_integrity(exc) == "slug_race":
+                        raise _SlugRace from exc
+                    raise OnboardingError(
+                        "channel_conflict",
+                        "Channel mapping is not available.",
+                        retryable=False,
+                    ) from exc
+                return ProvisionedTenant(
+                    identity=TenantIdentity(tenant_id=tenant_id, tenant_slug=slug),
+                    status="disabled",
+                    config_version=int(package.config.version),
+                    config_status="draft",
                 )
-            except IntegrityError as exc:
+        except _SlugRace:
+            replayed = await self.get_by_slug(slug)
+            if replayed is None:
                 raise OnboardingError(
                     "channel_conflict",
                     "Channel mapping is not available.",
-                ) from exc
-            return ProvisionedTenant(
-                identity=TenantIdentity(tenant_id=tenant_id, tenant_slug=slug),
-                status="disabled",
-                config_version=int(package.config.version),
-                config_status="draft",
-            )
+                    retryable=False,
+                )
+            return replayed
 
     async def disable(self, admin: TenantAdminContext, reason: str) -> None:
-        del reason
+        sanitized_reason = redact(reason.strip())
         async with self._sessions() as session, session.begin():
             row = (
                 (
@@ -271,6 +304,7 @@ class SqlAlchemyOnboardingStore:
                     actor_id=admin.principal_id,
                     action="disable",
                     version=None,
+                    payload={"reason": sanitized_reason},
                     created_at=now,
                 )
             )
@@ -372,6 +406,34 @@ class TenantOnboardingService:
 
     async def get(self, channel: str, account_id: str) -> ChannelIntegration | None:
         return await self._store.get(channel, account_id)
+
+
+def admin_context_for(
+    principal: Principal, tenant: ProvisionedTenant
+) -> TenantAdminContext:
+    if PLATFORM_ADMIN in principal.roles:
+        return TenantAdminContext(
+            identity=tenant.identity,
+            principal_id=principal.principal_id,
+            roles=principal.roles,
+            correlation_id=uuid4(),
+        )
+    if TENANT_ADMIN in principal.roles:
+        if (
+            principal.tenant_id != tenant.identity.tenant_id
+            or principal.tenant_slug != tenant.identity.tenant_slug
+        ):
+            raise TenantIsolationViolation()
+        return TenantAdminContext(
+            identity=tenant.identity,
+            principal_id=principal.principal_id,
+            roles=principal.roles,
+            correlation_id=uuid4(),
+        )
+    raise OnboardingError(
+        "forbidden",
+        "Administrator is not allowed to perform this action.",
+    )
 
 
 def _require_platform_admin(roles: frozenset[str]) -> None:

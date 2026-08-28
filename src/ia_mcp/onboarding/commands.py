@@ -32,6 +32,8 @@ class OnboardingError(DomainError):
 class Principal:
     principal_id: UUID
     roles: frozenset[str]
+    tenant_id: UUID | None = None
+    tenant_slug: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

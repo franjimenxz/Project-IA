@@ -6,12 +6,15 @@ from uuid import UUID, uuid4
 
 import pytest
 from alembic.config import Config
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from alembic import command
 from ia_mcp.configuration.adapters.sqlalchemy import audit_event_table, tenant_table
 from ia_mcp.configuration.models import TenantAdminContext
+from ia_mcp.onboarding.api import create_onboarding_router
 from ia_mcp.onboarding.commands import OnboardingError, Principal
 from ia_mcp.onboarding.loader import load_package
 from ia_mcp.onboarding.models import (
@@ -25,8 +28,6 @@ from ia_mcp.onboarding.models import (
 )
 from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.onboarding.validator import validate_package
-from ia_mcp.shared.errors import TenantIsolationViolation
-from ia_mcp.tenancy.models import TenantIdentity
 from tests.unit.onboarding.helpers import write_package
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -174,32 +175,52 @@ async def test_tenant_admin_cannot_disable_another_tenant(
     tenant_c = await service.provision(
         _package(tmp_path / "c", "tenant-c", "tenant-c-simulated"), PLATFORM
     )
-    foreign_admin = TenantAdminContext(
-        identity=TenantIdentity(
-            tenant_id=tenant_c.identity.tenant_id,
-            tenant_slug="tenant-b",
-        ),
+    app = FastAPI()
+    app.include_router(create_onboarding_router())
+    app.state.onboarding_service = service
+    app.state.principal = Principal(
         principal_id=uuid4(),
         roles=frozenset({"tenant_admin"}),
-        correlation_id=uuid4(),
+        tenant_id=tenant_b.identity.tenant_id,
+        tenant_slug=tenant_b.identity.tenant_slug,
     )
-    with pytest.raises(TenantIsolationViolation):
-        await service.disable(foreign_admin, "cross-tenant")
-    own_admin = TenantAdminContext(
-        identity=tenant_c.identity,
-        principal_id=uuid4(),
-        roles=frozenset({"tenant_admin"}),
-        correlation_id=uuid4(),
+    client = TestClient(app)
+    leaked = client.get("/v1/admin/tenants/tenant-c")
+    assert leaked.status_code in {403, 404}
+    assert "tenant-c" not in leaked.text or leaked.status_code != 200
+    cross = client.post(
+        "/v1/admin/tenants/tenant-c/disable",
+        json={"reason": "cross-tenant"},
     )
-    await service.disable(own_admin, "owner-hold")
+    assert cross.status_code in {403, 404}
+    own_get = client.get("/v1/admin/tenants/tenant-b")
+    assert own_get.status_code == 200
+    own = client.post(
+        "/v1/admin/tenants/tenant-b/disable",
+        json={"reason": "owner-hold"},
+    )
+    assert own.status_code == 200
     async with engine.connect() as connection:
         rows = (
             await connection.execute(select(tenant_table.c.slug, tenant_table.c.status))
         ).all()
+        c_disable_actors = (
+            (
+                await connection.execute(
+                    select(audit_event_table.c.actor_id).where(
+                        audit_event_table.c.tenant_id == tenant_c.identity.tenant_id,
+                        audit_event_table.c.action == "disable",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         dump = str(rows)
     by_slug = {row[0]: row[1] for row in rows}
     assert by_slug["tenant-b"] == "disabled"
     assert by_slug["tenant-c"] == "disabled"
+    assert c_disable_actors == []
     assert "plain-secret" not in dump
     assert "sm://tenant-b/mcp/appointments" not in dump
 

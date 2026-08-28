@@ -46,6 +46,7 @@ from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.onboarding.validator import validate_package
 from ia_mcp.scheduling.models import JOB_TYPE, ScheduledJob
 from ia_mcp.scheduling.service import SqlAlchemyJobStore, scheduled_job_table
+from ia_mcp.shared.errors import DomainError
 from ia_mcp.tenancy.models import TenantIdentity
 from ia_mcp.tenancy.service import TenantResolutionError, TenantService
 from tests.unit.onboarding.helpers import write_package
@@ -398,24 +399,25 @@ async def test_disable_blocks_new_effects_preserves_audit_and_leaves_a_intact(
         server_id="fake-appointments-b",
     )
     provisioned = await service.provision(_tenant_package(root), PLATFORM_PRINCIPAL)
-    await job_store.put(
-        ScheduledJob(
-            tenant_id=provisioned.identity.tenant_id,
-            id=uuid4(),
-            type=JOB_TYPE,
-            payload={"schema_version": 1, "appointment_id": "b-1"},
-            business_key="b-1:pre_appointment",
-            scheduled_for=now,
-            schedule_version=1,
-            status="pending",
-            attempts=0,
-            lock_owner=None,
-            lock_expires_at=None,
-            last_error=None,
-            created_at=now,
-            updated_at=now,
+    async with engine.begin() as connection:
+        await connection.execute(
+            scheduled_job_table.insert().values(
+                tenant_id=provisioned.identity.tenant_id,
+                id=uuid4(),
+                type=JOB_TYPE,
+                payload={"schema_version": 1, "appointment_id": "b-1"},
+                business_key="b-1:pre_appointment",
+                scheduled_for=now,
+                schedule_version=1,
+                status="pending",
+                attempts=0,
+                lock_owner=None,
+                lock_expires_at=None,
+                last_error=None,
+                created_at=now,
+                updated_at=now,
+            )
         )
-    )
     admin_b = TenantAdminContext(
         identity=provisioned.identity,
         principal_id=PLATFORM_PRINCIPAL.principal_id,
@@ -485,11 +487,109 @@ async def test_disable_blocks_new_effects_preserves_audit_and_leaves_a_intact(
     assert caught.value.code == "tenant_disabled"
     assert "not available" in caught.value.safe_message.lower()
     await service.require_active(TENANT_A_IDENTITY)
+    async with engine.begin() as connection:
+        await connection.execute(
+            scheduled_job_table.insert().values(
+                tenant_id=provisioned.identity.tenant_id,
+                id=UUID("00000000-0000-4000-8000-0000000000bb"),
+                type=JOB_TYPE,
+                payload={"schema_version": 1, "appointment_id": "b-2"},
+                business_key="b-2:pre_appointment",
+                scheduled_for=now,
+                schedule_version=1,
+                status="pending",
+                attempts=0,
+                lock_owner=None,
+                lock_expires_at=None,
+                last_error=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    with pytest.raises(DomainError) as blocked_put:
+        await job_store.put(
+            ScheduledJob(
+                tenant_id=provisioned.identity.tenant_id,
+                id=uuid4(),
+                type=JOB_TYPE,
+                payload={"schema_version": 1, "appointment_id": "b-3"},
+                business_key="b-3:pre_appointment",
+                scheduled_for=now,
+                schedule_version=1,
+                status="pending",
+                attempts=0,
+                lock_owner=None,
+                lock_expires_at=None,
+                last_error=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    assert blocked_put.value.code == "tenant_disabled"
+    claimed = await job_store.claim_due(now=now, owner="worker-1", lock_until=now)
+    assert claimed is not None
+    assert claimed.tenant_id == TENANT_A
+    second = await job_store.claim_due(now=now, owner="worker-1", lock_until=now)
+    assert second is None or second.tenant_id == TENANT_A
+    disable_payloads = []
+    async with engine.connect() as connection:
+        disable_payloads = list(
+            (
+                await connection.execute(
+                    select(audit_event_table.c.payload).where(
+                        audit_event_table.c.tenant_id == provisioned.identity.tenant_id,
+                        audit_event_table.c.action == "disable",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert any(
+        isinstance(row, dict) and row.get("reason") == "cutover-hold"
+        for row in disable_payloads
+    )
+    assert all("plain-secret" not in str(row) for row in disable_payloads)
 
 
 @pytest.mark.anyio
 @pytest.mark.integration
-async def test_cli_and_api_adapters_provision_and_disable(
+async def test_api_provision_creates_disabled_tenant(
+    tmp_path: Path,
+    engine: AsyncEngine,
+    service: TenantOnboardingService,
+) -> None:
+    root = _package_for(
+        tmp_path / "b",
+        slug="tenant-b",
+        account="tenant-b-simulated",
+        server_id="fake-appointments-b",
+    )
+    app = FastAPI()
+    app.include_router(create_onboarding_router())
+    app.state.onboarding_service = service
+    app.state.principal = PLATFORM_PRINCIPAL
+    client = TestClient(app)
+    created = client.post(
+        "/v1/admin/tenants/provision",
+        json={"package_path": str(root)},
+    )
+    assert created.status_code == 200
+    body = created.json()
+    assert body["slug"] == "tenant-b"
+    assert body["status"] == "disabled"
+    listed = client.get("/v1/admin/tenants/tenant-b")
+    assert listed.status_code == 200
+    disabled = client.post(
+        "/v1/admin/tenants/tenant-b/disable",
+        json={"reason": "maintenance"},
+    )
+    assert disabled.status_code == 200
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_cli_provision_and_disable(
     tmp_path: Path,
     engine: AsyncEngine,
     service: TenantOnboardingService,
@@ -516,15 +616,6 @@ async def test_cli_and_api_adapters_provision_and_disable(
     assert exit_code == 0
     package = load_tenant_package(root)
     assert package.tenant.slug == "tenant-b"
-    app = FastAPI()
-    app.include_router(create_onboarding_router())
-    app.state.onboarding_service = service
-    app.state.principal = PLATFORM_PRINCIPAL
-    client = TestClient(app)
-    listed = client.get("/v1/admin/tenants/tenant-b")
-    assert listed.status_code == 200
-    body = listed.json()
-    assert body["status"] == "disabled"
     disable_exit = await asyncio.to_thread(
         lambda: onboarding_cli(
             [
@@ -541,8 +632,3 @@ async def test_cli_and_api_adapters_provision_and_disable(
         )
     )
     assert disable_exit == 0
-    disabled = client.post(
-        "/v1/admin/tenants/tenant-b/disable",
-        json={"reason": "maintenance"},
-    )
-    assert disabled.status_code == 200

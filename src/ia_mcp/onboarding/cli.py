@@ -6,10 +6,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from uuid import UUID
 
-from ia_mcp.configuration.models import TenantAdminContext
 from ia_mcp.observability.redaction import redact
 from ia_mcp.onboarding.commands import OnboardingError, Principal, load_tenant_package
-from ia_mcp.onboarding.service import TenantOnboardingService
+from ia_mcp.onboarding.service import TenantOnboardingService, admin_context_for
 from ia_mcp.onboarding.validator import validate_package
 from ia_mcp.shared.errors import TenantIsolationViolation
 
@@ -65,12 +64,7 @@ async def _dispatch(args: argparse.Namespace, service: TenantOnboardingService) 
                 print("tenant is not available")
                 return 1
             await service.disable(
-                TenantAdminContext(
-                    identity=tenant.identity,
-                    principal_id=principal.principal_id,
-                    roles=principal.roles,
-                    correlation_id=principal.principal_id,
-                ),
+                admin_context_for(principal, tenant),
                 args.reason,
             )
             print(redact(f"disabled slug={args.slug}"))
