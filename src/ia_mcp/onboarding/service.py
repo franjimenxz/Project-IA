@@ -446,7 +446,20 @@ class SqlAlchemyOnboardingStore:
                     "stale_preflight",
                     "Preflight evidence is not available.",
                 )
-            report = _report_from_row(report_row)
+            checks = tuple(
+                CheckOutcome.model_validate(item) for item in report_row["checks"]
+            )
+            report = report_from_outcomes(
+                tenant_id=report_row["tenant_id"],
+                content_hash=str(report_row["content_hash"]),
+                config_hash=str(report_row["config_hash"]),
+                checks=checks,
+            )
+            if report.report_hash != report_hash:
+                raise OnboardingError(
+                    "stale_preflight",
+                    "Preflight evidence is not available.",
+                )
             if report.tenant_id != admin.identity.tenant_id:
                 raise TenantIsolationViolation()
             config = (
