@@ -1,8 +1,18 @@
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import uuid4
 
+from ia_mcp.observability.context import bind_correlation_id, reset_correlation_id
+from ia_mcp.observability.propagation import (
+    bind_telemetry,
+    extract_payload,
+    inject_payload,
+    last_span_id_from_payload,
+    reset_telemetry,
+    start_span,
+)
+from ia_mcp.observability.semconv import SPAN_SCHEDULER_DISPATCH
 from ia_mcp.scheduling.models import (
     JOB_TYPE,
     DispatchResult,
@@ -47,11 +57,7 @@ def _tenant_from_job(job: ScheduledJob) -> TenantContext:
     slug = _payload_str(payload, "tenant_slug", "unknown")
     raw_version = payload.get("config_version")
     config_version = raw_version if isinstance(raw_version, int) else 1
-    raw_corr = payload.get("correlation_id")
-    try:
-        correlation_id = UUID(str(raw_corr)) if raw_corr is not None else job.id
-    except ValueError:
-        correlation_id = job.id
+    correlation_id = extract_payload(payload).correlation_id
     return TenantContext(
         tenant_id=job.tenant_id,
         tenant_slug=slug,
@@ -117,6 +123,27 @@ class JobWorker:
         )
 
     async def dispatch(self, claim: JobClaim) -> DispatchResult:
+        context = extract_payload(claim.job.payload)
+        telemetry_token = bind_telemetry(context)
+        correlation_token = bind_correlation_id(context.correlation_id)
+        previous = last_span_id_from_payload(claim.job.payload)
+        links: tuple[tuple[str, str], ...] = ()
+        if claim.job.attempts > 0 and previous is not None:
+            links = ((context.trace_id, previous),)
+        try:
+            with start_span(
+                SPAN_SCHEDULER_DISPATCH,
+                attributes={"retry_count": claim.job.attempts},
+                links=links,
+            ) as span:
+                result = await self._dispatch_job(claim)
+                span.set_attribute("status", result.status)
+                return result
+        finally:
+            reset_correlation_id(correlation_token)
+            reset_telemetry(telemetry_token)
+
+    async def _dispatch_job(self, claim: JobClaim) -> DispatchResult:
         now = self._clock.now()
         tenant = _tenant_from_job(claim.job)
         job = await self._store.get(tenant, claim.job.id)
@@ -157,7 +184,7 @@ class JobWorker:
                     job_id=job.id,
                     schedule_version=job.schedule_version,
                     kind=JOB_TYPE,
-                    payload=dict(job.payload),
+                    payload=inject_payload(dict(job.payload)),
                     external_message_id=external_id,
                     created_at=now,
                 )
@@ -176,6 +203,7 @@ class JobWorker:
                 lock_owner=None,
                 lock_expires_at=None,
                 updated_at=now,
+                payload=inject_payload(dict(job.payload)),
             )
             saved = await self._store.save(saved)
             await self._record(tenant, saved, outcome="retry", reason=last_error)

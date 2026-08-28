@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI
 
 from ia_mcp.channels.outbox import ChannelOutbox
+from ia_mcp.observability.context import CorrelationMiddleware
 
 _NON_PRODUCTION_ENVIRONMENTS = frozenset({"test", "development"})
 
@@ -15,6 +16,7 @@ def _resolve_environment(environment: str | None) -> str:
 
 def create_app(*, environment: str | None = None) -> FastAPI:
     app = FastAPI()
+    app.add_middleware(CorrelationMiddleware)
     app.state.outbox = ChannelOutbox()
 
     @app.get("/health/live")

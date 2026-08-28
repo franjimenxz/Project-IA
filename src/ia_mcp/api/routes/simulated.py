@@ -22,7 +22,7 @@ from ia_mcp.channels.simulated_auth import (
 from ia_mcp.configuration.ports import ConfigurationError
 from ia_mcp.configuration.service import ConfigurationService
 from ia_mcp.conversation.models import InboundMessage
-from ia_mcp.observability.context import CORRELATION_HEADER, parse_correlation_id
+from ia_mcp.observability.context import current_correlation_id
 from ia_mcp.tenancy.models import TenantIdentity
 from ia_mcp.tenancy.service import TenantResolutionError
 
@@ -84,7 +84,7 @@ def _correlation_id(request: Request) -> UUID:
     state_value = getattr(request.state, "correlation_id", None)
     if isinstance(state_value, UUID):
         return state_value
-    return parse_correlation_id(request.headers.get(CORRELATION_HEADER))
+    return current_correlation_id()
 
 
 @router.post("/v1/simulated/messages", status_code=status.HTTP_202_ACCEPTED)
