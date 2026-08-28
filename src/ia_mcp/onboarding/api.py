@@ -16,7 +16,9 @@ from ia_mcp.onboarding.service import (
     PLATFORM_ADMIN,
     TenantOnboardingService,
     admin_context_for,
+    tenant_context_for,
 )
+from ia_mcp.onboarding.validator import validate_package
 from ia_mcp.shared.errors import TenantIsolationViolation
 
 
@@ -26,7 +28,19 @@ class DisableRequest(BaseModel):
     reason: str = Field(min_length=1)
 
 
+class ActivateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    report_hash: str = Field(min_length=64, max_length=64)
+
+
 class ProvisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    package_path: str = Field(min_length=1)
+
+
+class PreflightRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     package_path: str = Field(min_length=1)
@@ -104,6 +118,78 @@ def create_onboarding_router() -> APIRouter:
                 detail="Resource not found",
             ) from exc
         return _tenant_body(tenant)
+
+    @router.post("/v1/admin/tenants/{slug}/preflight")
+    async def preflight_tenant(
+        slug: str,
+        payload: PreflightRequest,
+        service: Annotated[TenantOnboardingService, Depends(_get_service)],
+        principal: Annotated[Principal, Depends(_get_principal)],
+    ) -> dict[str, str | bool]:
+        tenant = await service.get_by_slug(slug)
+        if tenant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found",
+            )
+        try:
+            admin = admin_context_for(principal, tenant)
+            validation = validate_package(Path(payload.package_path))
+            if validation.content_hash is None:
+                raise OnboardingError("invalid_preflight", "A content hash is required.")
+            report = await service.preflight(
+                tenant_context_for(tenant, correlation_id=admin.correlation_id),
+                content_hash=validation.content_hash,
+            )
+        except OnboardingError as exc:
+            raise HTTPException(
+                status_code=_status_for(exc),
+                detail=exc.safe_message,
+            ) from exc
+        except TenantIsolationViolation as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found",
+            ) from exc
+        return {
+            "report_hash": report.report_hash,
+            "passed": report.passed,
+            "content_hash": report.content_hash,
+        }
+
+    @router.post("/v1/admin/tenants/{slug}/activate")
+    async def activate_tenant(
+        slug: str,
+        payload: ActivateRequest,
+        service: Annotated[TenantOnboardingService, Depends(_get_service)],
+        principal: Annotated[Principal, Depends(_get_principal)],
+    ) -> dict[str, str]:
+        tenant = await service.get_by_slug(slug)
+        if tenant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found",
+            )
+        try:
+            admin = admin_context_for(principal, tenant)
+            await service.activate(admin, payload.report_hash)
+        except OnboardingError as exc:
+            raise HTTPException(
+                status_code=_status_for(exc),
+                detail=exc.safe_message,
+            ) from exc
+        except TenantIsolationViolation as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found",
+            ) from exc
+        updated = await service.get_by_slug(slug)
+        if updated is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found",
+            )
+        return _tenant_body(updated)
 
     return router
 

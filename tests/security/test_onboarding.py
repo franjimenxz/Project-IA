@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -26,8 +27,10 @@ from ia_mcp.onboarding.models import (
     TenantDocument,
     TenantPackage,
 )
-from ia_mcp.onboarding.service import TenantOnboardingService
+from ia_mcp.onboarding.preflight import PREFLIGHT_CHECK_NAMES, CheckOutcome
+from ia_mcp.onboarding.service import TenantOnboardingService, tenant_context_for
 from ia_mcp.onboarding.validator import validate_package
+from ia_mcp.tenancy.models import TenantContext
 from tests.unit.onboarding.helpers import write_package
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -245,3 +248,142 @@ async def test_auditor_cannot_provision_and_audit_omits_secret_values(
     assert "sk-live" not in payload
     assert not hasattr(service, "ingest")
     assert not hasattr(service.provision, "activate")
+
+
+@dataclass(frozen=True, slots=True)
+class StubCheck:
+    name: str
+    passed: bool = True
+    severity: str = "critical"
+    code: str = "ok"
+    message: str = "ok"
+
+    async def run(self, tenant: TenantContext) -> CheckOutcome:
+        return CheckOutcome(
+            name=self.name,
+            passed=self.passed,
+            severity="critical",
+            code=self.code,
+            message=self.message,
+        )
+
+
+def _passing_checks() -> tuple[StubCheck, ...]:
+    return tuple(StubCheck(name=name) for name in PREFLIGHT_CHECK_NAMES)
+
+
+def _admin_app(service: TenantOnboardingService, principal: Principal) -> TestClient:
+    app = FastAPI()
+    app.include_router(create_onboarding_router())
+    app.state.onboarding_service = service
+    app.state.principal = principal
+    return TestClient(app)
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+async def test_tenant_admin_cannot_activate_another_tenant(
+    tmp_path: Path, engine: AsyncEngine
+) -> None:
+    service = TenantOnboardingService(engine, checks=_passing_checks())
+    tenant_b = await service.provision(
+        _package(tmp_path / "b", "tenant-b", "tenant-b-simulated"), PLATFORM
+    )
+    tenant_c = await service.provision(
+        _package(tmp_path / "c", "tenant-c", "tenant-c-simulated"), PLATFORM
+    )
+    hash_c = validate_package(tmp_path / "c").content_hash
+    assert hash_c is not None
+    report_c = await service.preflight(tenant_context_for(tenant_c), content_hash=hash_c)
+    client = _admin_app(
+        service,
+        Principal(
+            principal_id=uuid4(),
+            roles=frozenset({"tenant_admin"}),
+            tenant_id=tenant_b.identity.tenant_id,
+            tenant_slug=tenant_b.identity.tenant_slug,
+        ),
+    )
+    leaked = client.post(
+        "/v1/admin/tenants/tenant-c/activate",
+        json={
+            "report_hash": report_c.report_hash,
+            "identity": {
+                "tenant_id": str(tenant_c.identity.tenant_id),
+                "tenant_slug": tenant_c.identity.tenant_slug,
+            },
+        },
+    )
+    assert leaked.status_code in {403, 404, 422}
+    assert leaked.status_code != 200
+    cross = client.post(
+        "/v1/admin/tenants/tenant-c/activate",
+        json={"report_hash": report_c.report_hash},
+    )
+    assert cross.status_code in {403, 404}
+    assert cross.status_code != 200
+    own_get = client.get("/v1/admin/tenants/tenant-b")
+    assert own_get.status_code == 200
+    async with engine.connect() as connection:
+        rows = (
+            await connection.execute(select(tenant_table.c.slug, tenant_table.c.status))
+        ).all()
+        c_activate_actors = (
+            (
+                await connection.execute(
+                    select(audit_event_table.c.actor_id).where(
+                        audit_event_table.c.tenant_id == tenant_c.identity.tenant_id,
+                        audit_event_table.c.action == "activate",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    by_slug = {row[0]: row[1] for row in rows}
+    assert by_slug["tenant-b"] == "disabled"
+    assert by_slug["tenant-c"] == "disabled"
+    assert c_activate_actors == []
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+async def test_platform_admin_may_activate_and_operator_cannot(
+    tmp_path: Path, engine: AsyncEngine
+) -> None:
+    service = TenantOnboardingService(engine, checks=_passing_checks())
+    tenant_c = await service.provision(
+        _package(tmp_path / "c", "tenant-c", "tenant-c-simulated"), PLATFORM
+    )
+    hash_c = validate_package(tmp_path / "c").content_hash
+    assert hash_c is not None
+    report_c = await service.preflight(tenant_context_for(tenant_c), content_hash=hash_c)
+    operator_client = _admin_app(service, OPERATOR)
+    denied = operator_client.post(
+        "/v1/admin/tenants/tenant-c/activate",
+        json={"report_hash": report_c.report_hash},
+    )
+    assert denied.status_code in {403, 404}
+    platform_client = _admin_app(service, PLATFORM)
+    activated = platform_client.post(
+        "/v1/admin/tenants/tenant-c/activate",
+        json={"report_hash": report_c.report_hash},
+    )
+    assert activated.status_code == 200
+    assert activated.json()["status"] == "active"
+    async with engine.connect() as connection:
+        status = await connection.scalar(
+            select(tenant_table.c.status).where(
+                tenant_table.c.id == tenant_c.identity.tenant_id
+            )
+        )
+        payload = await connection.scalar(
+            select(audit_event_table.c.payload).where(
+                audit_event_table.c.tenant_id == tenant_c.identity.tenant_id,
+                audit_event_table.c.action == "activate",
+            )
+        )
+    assert status == "active"
+    assert "plain-secret" not in str(payload)
+    assert isinstance(payload, dict)
+    assert payload.get("report_hash") == report_c.report_hash
