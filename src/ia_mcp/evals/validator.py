@@ -5,24 +5,39 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from ia_mcp.evals.models import (
-    ADVERSARIAL_TAGS,
-    KNOWN_SOURCE_IDS,
-    DatasetValidationReport,
-    EvalCase,
-)
+from ia_mcp.evals.models import ADVERSARIAL_TAGS, DatasetValidationReport, EvalCase
 from ia_mcp.mcp.registry import KNOWN_TOOLS
 
 _REQUIRED_USE_CASES = tuple(f"UC-{index:02d}" for index in range(1, 11))
 _KNOWN_TOOL_NAMES = frozenset(str(name) for name in KNOWN_TOOLS)
 
 
-def validate_dataset(path: Path) -> DatasetValidationReport:
+def default_source_catalog_path() -> Path:
+    return Path(__file__).resolve().parents[3] / "evals" / "fixtures" / "known_sources.json"
+
+
+def load_known_source_ids(catalog: Path) -> frozenset[str]:
+    raw = json.loads(catalog.read_text(encoding="utf-8"))
+    items = raw["source_ids"]
+    return frozenset(str(item) for item in items)
+
+
+def validate_dataset(
+    path: Path,
+    *,
+    source_catalog: Path | None = None,
+) -> DatasetValidationReport:
     payload = path.read_bytes()
     dataset_hash = sha256(payload).hexdigest()
     issues: list[str] = []
     cases: list[EvalCase] = []
     id_counts: Counter[str] = Counter()
+    catalog_path = source_catalog or default_source_catalog_path()
+    known_sources: frozenset[str] = frozenset()
+    if not catalog_path.is_file():
+        issues.append("missing_source_catalog")
+    else:
+        known_sources = load_known_source_ids(catalog_path)
 
     lines = [line for line in payload.decode("utf-8").splitlines() if line.strip()]
     if not lines:
@@ -45,7 +60,7 @@ def validate_dataset(path: Path) -> DatasetValidationReport:
             continue
         cases.append(case)
         id_counts[case.case_id] += 1
-        issues.extend(_case_issues(case))
+        issues.extend(_case_issues(case, known_sources))
 
     for case_id, count in sorted(id_counts.items()):
         if count > 1:
@@ -56,6 +71,8 @@ def validate_dataset(path: Path) -> DatasetValidationReport:
     adversarial_counts = _adversarial_counts(cases)
     if cases:
         issues.extend(_coverage_issues(use_case_counts, tenant_counts, adversarial_counts))
+        if not any(len(case.messages) >= 2 for case in cases):
+            issues.append("missing_multi_turn")
 
     return DatasetValidationReport(
         valid=not issues,
@@ -68,13 +85,13 @@ def validate_dataset(path: Path) -> DatasetValidationReport:
     )
 
 
-def _case_issues(case: EvalCase) -> list[str]:
+def _case_issues(case: EvalCase, known_sources: frozenset[str]) -> list[str]:
     issues: list[str] = []
     if not case.allowed_sources.isdisjoint(case.forbidden_sources):
         issues.append(f"source_overlap:{case.case_id}")
     if not case.allowed_tools.isdisjoint(case.forbidden_tools):
         issues.append(f"tool_overlap:{case.case_id}")
-    unknown_sources = (case.allowed_sources | case.forbidden_sources) - KNOWN_SOURCE_IDS
+    unknown_sources = (case.allowed_sources | case.forbidden_sources) - known_sources
     for source in sorted(unknown_sources):
         issues.append(f"unknown_source:{case.case_id}:{source}")
     unknown_tools = (case.allowed_tools | case.forbidden_tools) - _KNOWN_TOOL_NAMES

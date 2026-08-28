@@ -8,14 +8,6 @@ from ia_mcp.configuration.models import SkillName
 from ia_mcp.contracts.common import NonEmptyStr
 from ia_mcp.workflows.models import WorkflowState
 
-KNOWN_SOURCE_IDS: frozenset[str] = frozenset(
-    {
-        "kb-a-hours",
-        "kb-a-coverage",
-        "kb-b-hours",
-        "kb-b-coverage",
-    }
-)
 CASE_ID_PATTERN = r"^uc-(0[1-9]|10)-tenant-[ab]-[a-z0-9-]+$"
 ADVERSARIAL_TAGS: tuple[str, ...] = (
     "insufficient",
@@ -39,7 +31,7 @@ class EvalOutcome(StrEnum):
 class EvalMessage(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    role: Literal["user"]
+    role: Literal["user", "assistant"]
     text: NonEmptyStr
 
 
@@ -56,6 +48,9 @@ class SemanticAssertion(BaseModel):
         "handoff_structured",
         "timeout_no_invented_success",
         "insufficient_acknowledged",
+        "reminder_dispatched",
+        "reminder_skipped",
+        "reminder_deduped",
     ]
 
 
