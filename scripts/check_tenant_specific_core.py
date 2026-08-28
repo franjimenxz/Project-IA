@@ -54,7 +54,9 @@ def classify_path(path: str) -> PathKind:
     normalized = path.replace("\\", "/")
     if normalized.startswith(ALLOWED_PREFIXES):
         return "allowed"
-    if normalized.startswith(CORE_PREFIX) and ADAPTER_MARKER in f"/{normalized}":
+    if normalized.startswith(CORE_PREFIX) and (
+        ADAPTER_MARKER in f"/{normalized}" or normalized.endswith("/cli.py")
+    ):
         return "allowed"
     if normalized.startswith((CORE_PREFIX, "alembic/")):
         return "core"

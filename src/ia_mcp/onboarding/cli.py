@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from ia_mcp.observability.redaction import redact
 from ia_mcp.onboarding.commands import OnboardingError, Principal, load_tenant_package
@@ -50,9 +53,18 @@ def main(
         print(redact(report.model_dump_json(indent=2)))
         return 0 if report.valid else 1
     if service is None:
+        service = default_onboarding_service()
+    if service is None:
         print("onboarding service is not configured")
         return 2
     return asyncio.run(_dispatch(args, service))
+
+
+def default_onboarding_service() -> TenantOnboardingService | None:
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if not url:
+        return None
+    return TenantOnboardingService(create_async_engine(url))
 
 
 async def _dispatch(args: argparse.Namespace, service: TenantOnboardingService) -> int:

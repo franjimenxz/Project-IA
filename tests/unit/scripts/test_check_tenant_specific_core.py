@@ -69,5 +69,6 @@ def test_core_file_change_is_rejected_even_without_slug_branch() -> None:
 
 def test_classify_adapters_as_allowed_and_skills_as_core() -> None:
     assert classify_path("src/ia_mcp/knowledge/adapters/sqlalchemy.py") == "allowed"
+    assert classify_path("src/ia_mcp/onboarding/cli.py") == "allowed"
     assert classify_path("src/ia_mcp/skills/faq.py") == "core"
     assert classify_path("tenants/fixtures/tenant-b/tenant.yaml") == "allowed"

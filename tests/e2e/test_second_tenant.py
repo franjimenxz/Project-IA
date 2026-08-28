@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 import sys
 from collections.abc import AsyncIterator
@@ -656,3 +657,68 @@ async def test_stale_preflight_hash_cannot_activate(engine: AsyncEngine) -> None
         )
     assert status_b == "disabled"
     assert status_a == "active"
+
+
+def _runbook_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["DATABASE_URL"] = DATABASE_URL
+    return subprocess.run(
+        [sys.executable, "-m", "ia_mcp.onboarding", *arguments],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.e2e
+async def test_runbook_cli_commands_do_not_exit_unconfigured(
+    engine: AsyncEngine,
+) -> None:
+    del engine
+    principal = str(PLATFORM.principal_id)
+    commands = (
+        (
+            "provision",
+            str(FIXTURE_B),
+            "--principal-id",
+            principal,
+            "--role",
+            "platform_admin",
+        ),
+        (
+            "preflight",
+            str(FIXTURE_B),
+            "--principal-id",
+            principal,
+            "--role",
+            "platform_admin",
+        ),
+        (
+            "activate",
+            "tenant-b",
+            "--report-hash",
+            "0" * 64,
+            "--principal-id",
+            principal,
+            "--role",
+            "platform_admin",
+        ),
+        (
+            "disable",
+            "tenant-b",
+            "--principal-id",
+            principal,
+            "--role",
+            "platform_admin",
+            "--reason",
+            "cutover-hold",
+        ),
+    )
+    for arguments in commands:
+        completed = _runbook_cli(*arguments)
+        output = completed.stdout + completed.stderr
+        assert "onboarding service is not configured" not in output, arguments
+        assert completed.returncode != 2, (arguments, output)
