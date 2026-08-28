@@ -26,6 +26,7 @@ class AgentConfig(BaseModel):
 class AppointmentPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
     credentials_reference: str | None = None
+    required_fields: tuple[str, ...] = ()
 
 
 class KnowledgeConfig(BaseModel):
