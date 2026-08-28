@@ -4,13 +4,20 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from ia_mcp.agent_runtime.harness import AgentHarness
 from ia_mcp.agent_runtime.models import AgentTurnResult
 from ia_mcp.api.app import create_app
+from ia_mcp.configuration.adapters.sqlalchemy import audit_event_table
 from ia_mcp.configuration.models import AgentConfig, TenantConfig
 from ia_mcp.configuration.service import ConfigurationService
+from ia_mcp.observability.adapters.sqlalchemy_run_query import (
+    SqlAlchemyRunInvestigationQuery,
+)
 from ia_mcp.observability.context import CORRELATION_HEADER
 from ia_mcp.observability.propagation import (
     TRACEPARENT_HEADER,
@@ -22,6 +29,7 @@ from ia_mcp.observability.propagation import (
     sanitized_span_tree,
     start_span,
 )
+from ia_mcp.observability.run_query import AUDIT_INVESTIGATION_ACTION, RunNotFound
 from ia_mcp.observability.semconv import (
     SPAN_TOOL_EXECUTE,
     metric_labels,
@@ -32,6 +40,19 @@ from tests.integration.api.test_simulated_messages import (
     make_client,
     signed_simulated_headers,
     valid_body,
+)
+from tests.integration.observability.test_run_query import (
+    CHUNK_TEXT,
+    DATABASE_URL,
+    MESSAGE_BODY,
+    PATIENT_REF,
+    PROMPT,
+    TENANT_A,
+    TENANT_A_CTX,
+    TENANT_B_TOOL,
+    _reset_schema,
+    _seed_tenants_and_channels,
+    seed_investigation_fixture,
 )
 
 
@@ -188,3 +209,82 @@ def test_signed_simulated_message_ignores_forged_correlation_header() -> None:
     deliveries = client.app.state.outbox.list()
     assert len(deliveries) == 1
     assert str(deliveries[0].correlation_id) == header_id
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+@pytest.mark.integration
+async def test_operator_a_cannot_read_run_b() -> None:
+    """AC-P07-004: cross-tenant run lookup is indistinguishable from missing."""
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        seeded = await seed_investigation_fixture(engine)
+        query = SqlAlchemyRunInvestigationQuery(engine)
+        with pytest.raises(RunNotFound) as missing:
+            await query.get(TENANT_A_CTX, UUID("99999999-9999-4999-8999-999999999999"))
+        with pytest.raises(RunNotFound) as cross:
+            await query.get(TENANT_A_CTX, seeded.run_b_id)
+        assert missing.value.safe_message == cross.value.safe_message
+        assert missing.value.code == "not_found"
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+@pytest.mark.integration
+async def test_investigation_redacts_sensitive_run_payloads() -> None:
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        seeded = await seed_investigation_fixture(engine)
+        query = SqlAlchemyRunInvestigationQuery(engine)
+        investigation = await query.get(TENANT_A_CTX, seeded.run_a_id)
+        dumped = investigation.model_dump_json()
+        assert MESSAGE_BODY not in dumped
+        assert CHUNK_TEXT not in dumped
+        assert PROMPT not in dumped
+        assert PATIENT_REF not in dumped
+        assert "30111222" not in dumped
+        assert "secret-token" not in dumped
+        assert "tenant_b_only" not in {
+            item.action for item in investigation.audit_events
+        }
+        assert TENANT_B_TOOL not in {item.tool_name for item in investigation.tools}
+        assert investigation.workflow is not None
+        assert investigation.workflow.error is not None
+        assert "[EMAIL]" in investigation.workflow.error
+        assert "Bearer [REDACTED]" in investigation.workflow.error
+        assert "Juan Perez" in investigation.workflow.error
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+@pytest.mark.integration
+async def test_authorized_investigation_query_writes_audit() -> None:
+    """AC-P07-005: an in-tenant query is recorded as an audit action."""
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        seeded = await seed_investigation_fixture(engine)
+        query = SqlAlchemyRunInvestigationQuery(engine)
+        result = await query.get(TENANT_A_CTX, seeded.run_a_id)
+        assert result.run.id == seeded.run_a_id
+        async with engine.connect() as connection:
+            actions = (
+                await connection.execute(
+                    select(audit_event_table.c.action).where(
+                        audit_event_table.c.tenant_id == TENANT_A,
+                        audit_event_table.c.action == AUDIT_INVESTIGATION_ACTION,
+                    )
+                )
+            ).scalars().all()
+        assert AUDIT_INVESTIGATION_ACTION in actions
+    finally:
+        await engine.dispose()
