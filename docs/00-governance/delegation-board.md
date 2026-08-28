@@ -20,12 +20,12 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P01-T01 | W0 | accepted | — | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T01-document-validator.md) |
 | P01-T02 | W0 | accepted | P01-T01 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T02-traceability-checker.md) |
 | P01-T03 | W0 | accepted | P01-T01, P01-T02 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T03-docs-ci.md) |
-| P02-T01 | W1 | in_review | P01-T03 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T01-bootstrap.md) |
-| P02-T02 | W1 | blocked | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T02-tenancy.md) |
+| P02-T01 | W1 | accepted | P01-T03 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T01-bootstrap.md) |
+| P02-T02 | W1 | in_progress | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T02-tenancy.md) |
 | P02-T03 | W1 | blocked | P02-T02 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T03-configuration.md) |
-| P02-T04 | W1 | blocked | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T04-observability-errors.md) |
+| P02-T04 | W1 | in_progress | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T04-observability-errors.md) |
 | P02-T05 | W1 | blocked | P02-T02, P02-T04 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T05-simulated-channel.md) |
-| P03-T01 | W2 | blocked | P02-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T01-common-contracts.md) |
+| P03-T01 | W2 | ready | P02-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T01-common-contracts.md) |
 | P03-T02 | W2 | blocked | P03-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T02-appointment-contracts.md) |
 | P03-T03 | W2 | blocked | P02-T02 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T03-tool-registry.md) |
 | P03-T04 | W2 | blocked | P03-T02, P03-T03 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T04-fake-appointments.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-Delegar únicamente `P01-T01`. Después de implementación y dos revisiones, marcarla `accepted` y desbloquear `P01-T02`.
+P02-T01 accepted. En paralelo: `P02-T02` (Implementador) y `P02-T04` (Implementador 2). `P03-T01` está `ready` y espera un owner libre.
 
 ## Actualización
 
@@ -80,4 +80,10 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P01-T03 | `ready → in_review → accepted` | `87fc14d` | [P01-T03](../phases/phase-01-functional-specification/evidence/P01-T03.md) |
 | P02-T01 | `blocked → ready` | dependencia P01-T03 aceptada | [P01-T03](../phases/phase-01-functional-specification/evidence/P01-T03.md) |
 | P02-T01 | `ready → in_progress` | asignada a implementación local | — |
-| P02-T01 | \`in_progress → in_review\` | \`bdda0b6\` | handoff FastAPI bootstrap; Revisor |
+| P02-T01 | `in_progress → in_review` | `bdda0b6` | handoff FastAPI bootstrap; Revisor |
+| P02-T01 | `in_review → accepted` | `bdda0b6`, `2afd666` | [P02-T01](../phases/phase-02-technical-foundations/evidence/P02-T01.md) |
+| P02-T02 | `blocked → ready` | dependencia P02-T01 aceptada | [P02-T01](../phases/phase-02-technical-foundations/evidence/P02-T01.md) |
+| P02-T04 | `blocked → ready` | dependencia P02-T01 aceptada | [P02-T01](../phases/phase-02-technical-foundations/evidence/P02-T01.md) |
+| P03-T01 | `blocked → ready` | dependencia P02-T01 aceptada | [P02-T01](../phases/phase-02-technical-foundations/evidence/P02-T01.md) |
+| P02-T02 | `ready → in_progress` | asignada a Implementador | — |
+| P02-T04 | `ready → in_progress` | asignada a Implementador 2 | — |
