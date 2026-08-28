@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "appointment_id": {
+      "minLength": 1,
+      "title": "Appointment Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "appointment_id"
+  ],
+  "title": "AppointmentGetRequest",
+  "type": "object"
+}
