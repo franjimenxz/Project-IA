@@ -19,3 +19,18 @@ jobs:
           python scripts/check_traceability.py
           pytest tests/docs -v
           ruff check scripts tests/docs
+
+  platform-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install quality dependencies
+        run: python -m pip install ".[quality]" fastapi==0.141.1 httpx==0.28.1 mypy==2.3.1
+      - name: Lint, typecheck, and unit tests
+        run: |
+          ruff check .
+          mypy src
+          pytest tests/unit -v
