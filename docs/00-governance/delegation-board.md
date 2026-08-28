@@ -24,9 +24,9 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P02-T02 | W1 | accepted | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T02-tenancy.md) |
 | P02-T03 | W1 | in_progress | P02-T02 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T03-configuration.md) |
 | P02-T04 | W1 | accepted | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T04-observability-errors.md) |
-| P02-T05 | W1 | ready | P02-T02, P02-T04 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T05-simulated-channel.md) |
+| P02-T05 | W1 | in_progress | P02-T02, P02-T04 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T05-simulated-channel.md) |
 | P03-T01 | W2 | accepted | P02-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T01-common-contracts.md) |
-| P03-T02 | W2 | in_review | P03-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T02-appointment-contracts.md) |
+| P03-T02 | W2 | accepted | P03-T01 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T02-appointment-contracts.md) |
 | P03-T03 | W2 | in_progress | P02-T02 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T03-tool-registry.md) |
 | P03-T04 | W2 | blocked | P03-T02, P03-T03 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T04-fake-appointments.md) |
 | P03-T05 | W2 | blocked | P03-T03, P03-T04 | [brief](../phases/phase-03-internal-contracts/agent-briefs/P03-T05-tool-executor.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P02-T04 accepted (`7e03d85`, PR #3). En curso: `P02-T03` (Implementador), `P03-T03` (Implementador 2). In review: `P03-T02` PR #4. Ready: `P02-T05`.
+P03-T02 accepted (`8ad10f4`, PR #4). En curso: `P02-T03` (Implementador), `P03-T03` (Implementador 2), `P02-T05` (Implementador 3).
 
 ## Actualización
 
@@ -100,3 +100,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P02-T05 | `blocked → ready` | dependencias P02-T02 y P02-T04 aceptadas | — |
 | P03-T03 | `ready → in_progress` | asignada a Implementador 2 | — |
 | P03-T02 | `in_progress → in_review` | `6ff733d`, `7260629` | https://github.com/franjimenxz/Project-IA/pull/4 |
+| P03-T02 | `in_review → accepted` | `6ff733d` merged `8ad10f4` | https://github.com/franjimenxz/Project-IA/pull/4 |
+| P02-T05 | `ready → in_progress` | asignada a Implementador 3 | — |
