@@ -20,9 +20,11 @@
 | Appointment Skill | Traducir conversación a comandos | Estado + workflow | Pregunta/resultado | Workflow |
 | Knowledge Service | Ingestar y recuperar conocimiento | Objetos + embeddings | Hits con procedencia | Document/chunk/vector |
 | Workflow Engine | Controlar estados y side effects | Commands | `WorkflowResult` | WorkflowExecution |
-| MCP Resolver | Seleccionar servidor/capacidad por tenant | Config + integration | `McpTarget` | Integration |
-| MCP Client | Invocar tool con política común | Target + ToolCall | `ToolResult` | ToolExecution |
-| MCP Platform | Reutilizar contratos/auth/audit | Capabilities/adapters | Tools MCP | Audit |
+| MCP Resolver | Seleccionar servidor/capacidad por tenant; validar host/scheme allowlist | Config + integration | `McpTarget` | Integration |
+| MCP Discovery Client | Obtener catálogo vigente vía `tools/list` | `McpTarget` + `TenantContext` | `DiscoveredToolCatalog` | No |
+| MCP Client | Invocar tool autorizada vía `tools/call` (SSE) | Target + ToolCall + `TenantContext` | `ToolResult` | ToolExecution |
+| Tool Registry | Intersectar discovered ∩ tenant ∩ skill; autorizar pre-ejecución | Catálogo descubierto + config + skill | `ToolName` autorizado | No |
+| MCP Platform | Orquestar resolver, discovery, registry, executor y audit | Capabilities/adapters | Tools MCP | Audit |
 | Institutional Adapter | Traducir a API confirmada | Contrato canónico | Contrato canónico | No autoritativa |
 | Handoff Service | Transferir ownership y contexto | Conversation/workflow | `HandoffResult` | Handoff |
 | Scheduler | Crear y despachar jobs durables | Appointment events | Reminder command | ScheduledJob/outbox |

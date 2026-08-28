@@ -25,6 +25,7 @@ flowchart LR
     P5 --> P8[Fase 8\nSegundo tenant]
     P6 --> P8
     P7 --> P8
+    P8 --> P9[Fase 9\nMCP discovery]
 ```
 
 ## Estrategia de entrega
@@ -46,6 +47,7 @@ La arquitectura y los contratos se estabilizan primero. A continuación se imple
 | W6-sandbox | P05-T04 | P05-T03 aceptada y `EXT-002` | Sandbox real, canary y rollback |
 | W7-prep | Fase 8 package/provision disabled | Fase 4 aceptada | Segundo package validado sin activar |
 | W7-activate | Fase 8 preflight/activación/prueba final | Fases 5, 6 y 7 aceptadas | Segundo tenant sin cambios específicos en Core |
+| W8 | Fase 9 MCP discovery e invocación genérica | Fase 8 aceptada (P08-T04); ADR-005 aceptado | Instituciones usan catálogo MCP propio vía `tools/list`; Core sin catálogo cerrado |
 
 ## Gates globales
 

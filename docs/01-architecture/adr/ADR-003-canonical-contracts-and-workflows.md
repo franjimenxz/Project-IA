@@ -1,7 +1,10 @@
 # ADR-003 — Contratos canónicos y workflows determinísticos
 
 **Estado:** accepted  
-**Fecha:** 2026-08-27
+**Fecha:** 2026-08-27  
+**Amended by:** [ADR-005](ADR-005-mcp-discovery-and-generic-invoke.md) (2026-08-28)
+
+> Los MCPs institucionales **no** están obligados a implementar los seis tools Pydantic canónicos de appointments. Discovery dinámico (`tools/list`) más intersección tenant/skill/server es el gate de autorización. ADR-003 sigue vigente para contratos canónicos internos, fakes, workflows determinísticos y dispatch especializado cuando el nombre de tool coincide con `appointments.*`.
 
 ## Contexto
 

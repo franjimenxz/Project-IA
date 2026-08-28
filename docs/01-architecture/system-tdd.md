@@ -3,7 +3,7 @@
 **ID:** TDD-SYS-001  
 **Estado:** ready  
 **Requisitos:** RF-001–RF-045, RNF-001–RNF-015  
-**ADRs:** ADR-001–ADR-004
+**ADRs:** ADR-001–ADR-005
 
 ## 1. Contexto
 
@@ -272,19 +272,29 @@ class McpResolver(Protocol):
     ) -> McpTarget: ...
 ```
 
-`McpTarget` contiene server id, endpoint interno, auth reference y tools permitidas. El auth reference se resuelve dentro del transporte/adapter, no se devuelve al modelo.
+`McpTarget` contiene server id, endpoint, auth reference y política de transporte. El auth reference se resuelve dentro del transporte/adapter; no se devuelve al modelo ni se serializa en fixtures.
+
+### Discovery e invocación (ADR-005)
+
+1. Tras resolver el target, el **MCP Discovery Client** ejecuta `tools/list` contra el servidor institucional y obtiene el catálogo vigente de tools (nombre, descripción, input schema).
+2. **Autorización:** una tool es elegible solo si pertenece a la intersección `discovered ∩ tenant_allowlist ∩ skill_allowlist`. No hay catálogo cerrado de Core que rechace nombres por no estar en un enum interno.
+3. **Invocación:** tools autorizadas se llaman con MCP `tools/call` mediante un cliente genérico con `TenantContext`, auditoría, timeout y límites de payload. Si el nombre coincide con la familia canónica `appointments.*` y la capability está cableada, el executor puede despachar a workflows/`AppointmentCapability` (ADR-003); el resto usa invocación genérica.
+4. **Host/scheme:** el resolver valida endpoint contra allowlist por tenant/entorno. `http` solo se permite si host+scheme están explícitamente allowlisted (p. ej. MCP de prueba en LAN).
+
+`KNOWN_TOOLS` designa el alias set canónico de appointments para fakes, contract tests y dispatch especializado; **no** actúa como deny-list de nombres descubiertos.
+
+Transporte inicial para MCP SSE (FastMCP): endpoint `/sse` y POST a `/messages/?session_id=`. CI usa fake in-process; E2E opcional contra URL real solo con `MCP_SSE_URL` configurada.
 
 Los MCPs institucionales reutilizan:
 
 - autenticación y secret resolution;
-- schemas canónicos;
-- tool registry;
-- errores;
+- tool registry (intersección post-discovery);
+- errores tipados;
 - tracing y audit hooks;
 - políticas de timeout/retry;
-- contract test suite.
+- contract test suite para tools canónicas cuando aplica.
 
-El adaptador institucional sólo transforma y aplica particularidades confirmadas de su API.
+El adaptador institucional REST (Fase 5) transforma contratos canónicos confirmados; no sustituye discovery para tools expuestas por el MCP.
 
 ## 14. Channel Gateway
 

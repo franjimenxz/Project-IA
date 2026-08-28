@@ -33,8 +33,9 @@
 |---|---|---|
 | D-001 | Monolito modular con procesos API/worker/MCP separables | ADR-001 |
 | D-002 | TenantContext obligatorio y aislamiento en repositorios | ADR-002 |
-| D-003 | Contratos canónicos y workflows determinísticos para mutaciones | ADR-003 |
+| D-003 | Contratos canónicos y workflows determinísticos para mutaciones; MCPs institucionales no requieren implementar los seis tools Pydantic (amended ADR-005) | ADR-003, ADR-005 |
 | D-004 | PostgreSQL autoritativo, Redis coordinador y pgvector reemplazable | ADR-004 |
+| D-005 | MCP discovery (`tools/list`) e invocación genérica con intersección tenant/skill/servidor | ADR-005 |
 
 ## Dependencias externas
 
