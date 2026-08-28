@@ -7,7 +7,7 @@ coroutines with asyncio.run. Seed body matches the plan; the wrapper is sync.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Coroutine, Mapping
+from collections.abc import Coroutine, Iterable, Mapping
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
@@ -45,6 +45,10 @@ CATALOG = frozenset(
 )
 # Tenant A enabled_tools = search/get only so create is outside the intersection.
 TENANT_A_TOOLS = frozenset({"appointments.search", "appointments.get"})
+CREAR_TURNO = "crear_turno"
+CREAR_TURNO_ARGS: dict[str, Any] = {"slot": "manana"}
+ALLOWED_MCP_HOST = "mcp.example"
+ALLOWED_MCP_ENDPOINT = f"https://{ALLOWED_MCP_HOST}/sse"
 
 SEARCH_ARGS: dict[str, Any] = {
     "specialty": "cardiologia",
@@ -99,12 +103,17 @@ class CapabilitySpy:
 
 
 class ResolverSpy:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        allowed_tools: frozenset[str] = CATALOG,
+        endpoint: str = "https://internal.example/secret-mcp",
+    ) -> None:
         self.resolve = AsyncMock(
             return_value=McpTarget(
                 server_id="mcp-appointments-a",
-                allowed_tools=CATALOG,
-                endpoint="https://internal.example/secret-mcp",
+                allowed_tools=allowed_tools,
+                endpoint=endpoint,
                 auth_reference="cred-secret-must-not-leak",
             )
         )
@@ -113,20 +122,39 @@ class ResolverSpy:
         self.resolve.assert_not_called()
 
 
+class TransportSpy:
+    def __init__(self) -> None:
+        self.call_tool = AsyncMock(
+            return_value=ToolResult[dict[str, str]](ok=True, value={"status": "ok"})
+        )
+
+    def assert_not_called(self) -> None:
+        self.call_tool.assert_not_called()
+
+
 def _make_executor(
     capability: CapabilitySpy,
     resolver: ResolverSpy,
     audit: Mock,
     *,
     tenant_tools: frozenset[str] = TENANT_A_TOOLS,
+    server_tools: frozenset[str] = CATALOG,
+    skill_tools: frozenset[str] = CATALOG,
+    transport: TransportSpy | None = None,
+    allowed_hosts: Iterable[str] | None = None,
 ) -> ToolExecutor:
+    extras: dict[str, Any] = {}
+    if transport is not None:
+        extras["transport"] = transport
     return ToolExecutor(
-        server=CATALOG,
+        server=server_tools,
         tenant=tenant_tools,
-        skill=CATALOG,
+        skill=skill_tools,
         capability=capability,
         resolver=resolver,
         audit_hook=audit,
+        allowed_hosts=allowed_hosts,
+        **extras,
     )
 
 
@@ -298,3 +326,191 @@ def _event_blob(event: object) -> str:
         for name in dump:
             parts.append(f"{name}={getattr(event, name)!r}")
     return " ".join(parts)
+
+
+def _generic_allowlists() -> dict[str, frozenset[str]]:
+    tools = CATALOG | {CREAR_TURNO}
+    return {
+        "server_tools": tools,
+        "tenant_tools": tools,
+        "skill_tools": tools,
+    }
+
+
+def test_authorized_non_canonical_tool_calls_generic_client_not_capability(
+    capability_spy: CapabilitySpy,
+    audit_spy: Mock,
+) -> None:
+    transport = TransportSpy()
+    resolver = ResolverSpy(
+        allowed_tools=CATALOG | {CREAR_TURNO},
+        endpoint=ALLOWED_MCP_ENDPOINT,
+    )
+    executor = _make_executor(
+        capability_spy,
+        resolver,
+        audit_spy,
+        transport=transport,
+        allowed_hosts=(ALLOWED_MCP_HOST,),
+        **_generic_allowlists(),
+    )
+
+    result = _run(
+        executor.execute(
+            TENANT_A_CTX,
+            RUN_ID,
+            tool_call(CREAR_TURNO, CREAR_TURNO_ARGS),
+        )
+    )
+
+    assert result.ok is True
+    assert result.value == {"status": "ok"}
+    capability_spy.assert_not_called()
+    transport.call_tool.assert_awaited_once()
+    args = transport.call_tool.call_args
+    assert args.args[0] is TENANT_A_CTX
+    assert args.args[1].server_id == "mcp-appointments-a"
+    assert args.args[2] == CREAR_TURNO
+    assert dict(args.args[3]) == CREAR_TURNO_ARGS
+    audit_spy.assert_called_once()
+    event = audit_spy.call_args.args[0]
+    assert event.allowed is True
+    assert event.tool == CREAR_TURNO
+    assert event.mcp_server_id == "mcp-appointments-a"
+    blob = _event_blob(event)
+    for fragment in SECRET_FRAGMENTS:
+        assert fragment not in blob
+
+
+def test_canonical_appointments_search_uses_capability_when_wired(
+    capability_spy: CapabilitySpy,
+    audit_spy: Mock,
+) -> None:
+    transport = TransportSpy()
+    resolver = ResolverSpy(endpoint=ALLOWED_MCP_ENDPOINT)
+    executor = _make_executor(
+        capability_spy,
+        resolver,
+        audit_spy,
+        transport=transport,
+        allowed_hosts=(ALLOWED_MCP_HOST,),
+    )
+
+    result = _run(
+        executor.execute(
+            TENANT_A_CTX,
+            RUN_ID,
+            tool_call("appointments.search", SEARCH_ARGS),
+        )
+    )
+
+    assert result.ok is True
+    capability_spy.search.assert_called_once()
+    assert capability_spy.search.call_args.args[0] is TENANT_A_CTX
+    transport.assert_not_called()
+
+
+def test_host_not_allowlisted_is_forbidden_without_calling_client(
+    capability_spy: CapabilitySpy,
+    audit_spy: Mock,
+) -> None:
+    transport = TransportSpy()
+    resolver = ResolverSpy(
+        allowed_tools=CATALOG | {CREAR_TURNO},
+        endpoint="https://evil.example/sse",
+    )
+    executor = _make_executor(
+        capability_spy,
+        resolver,
+        audit_spy,
+        transport=transport,
+        allowed_hosts=(ALLOWED_MCP_HOST,),
+        **_generic_allowlists(),
+    )
+
+    result = _run(
+        executor.execute(
+            TENANT_A_CTX,
+            RUN_ID,
+            tool_call(CREAR_TURNO, CREAR_TURNO_ARGS),
+        )
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == ToolErrorCode.FORBIDDEN
+    transport.assert_not_called()
+    capability_spy.assert_not_called()
+    audit_spy.assert_called_once()
+    assert audit_spy.call_args.args[0].allowed is False
+
+
+def test_tool_outside_intersection_is_forbidden_without_calling_client(
+    capability_spy: CapabilitySpy,
+    audit_spy: Mock,
+) -> None:
+    transport = TransportSpy()
+    resolver = ResolverSpy(
+        allowed_tools=CATALOG | {CREAR_TURNO},
+        endpoint=ALLOWED_MCP_ENDPOINT,
+    )
+    executor = _make_executor(
+        capability_spy,
+        resolver,
+        audit_spy,
+        transport=transport,
+        allowed_hosts=(ALLOWED_MCP_HOST,),
+        server_tools=CATALOG | {CREAR_TURNO},
+        tenant_tools=TENANT_A_TOOLS,
+        skill_tools=CATALOG | {CREAR_TURNO},
+    )
+
+    result = _run(
+        executor.execute(
+            TENANT_A_CTX,
+            RUN_ID,
+            tool_call(CREAR_TURNO, CREAR_TURNO_ARGS),
+        )
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == ToolErrorCode.FORBIDDEN
+    transport.assert_not_called()
+    capability_spy.assert_not_called()
+    resolver.assert_not_called()
+
+
+def test_transport_without_allowed_hosts_cannot_build(
+    capability_spy: CapabilitySpy,
+    resolver_spy: ResolverSpy,
+) -> None:
+    transport = TransportSpy()
+    with pytest.raises(ValueError) as caught:
+        ToolExecutor(
+            server=CATALOG | {CREAR_TURNO},
+            tenant=CATALOG | {CREAR_TURNO},
+            skill=CATALOG | {CREAR_TURNO},
+            capability=capability_spy,
+            resolver=resolver_spy,
+            transport=transport,
+        )
+    assert "allowed_hosts" in str(caught.value)
+    transport.assert_not_called()
+
+
+def test_transport_without_resolver_cannot_build(
+    capability_spy: CapabilitySpy,
+) -> None:
+    with pytest.raises(ValueError) as caught:
+        ToolExecutor(
+            server=CATALOG | {CREAR_TURNO},
+            tenant=CATALOG | {CREAR_TURNO},
+            skill=CATALOG | {CREAR_TURNO},
+            capability=capability_spy,
+            allowed_hosts=(ALLOWED_MCP_HOST,),
+            transport=TransportSpy(),
+        )
+    message = str(caught.value)
+    assert "resolver" in message
+    assert "transport" in message or "allowed_hosts" in message
