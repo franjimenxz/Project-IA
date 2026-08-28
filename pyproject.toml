@@ -29,6 +29,7 @@ namespaces = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]
+addopts = ["--import-mode=importlib"]
 markers = ["integration: requires PostgreSQL", "contract: appointment capability contract suite", "security: tenant isolation and authz", "e2e: end-to-end slice suites", "resilience: crash, timeout, and concurrent failure suites"]
 
 [tool.ruff]
