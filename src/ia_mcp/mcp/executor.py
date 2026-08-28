@@ -87,10 +87,17 @@ class HostAllowlist:
         if not endpoint:
             return False
         parsed = urlsplit(endpoint)
-        if parsed.scheme != "https":
-            return False
         host = (parsed.hostname or "").lower()
-        return bool(host) and host in self._hosts
+        if not host:
+            return False
+        # Bare host entries remain https-only. http requires an explicit
+        # "http://host" pair so LAN fixtures can be listed without opening
+        # plaintext to every https-allowlisted production host.
+        if parsed.scheme == "https":
+            return host in self._hosts or f"https://{host}" in self._hosts
+        if parsed.scheme == "http":
+            return f"http://{host}" in self._hosts
+        return False
 
 
 class ToolRegistry:
