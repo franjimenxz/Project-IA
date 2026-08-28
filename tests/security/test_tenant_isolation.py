@@ -18,7 +18,13 @@ from ia_mcp.configuration.adapters.sqlalchemy import (
 )
 from ia_mcp.conversation.adapters.sqlalchemy import SqlAlchemyConversationRepository
 from ia_mcp.conversation.models import InboundMessage
+from ia_mcp.knowledge.adapters.object_store import InMemoryObjectStore
+from ia_mcp.knowledge.adapters.sqlalchemy import SqlAlchemyKnowledgeRepository
+from ia_mcp.knowledge.models import DocumentSource, KnowledgeQuery
+from ia_mcp.knowledge.ports import KnowledgeError
+from ia_mcp.knowledge.service import KnowledgeService
 from ia_mcp.tenancy.models import TenantContext
+from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
 
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
@@ -192,3 +198,58 @@ async def test_tenant_b_receive_does_not_attach_to_tenant_a_conversation(
     assert message_a is not None
     assert message_b is not None
     assert message_a.id != message_b.id
+
+
+
+@pytest.fixture
+async def knowledge_service() -> AsyncIterator[KnowledgeService]:
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        yield KnowledgeService(
+            repository=SqlAlchemyKnowledgeRepository(engine),
+            parser=FakeParser(),
+            chunker=FakeChunker(),
+            embeddings=FakeEmbedding(),
+            object_store=InMemoryObjectStore(),
+        )
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+async def test_search_under_a_never_returns_tenant_b_canary_chunk(
+    knowledge_service: KnowledgeService,
+) -> None:
+    draft_a = await knowledge_service.ingest(
+        TENANT_A_CTX,
+        DocumentSource(filename="a.pdf", payload=b"canary-a clinic hours"),
+    )
+    draft_b = await knowledge_service.ingest(
+        TENANT_B_CTX,
+        DocumentSource(filename="b.pdf", payload=b"canary-b exclusive secret"),
+    )
+    await knowledge_service.publish(TENANT_A_CTX, draft_a.document_id, draft_a.version)
+    await knowledge_service.publish(TENANT_B_CTX, draft_b.document_id, draft_b.version)
+    hits = await knowledge_service.search(
+        TENANT_A_CTX, KnowledgeQuery(text="canary-b exclusive", limit=10)
+    )
+    assert all(hit.tenant_id == TENANT_A for hit in hits)
+    assert all("canary-b" not in hit.text for hit in hits)
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+async def test_tenant_a_cannot_publish_tenant_b_document(
+    knowledge_service: KnowledgeService,
+) -> None:
+    draft_b = await knowledge_service.ingest(
+        TENANT_B_CTX,
+        DocumentSource(filename="b.pdf", payload=b"canary-b exclusive secret"),
+    )
+    with pytest.raises(KnowledgeError):
+        await knowledge_service.publish(
+            TENANT_A_CTX, draft_b.document_id, draft_b.version
+        )
