@@ -62,13 +62,15 @@ def redact(value: str) -> str:
     redacted = _HEADER_RE.sub(r"\1: [REDACTED]", value)
     redacted = _BEARER_RE.sub(r"\1 [REDACTED]", redacted)
     redacted = _BASIC_RE.sub(r"\1 [REDACTED]", redacted)
-    redacted = _CONNECTION_STRING_RE.sub(r"\1://[REDACTED]", redacted)
-    redacted = _ASSIGNMENT_RE.sub(_mask_assignment, redacted)
+    # T01 patterns use a single token; they must run before T03 assignment,
+    # whose value class includes spaces and would swallow a later DNI/phone.
     redacted = _API_KEY_RE.sub(r"\1=[REDACTED]", redacted)
     redacted = _DNI_RE.sub(r"\1 [REDACTED]", redacted)
+    redacted = _PHONE_RE.sub("[PHONE]", redacted)
+    redacted = _CONNECTION_STRING_RE.sub(r"\1://[REDACTED]", redacted)
+    redacted = _ASSIGNMENT_RE.sub(_mask_assignment, redacted)
     redacted = _LABELLED_DOCUMENT_RE.sub(r"\1 [DOCUMENT]", redacted)
     redacted = _DOTTED_DOCUMENT_RE.sub("[DOCUMENT]", redacted)
     redacted = _LABELLED_PHONE_RE.sub(r"\1 [PHONE]", redacted)
     redacted = _INTERNATIONAL_PHONE_RE.sub("[PHONE]", redacted)
-    redacted = _PHONE_RE.sub("[PHONE]", redacted)
     return _EMAIL_RE.sub("[EMAIL]", redacted)
