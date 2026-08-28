@@ -20,6 +20,15 @@ class RunNotFound(DomainError):
         )
 
 
+class InvalidCursor(DomainError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="validation_error",
+            safe_message="The request is invalid.",
+            retryable=False,
+        )
+
+
 class RunInvestigationQuery(Protocol):
     async def get(
         self,

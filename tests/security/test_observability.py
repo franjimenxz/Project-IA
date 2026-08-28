@@ -49,6 +49,7 @@ from tests.integration.observability.test_run_query import (
     PROMPT,
     TENANT_A,
     TENANT_A_CTX,
+    TENANT_B_TOOL,
     _reset_schema,
     _seed_tenants_and_channels,
     seed_investigation_fixture,
@@ -249,6 +250,15 @@ async def test_investigation_redacts_sensitive_run_payloads() -> None:
         assert PATIENT_REF not in dumped
         assert "30111222" not in dumped
         assert "secret-token" not in dumped
+        assert "tenant_b_only" not in {
+            item.action for item in investigation.audit_events
+        }
+        assert TENANT_B_TOOL not in {item.tool_name for item in investigation.tools}
+        assert investigation.workflow is not None
+        assert investigation.workflow.error is not None
+        assert "[EMAIL]" in investigation.workflow.error
+        assert "Bearer [REDACTED]" in investigation.workflow.error
+        assert "Juan Perez" in investigation.workflow.error
     finally:
         await engine.dispose()
 

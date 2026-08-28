@@ -31,6 +31,7 @@ from ia_mcp.observability.run_query import (
     AUDIT_INVESTIGATION_ACTION,
     DEFAULT_PAGE_SIZE,
     INVESTIGATION_ACTOR_ID,
+    InvalidCursor,
     RunNotFound,
     clamp_page_size,
 )
@@ -124,13 +125,17 @@ def _encode_cursor(occurred_at: datetime, ident: str) -> str:
 
 
 def _decode_cursor(raw: str | None) -> tuple[datetime, str] | None:
-    if raw is None or "|" not in raw:
+    if raw is None:
         return None
+    if "|" not in raw:
+        raise InvalidCursor()
     stamp, _, ident = raw.partition("|")
+    if stamp == "" or ident == "":
+        raise InvalidCursor()
     try:
         return _utc(datetime.fromisoformat(stamp)), ident
-    except ValueError:
-        return None
+    except ValueError as exc:
+        raise InvalidCursor() from exc
 
 
 def _after_cursor(
@@ -195,6 +200,14 @@ def _timeline_label(kind: TimelineKind, detail: str) -> str:
             assert_never(unreachable)
 
 
+def _run_window(run_row: RowMapping) -> tuple[datetime, datetime | None]:
+    started = _utc(run_row["started_at"])
+    finished = run_row["finished_at"]
+    if finished is None:
+        return started, None
+    return started, _utc(finished)
+
+
 def _latency_ms(started_at: datetime, finished_at: datetime | None) -> int | None:
     if finished_at is None:
         return None
@@ -246,7 +259,12 @@ class SqlAlchemyRunInvestigationQuery:
                 cursor=tools_cursor,
                 limit=tool_limit,
             )
-            handoff = await self._handoff(session, tenant, run_row["conversation_id"])
+            handoff = await self._handoff(
+                session,
+                tenant,
+                run_row,
+                workflow.id if workflow is not None else None,
+            )
             jobs = await self._jobs(session, tenant, run_row)
             audits = await self._audits(session, tenant, run_row)
             paged_audits, audit_next = _page(
@@ -312,7 +330,7 @@ class SqlAlchemyRunInvestigationQuery:
                 )
             )
             .mappings()
-            .first()
+            .one_or_none()
         )
         message = (
             (
@@ -328,7 +346,7 @@ class SqlAlchemyRunInvestigationQuery:
                 )
             )
             .mappings()
-            .first()
+            .one_or_none()
         )
         last_message_at = (
             _utc(conv["last_message_at"])
@@ -399,16 +417,17 @@ class SqlAlchemyRunInvestigationQuery:
                 )
             )
             .mappings()
-            .first()
+            .one_or_none()
         )
         if row is None:
             return None
+        error = row["error"] if isinstance(row["error"], str) else None
         return WorkflowSummary(
             id=row["id"],
             type=str(row["type"]),
             state=str(row["state"]),
             status=str(row["status"]),
-            error=sanitize_text(row["error"] if isinstance(row["error"], str) else None),
+            error=sanitize_text(redact(error) if error is not None else None),
             schema_version=int(row["schema_version"]),
         )
 
@@ -473,8 +492,20 @@ class SqlAlchemyRunInvestigationQuery:
         self,
         session: AsyncSession,
         tenant: TenantContext,
-        conversation_id: UUID,
+        run_row: RowMapping,
+        workflow_id: UUID | None,
     ) -> HandoffSummary | None:
+        started, end = _run_window(run_row)
+        conversation_id = cast(UUID, run_row["conversation_id"])
+        conditions = [
+            handoff_table.c.tenant_id == tenant.tenant_id,
+            handoff_table.c.conversation_id == conversation_id,
+            handoff_table.c.requested_at >= started,
+        ]
+        if end is not None:
+            conditions.append(handoff_table.c.requested_at <= end)
+        if workflow_id is not None:
+            conditions.append(handoff_table.c.workflow_id == workflow_id)
         row = (
             (
                 await session.execute(
@@ -486,10 +517,7 @@ class SqlAlchemyRunInvestigationQuery:
                         handoff_table.c.accepted_at,
                         handoff_table.c.resolved_at,
                     )
-                    .where(
-                        handoff_table.c.tenant_id == tenant.tenant_id,
-                        handoff_table.c.conversation_id == conversation_id,
-                    )
+                    .where(*conditions)
                     .order_by(handoff_table.c.requested_at.desc())
                     .limit(1)
                 )
@@ -515,9 +543,19 @@ class SqlAlchemyRunInvestigationQuery:
         run_row: RowMapping,
     ) -> list[JobSummary]:
         correlation = str(run_row["correlation_id"])
-        started = _utc(run_row["started_at"])
-        finished = run_row["finished_at"]
-        end = _utc(finished) if finished is not None else started
+        started, end = _run_window(run_row)
+        filters = [
+            scheduled_job_table.c.tenant_id == tenant.tenant_id,
+            scheduled_job_table.c.created_at >= started,
+            or_(
+                scheduled_job_table.c.payload["correlation_id"].as_string()
+                == correlation,
+                scheduled_job_table.c.payload["telemetry"]["correlation_id"].as_string()
+                == correlation,
+            ),
+        ]
+        if end is not None:
+            filters.append(scheduled_job_table.c.created_at <= end)
         rows = (
             (
                 await session.execute(
@@ -530,19 +568,7 @@ class SqlAlchemyRunInvestigationQuery:
                         scheduled_job_table.c.created_at,
                         scheduled_job_table.c.last_error,
                     )
-                    .where(
-                        scheduled_job_table.c.tenant_id == tenant.tenant_id,
-                        scheduled_job_table.c.created_at >= started,
-                        scheduled_job_table.c.created_at <= end,
-                        or_(
-                            scheduled_job_table.c.payload["correlation_id"].as_string()
-                            == correlation,
-                            scheduled_job_table.c.payload["telemetry"][
-                                "correlation_id"
-                            ].as_string()
-                            == correlation,
-                        ),
-                    )
+                    .where(*filters)
                     .order_by(scheduled_job_table.c.created_at)
                 )
             )
@@ -560,7 +586,7 @@ class SqlAlchemyRunInvestigationQuery:
                     scheduled_for=_utc(row["scheduled_for"]),
                     created_at=_utc(row["created_at"]),
                     last_error=sanitize_text(
-                        row["last_error"]
+                        redact(row["last_error"])
                         if isinstance(row["last_error"], str)
                         else None
                     ),
@@ -574,9 +600,13 @@ class SqlAlchemyRunInvestigationQuery:
         tenant: TenantContext,
         run_row: RowMapping,
     ) -> list[AuditEventSummary]:
-        started = _utc(run_row["started_at"])
-        finished = run_row["finished_at"]
-        end = _utc(finished) if finished is not None else started
+        started, end = _run_window(run_row)
+        filters = [
+            audit_event_table.c.tenant_id == tenant.tenant_id,
+            audit_event_table.c.created_at >= started,
+        ]
+        if end is not None:
+            filters.append(audit_event_table.c.created_at <= end)
         rows = (
             (
                 await session.execute(
@@ -586,11 +616,7 @@ class SqlAlchemyRunInvestigationQuery:
                         audit_event_table.c.created_at,
                         audit_event_table.c.version,
                     )
-                    .where(
-                        audit_event_table.c.tenant_id == tenant.tenant_id,
-                        audit_event_table.c.created_at >= started,
-                        audit_event_table.c.created_at <= end,
-                    )
+                    .where(*filters)
                     .order_by(
                         audit_event_table.c.created_at, audit_event_table.c.id
                     )

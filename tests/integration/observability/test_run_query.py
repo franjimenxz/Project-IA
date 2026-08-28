@@ -23,7 +23,11 @@ from ia_mcp.configuration.adapters.sqlalchemy import (
     channel_integration_table,
     tenant_table,
 )
-from ia_mcp.conversation.adapters.sqlalchemy import SqlAlchemyConversationRepository
+from ia_mcp.conversation.adapters.sqlalchemy import (
+    SqlAlchemyConversationRepository,
+    conversation_table,
+    message_table,
+)
 from ia_mcp.conversation.models import InboundMessage
 from ia_mcp.handoff.service import handoff_table
 from ia_mcp.knowledge.adapters.sqlalchemy import (
@@ -36,6 +40,7 @@ from ia_mcp.observability.adapters.sqlalchemy_run_query import (
 )
 from ia_mcp.observability.run_query import (
     AUDIT_INVESTIGATION_ACTION,
+    InvalidCursor,
     RunNotFound,
 )
 from ia_mcp.scheduling.service import scheduled_job_table
@@ -81,6 +86,31 @@ T_FINISH = T_START + timedelta(seconds=8)
 T_AUDIT_1 = T_START + timedelta(seconds=2)
 T_AUDIT_2 = T_START + timedelta(seconds=4)
 T_AUDIT_3 = T_START + timedelta(seconds=6)
+T_B_HANDOFF = T_HANDOFF + timedelta(milliseconds=500)
+T_LATER_START = T_FINISH + timedelta(minutes=10)
+T_LATER_HANDOFF = T_LATER_START + timedelta(seconds=3)
+T_LATER_FINISH = T_LATER_START + timedelta(seconds=5)
+T_INFLIGHT = T_START + timedelta(hours=3)
+T_INFLIGHT_JOB = T_INFLIGHT + timedelta(seconds=5)
+
+CORR_INFLIGHT = UUID("77777777-7777-4777-8777-777777777777")
+INFLIGHT_CTX = TenantContext(
+    tenant_id=TENANT_A,
+    tenant_slug="tenant-a",
+    config_version=1,
+    correlation_id=CORR_INFLIGHT,
+)
+
+TENANT_B_TOOL = "tenant_b_tool"
+TENANT_B_WORKFLOW_TYPE = "tenant_b_workflow"
+TENANT_B_JOB_MARKER = "tenant_b_job_marker"
+LATER_HANDOFF_REASON = "explicit_request"
+WORKFLOW_ERROR = (
+    "upstream timeout for Juan Perez patient@example.com Bearer secret-token"
+)
+JOB_LAST_ERROR = (
+    "delivery failed Juan Perez patient@example.com Bearer secret-token"
+)
 
 MESSAGE_BODY = (
     "Necesito turno. DNI 30111222 patient@example.com Bearer secret-token"
@@ -97,6 +127,8 @@ class SeededRuns:
     run_a_id: UUID
     run_b_id: UUID
     sparse_run_id: UUID
+    later_run_id: UUID
+    inflight_run_id: UUID
     trigger_message_id: UUID
 
 
@@ -249,6 +281,41 @@ async def seed_investigation_fixture(engine: AsyncEngine) -> SeededRuns:
     )
     await runs.finish(TENANT_A_CTX, sparse.id, "succeeded")
 
+    received_later = await conversations.receive(
+        TENANT_A_CTX,
+        _inbound(
+            channel_integration_id=CHANNEL_A,
+            channel_account_id="acct-a",
+            external_message_id="ext-a-later",
+            external_user_id="user-pii-30111222",
+            text="seguimiento",
+        ),
+    )
+    later_run = await runs.start(
+        TENANT_A_CTX,
+        received_later.conversation.id,
+        received_later.message.id,
+        skill="appointments",
+    )
+    await runs.finish(TENANT_A_CTX, later_run.id, "handed_off")
+
+    received_inflight = await conversations.receive(
+        INFLIGHT_CTX,
+        _inbound(
+            channel_integration_id=CHANNEL_A,
+            channel_account_id="acct-a",
+            external_message_id="ext-a-inflight",
+            external_user_id="user-inflight",
+            text="en curso",
+        ),
+    )
+    inflight_run = await runs.start(
+        INFLIGHT_CTX,
+        received_inflight.conversation.id,
+        received_inflight.message.id,
+        skill="appointments",
+    )
+
     workflow_id = uuid4()
     document_id = uuid4()
     async with engine.begin() as connection:
@@ -264,6 +331,22 @@ async def seed_investigation_fixture(engine: AsyncEngine) -> SeededRuns:
                 started_at=T_START,
                 finished_at=T_FINISH,
             )
+        )
+        await connection.execute(
+            update(agent_run_table)
+            .where(
+                agent_run_table.c.tenant_id == TENANT_A,
+                agent_run_table.c.id == later_run.id,
+            )
+            .values(started_at=T_LATER_START, finished_at=T_LATER_FINISH)
+        )
+        await connection.execute(
+            update(agent_run_table)
+            .where(
+                agent_run_table.c.tenant_id == TENANT_A,
+                agent_run_table.c.id == inflight_run.id,
+            )
+            .values(started_at=T_INFLIGHT, finished_at=None, status="started")
         )
         await connection.execute(
             knowledge_document_table.insert().values(
@@ -315,7 +398,7 @@ async def seed_investigation_fixture(engine: AsyncEngine) -> SeededRuns:
                 lock_version=3,
                 created_at=T_START,
                 updated_at=T_ADVANCE,
-                error=None,
+                error=WORKFLOW_ERROR,
             )
         )
         await connection.execute(
@@ -447,7 +530,7 @@ async def seed_investigation_fixture(engine: AsyncEngine) -> SeededRuns:
                     "attempts": 2,
                     "lock_owner": None,
                     "lock_expires_at": None,
-                    "last_error": "delivery failed patient@example.com Bearer secret-token",
+                    "last_error": JOB_LAST_ERROR,
                     "created_at": T_JOB,
                     "updated_at": T_JOB,
                 },
@@ -509,11 +592,164 @@ async def seed_investigation_fixture(engine: AsyncEngine) -> SeededRuns:
                 },
             ],
         )
+        await connection.execute(
+            conversation_table.insert().values(
+                id=received_a.conversation.id,
+                tenant_id=TENANT_B,
+                channel_integration_id=CHANNEL_B,
+                external_user_ref="twin-a-conversation",
+                status="closed",
+                last_message_at=datetime(2099, 1, 1, tzinfo=UTC),
+                lock_version=1,
+            )
+        )
+        await connection.execute(
+            message_table.insert().values(
+                id=received_a.message.id,
+                tenant_id=TENANT_B,
+                conversation_id=received_a.conversation.id,
+                channel_integration_id=CHANNEL_B,
+                direction="outbound",
+                external_message_id="twin-a-message",
+                content="tenant b twin body",
+                content_type="document",
+                occurred_at=T_START,
+                received_at=T_START,
+                dedupe_hash="b" * 64,
+            )
+        )
+        await connection.execute(
+            workflow_execution_table.insert().values(
+                tenant_id=TENANT_B,
+                id=workflow_id,
+                conversation_id=received_a.conversation.id,
+                type=TENANT_B_WORKFLOW_TYPE,
+                schema_version=1,
+                state="failed",
+                status="failed",
+                data={},
+                idempotency_key_hash=None,
+                lock_version=1,
+                created_at=T_START,
+                updated_at=T_START,
+                error=None,
+            )
+        )
+        await connection.execute(
+            workflow_transition_table.insert().values(
+                tenant_id=TENANT_B,
+                workflow_id=workflow_id,
+                sequence=1,
+                from_state=None,
+                to_state="failed",
+                command_id="cmd-b-twin",
+                event_type="tool.execute",
+                payload={
+                    "tool_name": TENANT_B_TOOL,
+                    "mcp_server_id": "mcp-b",
+                    "status": "ok",
+                    "retry_count": 0,
+                },
+                actor="system",
+                run_id=run_a.id,
+                timestamp=T_TOOL,
+            )
+        )
+        await connection.execute(
+            handoff_table.insert().values(
+                tenant_id=TENANT_B,
+                id=uuid4(),
+                conversation_id=received_a.conversation.id,
+                workflow_id=workflow_id,
+                reason="out_of_scope",
+                summary={"reason": "out_of_scope"},
+                business_key="handoff:twin-b",
+                status="requested",
+                external_case_reference=None,
+                owner_reference=None,
+                requested_at=T_B_HANDOFF,
+                accepted_at=None,
+                resolved_at=None,
+            )
+        )
+        await connection.execute(
+            scheduled_job_table.insert().values(
+                tenant_id=TENANT_B,
+                id=uuid4(),
+                type="appointment_reminder",
+                payload={
+                    "appointment_id": "apt-b-twin",
+                    "correlation_id": str(CORR_A),
+                    "telemetry": {"correlation_id": str(CORR_A)},
+                },
+                business_key="apt-b-twin:pre_appointment",
+                scheduled_for=T_JOB,
+                schedule_version=1,
+                status="pending",
+                attempts=99,
+                lock_owner=None,
+                lock_expires_at=None,
+                last_error=TENANT_B_JOB_MARKER,
+                created_at=T_JOB,
+                updated_at=T_JOB,
+            )
+        )
+        await connection.execute(
+            handoff_table.insert().values(
+                tenant_id=TENANT_A,
+                id=uuid4(),
+                conversation_id=received_a.conversation.id,
+                workflow_id=None,
+                reason=LATER_HANDOFF_REASON,
+                summary={"reason": LATER_HANDOFF_REASON},
+                business_key=f"handoff:{later_run.id}",
+                status="requested",
+                external_case_reference=None,
+                owner_reference=None,
+                requested_at=T_LATER_HANDOFF,
+                accepted_at=None,
+                resolved_at=None,
+            )
+        )
+        await connection.execute(
+            scheduled_job_table.insert().values(
+                tenant_id=TENANT_A,
+                id=uuid4(),
+                type="appointment_reminder",
+                payload={
+                    "appointment_id": "apt-inflight",
+                    "correlation_id": str(CORR_INFLIGHT),
+                    "telemetry": {"correlation_id": str(CORR_INFLIGHT)},
+                },
+                business_key="apt-inflight:pre_appointment",
+                scheduled_for=T_INFLIGHT_JOB,
+                schedule_version=1,
+                status="pending",
+                attempts=1,
+                lock_owner=None,
+                lock_expires_at=None,
+                last_error=None,
+                created_at=T_INFLIGHT_JOB,
+                updated_at=T_INFLIGHT_JOB,
+            )
+        )
+        await connection.execute(
+            audit_event_table.insert().values(
+                id=uuid4(),
+                tenant_id=TENANT_A,
+                actor_id=ACTOR_A,
+                action="inflight_audit",
+                version=1,
+                created_at=T_INFLIGHT_JOB,
+            )
+        )
 
     return SeededRuns(
         run_a_id=run_a.id,
         run_b_id=run_b.id,
         sparse_run_id=sparse.id,
+        later_run_id=later_run.id,
+        inflight_run_id=inflight_run.id,
         trigger_message_id=received_a.message.id,
     )
 
@@ -680,6 +916,17 @@ async def test_summaries_omit_bodies_chunks_prompts_payloads_and_patient_ids(
     assert "patient_reference" not in dumped_handoff
     assert "notes" not in dumped_handoff
     assert "collected_fields" not in dumped_handoff
+    assert investigation.workflow is not None
+    assert investigation.workflow.error is not None
+    assert "[EMAIL]" in investigation.workflow.error
+    assert "Bearer [REDACTED]" in investigation.workflow.error
+    assert "patient@example.com" not in investigation.workflow.error
+    assert "secret-token" not in investigation.workflow.error
+    assert "Juan Perez" in investigation.workflow.error
+    assert investigation.jobs[0].last_error is not None
+    assert "[EMAIL]" in investigation.jobs[0].last_error
+    assert "Bearer [REDACTED]" in investigation.jobs[0].last_error
+    assert "Juan Perez" in investigation.jobs[0].last_error
 
 
 @pytest.mark.anyio
@@ -710,3 +957,66 @@ async def test_tenant_b_can_read_own_run(
     investigation = await query.get(TENANT_B_CTX, runs.run_b_id)
     assert investigation.run.id == runs.run_b_id
     assert investigation.run.skill == "faq"
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_earlier_run_does_not_surface_later_conversation_handoff(
+    seeded: tuple[SqlAlchemyRunInvestigationQuery, SeededRuns, AsyncEngine],
+) -> None:
+    query, runs, _engine = seeded
+    earlier = await query.get(TENANT_A_CTX, runs.run_a_id)
+    later = await query.get(TENANT_A_CTX, runs.later_run_id)
+    assert earlier.handoff is not None
+    assert earlier.handoff.reason == "manual_review_required"
+    assert later.handoff is not None
+    assert later.handoff.reason == LATER_HANDOFF_REASON
+    assert earlier.handoff.id != later.handoff.id
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_tenant_predicates_exclude_cross_tenant_twins(
+    seeded: tuple[SqlAlchemyRunInvestigationQuery, SeededRuns, AsyncEngine],
+) -> None:
+    query, runs, _engine = seeded
+    investigation = await query.get(TENANT_A_CTX, runs.run_a_id)
+    assert investigation.conversation.status != "closed"
+    assert investigation.conversation.trigger_direction == "inbound"
+    assert investigation.conversation.trigger_content_type == "text"
+    assert investigation.workflow is not None
+    assert investigation.workflow.type != TENANT_B_WORKFLOW_TYPE
+    assert TENANT_B_TOOL not in {item.tool_name for item in investigation.tools}
+    assert investigation.handoff is not None
+    assert investigation.handoff.reason != "out_of_scope"
+    assert all(
+        TENANT_B_JOB_MARKER not in (item.last_error or "")
+        for item in investigation.jobs
+    )
+    assert "tenant_b_only" not in {item.action for item in investigation.audit_events}
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_inflight_run_keeps_open_ended_job_and_audit_window(
+    seeded: tuple[SqlAlchemyRunInvestigationQuery, SeededRuns, AsyncEngine],
+) -> None:
+    query, runs, _engine = seeded
+    investigation = await query.get(TENANT_A_CTX, runs.inflight_run_id)
+    assert investigation.run.finished_at is None
+    assert len(investigation.jobs) == 1
+    assert "inflight_audit" in {item.action for item in investigation.audit_events}
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_malformed_cursor_fails_closed(
+    seeded: tuple[SqlAlchemyRunInvestigationQuery, SeededRuns, AsyncEngine],
+) -> None:
+    query, runs, _engine = seeded
+    with pytest.raises(InvalidCursor) as tools_exc:
+        await query.get(TENANT_A_CTX, runs.run_a_id, tools_cursor="not-a-cursor")
+    with pytest.raises(InvalidCursor) as events_exc:
+        await query.get(TENANT_A_CTX, runs.run_a_id, events_cursor="also-bad")
+    assert tools_exc.value.code == "validation_error"
+    assert events_exc.value.code == "validation_error"
