@@ -8,9 +8,14 @@ Este procedimiento incorpora un tenant sintético B sin cambiar Core. Los valore
 ## Precondiciones
 
 - Package declarativo bajo `tenants/fixtures/tenant-b/` (config, corpus, tools y MCP distintos de A).
-- Principal `platform_admin` inyectado. No hay autenticación federada.
-- PostgreSQL local y servicios T01–T03 (`validate`, `provision`, `preflight`, `activate`, `disable`).
+- Principal `platform_admin` por `--principal-id` y `--role`. No hay autenticación federada.
+- PostgreSQL local (misma URL que `tests/e2e/test_second_tenant.py`).
+- `DATABASE_URL` exportada; el CLI construye `TenantOnboardingService` con ese engine.
 - Corpus canario B en `tenants/fixtures/tenant-b/knowledge/hours-b.txt` (`canary-tenant-b`).
+
+```text
+export DATABASE_URL=postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03
+```
 
 ## Activación
 
