@@ -121,15 +121,83 @@ async def test_appointments_skill_emits_only_authorized_tool_schemas() -> None:
     tenant_b = tenant_context(tenant_id=TENANT_B, slug="tenant-b")
     compiler = ContextCompiler(
         configs=FakeConfigRepository(
-            {TENANT_B: config_for(TENANT_B, skills=frozenset({"appointments"}))}
+            {
+                TENANT_B: config_for(
+                    TENANT_B,
+                    skills=frozenset({"appointments"}),
+                    enabled_tools=frozenset({"appointments.search"}),
+                )
+            }
         ),
         skills=SkillRegistry(),
         tenant_tools={TENANT_B: frozenset({"appointments.search"})},
+        server_tools={
+            TENANT_B: frozenset({"appointments.search", "appointments.create"}),
+        },
     )
     context = await compiler.compile(tenant_b, request(skill="appointments"))
     assert [schema.name for schema in context.tool_schemas] == ["appointments.search"]
     assert "appointments.create" not in context.model_dump_json()
     assert "credentials_reference" not in context.model_dump_json()
+
+
+@pytest.mark.anyio
+async def test_empty_skill_allowlist_emits_no_tool_schemas() -> None:
+    tenant_b = tenant_context(tenant_id=TENANT_B, slug="tenant-b")
+    compiler = ContextCompiler(
+        configs=FakeConfigRepository(
+            {TENANT_B: config_for(TENANT_B, skills=frozenset({"appointments"}))}
+        ),
+        skills=SkillRegistry(),
+        tenant_tools={TENANT_B: frozenset({"appointments.search"})},
+        server_tools={TENANT_B: frozenset({"appointments.search"})},
+    )
+    context = await compiler.compile(tenant_b, request(skill="appointments"))
+    assert context.tool_schemas == ()
+
+
+@pytest.mark.anyio
+async def test_missing_server_catalog_emits_no_tool_schemas() -> None:
+    tenant_b = tenant_context(tenant_id=TENANT_B, slug="tenant-b")
+    compiler = ContextCompiler(
+        configs=FakeConfigRepository(
+            {
+                TENANT_B: config_for(
+                    TENANT_B,
+                    skills=frozenset({"appointments"}),
+                    enabled_tools=frozenset({"appointments.search"}),
+                )
+            }
+        ),
+        skills=SkillRegistry(),
+        tenant_tools={TENANT_B: frozenset({"appointments.search"})},
+    )
+    context = await compiler.compile(tenant_b, request(skill="appointments"))
+    assert context.tool_schemas == ()
+    assert "appointments.search" not in context.model_dump_json()
+
+
+@pytest.mark.anyio
+async def test_name_in_tenant_and_skill_but_not_server_is_omitted() -> None:
+    tenant_b = tenant_context(tenant_id=TENANT_B, slug="tenant-b")
+    compiler = ContextCompiler(
+        configs=FakeConfigRepository(
+            {
+                TENANT_B: config_for(
+                    TENANT_B,
+                    skills=frozenset({"appointments"}),
+                    enabled_tools=frozenset({"crear_turno", "appointments.search"}),
+                )
+            }
+        ),
+        skills=SkillRegistry(),
+        tenant_tools={TENANT_B: frozenset({"crear_turno", "appointments.search"})},
+        server_tools={TENANT_B: frozenset({"appointments.search"})},
+    )
+    context = await compiler.compile(tenant_b, request(skill="appointments"))
+    names = [schema.name for schema in context.tool_schemas]
+    assert "crear_turno" not in names
+    assert names == ["appointments.search"]
 
 
 @pytest.mark.anyio
