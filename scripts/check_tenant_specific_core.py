@@ -19,6 +19,7 @@ ALLOWED_PREFIXES: tuple[str, ...] = (
 )
 CORE_PREFIX = "src/ia_mcp/"
 ADAPTER_MARKER = "/adapters/"
+ONBOARDING_CLI = "src/ia_mcp/onboarding/cli.py"
 PathKind = Literal["allowed", "core", "other"]
 
 _COMPARISON = re.compile(
@@ -55,7 +56,7 @@ def classify_path(path: str) -> PathKind:
     if normalized.startswith(ALLOWED_PREFIXES):
         return "allowed"
     if normalized.startswith(CORE_PREFIX) and (
-        ADAPTER_MARKER in f"/{normalized}" or normalized.endswith("/cli.py")
+        ADAPTER_MARKER in f"/{normalized}" or normalized == ONBOARDING_CLI
     ):
         return "allowed"
     if normalized.startswith((CORE_PREFIX, "alembic/")):
