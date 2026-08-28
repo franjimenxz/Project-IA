@@ -18,6 +18,9 @@ from ia_mcp.configuration.adapters.sqlalchemy import (
 )
 from ia_mcp.conversation.adapters.sqlalchemy import SqlAlchemyConversationRepository
 from ia_mcp.conversation.models import InboundMessage
+from ia_mcp.handoff.adapters.fake import FakeHandoffAdapter
+from ia_mcp.handoff.models import HandoffRequest
+from ia_mcp.handoff.service import HandoffService, SqlAlchemyHandoffRepository
 from ia_mcp.knowledge.adapters.object_store import InMemoryObjectStore
 from ia_mcp.knowledge.adapters.sqlalchemy import SqlAlchemyKnowledgeRepository
 from ia_mcp.knowledge.models import DocumentSource, KnowledgeQuery
@@ -253,3 +256,50 @@ async def test_tenant_a_cannot_publish_tenant_b_document(
         await knowledge_service.publish(
             TENANT_A_CTX, draft_b.document_id, draft_b.version
         )
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+async def test_operator_of_a_does_not_receive_case_b(
+    repos: tuple[SqlAlchemyConversationRepository, SqlAlchemyAgentRunRepository],
+) -> None:
+    conversations, _runs = repos
+    received_b = await conversations.receive(
+        TENANT_B_CTX,
+        InboundMessage(
+            channel="simulated",
+            channel_account_id="acct-b",
+            channel_integration_id=CHANNEL_B,
+            external_message_id="ext-handoff-b",
+            external_user_id="user-b",
+            text="canary-handoff-from-b",
+            occurred_at=OCCURRED_AT,
+        ),
+    )
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        repository = SqlAlchemyHandoffRepository(engine)
+        provider = FakeHandoffAdapter()
+        service = HandoffService(repository, provider)
+        result = await service.create(
+            TENANT_B_CTX,
+            HandoffRequest(
+                conversation_id=received_b.conversation.id,
+                reason="explicit_request",
+                business_key=f"handoff:{received_b.conversation.id}",
+            ),
+        )
+        assert await repository.get(TENANT_A_CTX, result.handoff_id) is None
+        assert (
+            await repository.get_by_business_key(
+                TENANT_A_CTX, f"handoff:{received_b.conversation.id}"
+            )
+            is None
+        )
+        assert provider.cases_for(TENANT_A_CTX) == ()
+        b_cases = provider.cases_for(TENANT_B_CTX)
+        assert len(b_cases) == 1
+        assert b_cases[0].handoff_id == result.handoff_id
+        assert b_cases[0].conversation_id == received_b.conversation.id
+    finally:
+        await engine.dispose()
