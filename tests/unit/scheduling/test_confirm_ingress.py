@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -15,6 +15,7 @@ from ia_mcp.contracts.appointments import (
 )
 from ia_mcp.mcp.executor import ToolExecutor
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
+from ia_mcp.scheduling.ingress import ConfirmationIngress
 from ia_mcp.scheduling.models import AppointmentScheduledEvent, SchedulingPolicy
 from ia_mcp.scheduling.service import ReminderScheduler
 from ia_mcp.scheduling.worker import JobWorker
@@ -100,37 +101,23 @@ async def test_affirmative_reply_after_reminder_continues_confirm_workflow() -> 
     assert dispatched.status == "dispatched"
     assert len(channel.deliveries_for(TENANT_A_CTX)) == 1
 
-    repository = InMemoryWorkflowRepository()
-    definition = ConfirmAppointmentDefinition()
-    engine = WorkflowEngine(repository, definition)
+    engine = WorkflowEngine(
+        InMemoryWorkflowRepository(), ConfirmAppointmentDefinition()
+    )
     executor = ToolExecutor(
         server=CONFIRM_TOOLS,
         tenant=CONFIRM_TOOLS,
         skill=CONFIRM_TOOLS,
         capability=capability,
     )
-    started = await definition.start(
-        engine,
+    ingress = ConfirmationIngress(
+        store=store, engine=engine, executor=executor
+    )
+    result = await ingress.apply_reply(
         TENANT_A_CTX,
-        command_id="start-1",
         appointment_id=appointment_id,
-    )
-    await definition.load_appointment(
-        engine,
-        executor,
-        TENANT_A_CTX,
-        started.workflow_id,
-        command_id="load-1",
-        run_id=uuid4(),
-    )
-    result = await definition.apply_reply(
-        engine,
-        executor,
-        TENANT_A_CTX,
-        started.workflow_id,
-        command_id="reply-yes",
-        run_id=uuid4(),
         text="yes",
+        command_id="reply-yes",
     )
     assert result.state == "completed"
     assert result.data["status"] == AppointmentStatus.CONFIRMED
