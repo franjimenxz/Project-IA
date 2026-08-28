@@ -37,9 +37,9 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P04-T05 | W3 | accepted | P04-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T05-faq-e2e.md) |
 | P04-T06 | W3 | accepted | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
 | P04-T07 | W3 | accepted | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
-| P04-T08 | W3 | in_progress | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
-| P04-T09 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
-| P04-T10 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T10-reschedule-confirm.md) |
+| P04-T08 | W3 | accepted | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
+| P04-T09 | W4 | ready | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
+| P04-T10 | W4 | ready | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T10-reschedule-confirm.md) |
 | P04-T11 | W4 | accepted | P04-T04, P04-T06 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T11-handoff.md) |
 | P04-T12 | W5 | blocked | P04-T08, P04-T10 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T12-scheduler.md) |
 | P04-T13 | W5 | blocked | P04-T05, P04-T09–P04-T12 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T13-mvp-e2e.md) |
@@ -47,7 +47,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P05-T02 | W6-build | blocked | P05-T01, EXT-003 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T02-transport-auth.md) |
 | P05-T03 | W6-build | blocked | P05-T01, P05-T02 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T03-appointment-adapter.md) |
 | P05-T04 | W6-sandbox | blocked | P05-T03, EXT-002 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T04-sandbox-rollout.md) |
-| P06-T01 | W6 | blocked | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
+| P06-T01 | W6 | ready | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
 | P06-T02 | W6 | blocked | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
 | P06-T03 | W6 | blocked | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
 | P06-T04 | W6 | blocked | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P04-T07 accepted (PR #17) and P04-T11 accepted (PR #16). En curso: `P04-T08` (Implementador 2). Implementador y Implementador 3 idle.
+P04-T08 accepted (PR #18). Corrida cerrada. Siguiente: P04-T09 y P04-T10 ready, sin asignar. P06-T01 ready.
 
 ## Actualización
 
@@ -143,3 +143,7 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P04-T11 | `in_review → accepted` | `ed308d3` merged `b2e4e0d` | https://github.com/franjimenxz/Project-IA/pull/16 |
 | P04-T07 | `in_review → accepted` | `38a9158` merged PR #17 | https://github.com/franjimenxz/Project-IA/pull/17 |
 | P04-T08 | `blocked → ready → in_progress` | dependencia P04-T07 aceptada | asignada a Implementador 2 |
+| P04-T08 | `in_progress → in_review → accepted` | `9d2e31c` merged PR #18 | https://github.com/franjimenxz/Project-IA/pull/18 |
+| P04-T09 | `blocked → ready` | dependencia P04-T08 aceptada | sin asignar |
+| P04-T10 | `blocked → ready` | dependencia P04-T08 aceptada | sin asignar |
+| P06-T01 | `blocked → ready` | dependencias P04-T05 y P04-T08 aceptadas | sin asignar |
