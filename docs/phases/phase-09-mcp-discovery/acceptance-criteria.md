@@ -10,7 +10,7 @@
 | AC-P09-006 | Host/scheme no allowlisted rechazado fail-closed; `http` solo si par explícitamente allowlisted |
 | AC-P09-007 | Executor despacha `appointments.*` canónico a capability/workflow cuando está cableado |
 | AC-P09-008 | Executor usa cliente genérico para tools autorizadas no canónicas |
-| AC-P09-009 | Context compiler usa `server` del catálogo descubierto, no de `KNOWN_TOOLS` |
+| AC-P09-009 | Context compiler pasa catálogo descubierto como `server=` de `available()` y expone resultado en `CompiledContext.tool_schemas`; no usa `KNOWN_TOOLS` como server set |
 | AC-P09-010 | Onboarding/evals no rechazan nombre solo por estar fuera de `KNOWN_TOOLS` |
 | AC-P09-011 | Tenant A no autoriza tools descubiertas exclusivas de tenant B |
 | AC-P09-012 | Toda invocación pública incluye `TenantContext`, audit y timeout |

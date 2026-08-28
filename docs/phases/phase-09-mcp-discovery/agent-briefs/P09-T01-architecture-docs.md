@@ -1,6 +1,6 @@
 # P09-T01 — Architecture docs (MCP discovery)
 
-**Estado:** accepted-doc · **Wave:** W8 · **Depends on:** Fase 8 aceptada
+**Estado:** in_review · **Wave:** W8 · **Depends on:** P08-T04 accepted
 
 Documentación únicamente. Definir Fase 9, ADR-005, enmienda ADR-003 y actualizaciones mínimas de arquitectura/governance. Sin código de producto.
 
@@ -13,7 +13,7 @@ Commit: `docs: define MCP discovery instead of closed tool catalog`.
 - [system-tdd.md §13](../../../01-architecture/system-tdd.md)
 - [delegation-protocol.md](../../../00-governance/delegation-protocol.md)
 
-## Archivos exactos
+## Archivos exactos e interfaces
 
 **Crear:**
 
@@ -39,10 +39,12 @@ Commit: `docs: define MCP discovery instead of closed tool catalog`.
 - `docs/01-architecture/component-model.md` — filas MCP
 - `docs/01-architecture/security-and-multitenancy.md` — lenguaje allowlist
 - `docs/00-governance/assumptions-decisions-dependencies.md` — D-003 nota, D-005
-- `docs/00-governance/master-roadmap.md` — W8 / Fase 9
+- `docs/00-governance/master-roadmap.md` — W8 / G6 / Fase 9
 - `docs/00-governance/file-map.md`
 - `docs/00-governance/delegation-board.md` — P09-T01–T04
 - `docs/README.md` — nueve fases
+
+Produce paquete documental Fase 9 + ADR-005 verificable con `check_docs.py`.
 
 ## Exclusiones
 
@@ -50,14 +52,6 @@ Commit: `docs: define MCP discovery instead of closed tool catalog`.
 - No abrir PR (coordinador).
 - No revertir P05 blocked ni estados accepted de Fases 6–8 / P07-T04.
 
-## Verificación
+## TDD/evidencia
 
-Documental: briefs T02–T04 `ready`; ADR-005 `accepted`; tablero con T01 `in_review`, T02/T03 `in_progress`, T04 `blocked`.
-
-## Criterios
-
-AC-P09-001
-
-## Evidencia
-
-`docs/phases/phase-09-mcp-discovery/evidence/P09-T01.md`
+Rojo: `uv run python scripts/check_docs.py --all docs` falla gates/briefs; verde mismo comando exit 0. Criterio AC-P09-001: ADR-005 accepted, G6 definido en master-roadmap, briefs con sección TDD/evidencia ejecutable. Adjuntar salida en `evidence/P09-T01.md` y commit.

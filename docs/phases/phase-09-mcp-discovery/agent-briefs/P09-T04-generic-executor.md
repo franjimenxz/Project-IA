@@ -12,7 +12,7 @@ Commit: `feat: generic MCP tool invocation in executor`.
 - [../TDD.md](../TDD.md)
 - Brief P03-T05 (executor baseline)
 
-## Archivos exactos
+## Archivos exactos e interfaces
 
 **Modificar:**
 
@@ -23,11 +23,13 @@ Commit: `feat: generic MCP tool invocation in executor`.
 - `tests/unit/mcp/test_executor.py`
 - `tests/security/test_tool_contracts.py` _(solo casos nuevos si hace falta)_
 
+Consume `authorize`, `McpResolver`, `HostAllowlist`, `McpTransportClient` y `AppointmentCapability`. Produce dispatch genérico post-autorización sin relajar host allowlist.
+
 ## Comportamiento
 
 ```text
 authorize(tool, discovered, tenant, skill)
-→ resolver + host allowlist (fail-closed)
+→ resolver + HostAllowlist (fail-closed)
 → if tool in KNOWN_TOOLS appointments.* AND AppointmentCapability wired:
       existing capability/workflow dispatch
   else if tool in authorized intersection:
@@ -45,27 +47,6 @@ No reescribir dominio de Fases 6–8 (workflows, scheduling, onboarding activati
 - No relajar host allowlist.
 - No tocar `discovery.py` / `client.py` salvo wiring DI.
 
-## TDD — rojo / verde
+## TDD/evidencia
 
-**Rojo:**
-
-```bash
-pytest tests/unit/mcp/test_executor.py::test_generic_client_called_for_non_canonical_authorized_tool -v
-pytest tests/unit/mcp/test_executor.py::test_canonical_appointment_still_uses_capability -v
-pytest tests/unit/mcp/test_executor.py::test_unauthorized_tool_does_not_invoke_client -v
-```
-
-**Verde:**
-
-```bash
-pytest tests/unit/mcp/test_executor.py tests/security/test_tool_contracts.py -v
-mypy src/ia_mcp/mcp/executor.py
-```
-
-## Criterios
-
-AC-P09-007, AC-P09-008, AC-P09-012
-
-## Evidencia
-
-`docs/phases/phase-09-mcp-discovery/evidence/P09-T04.md`
+Rojo: tool no canónica autorizada no usa generic client o canónica deja de usar capability; verde `pytest tests/unit/mcp/test_executor.py tests/security/test_tool_contracts.py -v && mypy src/ia_mcp/mcp/executor.py`. Criterios AC-P09-007, AC-P09-008, AC-P09-012. Adjuntar spy/evidence y commit.

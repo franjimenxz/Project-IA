@@ -26,10 +26,12 @@ class DiscoveredToolCatalog:
 @dataclass(frozen=True, slots=True)
 class McpTarget:
     server_id: str
-    endpoint: str  # base URL; transport adds /sse
+    endpoint: str
     auth_reference: str
-    allowed_hosts: frozenset[str]  # host+scheme pairs validated fail-closed
+    allowed_tools: frozenset[str]  # allowlist de tenant en config al resolver; no es el catálogo descubierto
 ```
+
+`DiscoveredToolCatalog` proviene de `tools/list` y alimenta el argumento `server=` de `available()`. La política de red/host+scheme se aplica vía `HostAllowlist` inyectada en executor/cliente (fail-closed; `http` solo si el par está allowlisted), no como campo de `McpTarget`.
 
 ## Puertos
 
@@ -89,7 +91,23 @@ Resolver + host allowlist se aplican antes de discovery/invoke.
 
 ## Context compiler
 
-`CompiledContext.tools` incluye metadatos de tools autorizadas. Campo `server` proviene del catálogo descubierto (o catálogo inyectado en tests), no de `KNOWN_TOOLS`.
+El compiler intersecta allowlists usando nombres del catálogo descubierto como argumento `server=` de `available()`:
+
+```python
+authorized = sorted(
+    available(
+        server=discovered_names,  # tools/list o catálogo inyectado en tests
+        tenant=tenant_allowlist,
+        skill=skill.allowed_tools(config),
+    )
+)
+return CompiledContext(
+    ...,
+    tool_schemas=tuple(ToolSchema(name=name) for name in authorized),
+)
+```
+
+No usar `KNOWN_TOOLS` como `server=`; ese set es alias canónico para workflows/fakes/dispatch.
 
 ## Validators (onboarding/evals)
 

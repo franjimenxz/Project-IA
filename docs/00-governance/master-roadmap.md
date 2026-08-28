@@ -99,6 +99,16 @@ G4 es el gate de salida de Fase 5. Su entrada requiere G2, las Slices 4.2–4.3 
 - SLOs y alertas operables;
 - segundo tenant incorporado sin lógica específica en Core.
 
+### G6 — MCP discovery listo
+
+Gate de salida de Fase 9. Entrada: G5 y P08-T04 aceptada.
+
+- discovery `tools/list` operativo con fake in-process en CI;
+- autorización por intersección discovered ∩ tenant ∩ skill sin catálogo cerrado en Core;
+- invocación genérica `tools/call` con host/scheme allowlist fail-closed;
+- dispatch canónico `appointments.*` preservado (ADR-003);
+- AC-P09-001–AC-P09-012 aceptados.
+
 ## Política de replanificación
 
 Se actualiza el roadmap cuando cambia un contrato compartido, aparece una nueva dependencia bloqueante, falla un gate por diseño o una tarea supera su boundary. La replanificación debe preservar identificadores existentes y marcar como `superseded` lo reemplazado.

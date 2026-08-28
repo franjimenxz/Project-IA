@@ -12,7 +12,7 @@ Commit: `feat: add MCP discovery and SSE client`.
 - [../TDD.md](../TDD.md)
 - [security-and-multitenancy.md](../../../01-architecture/security-and-multitenancy.md) — host allowlist
 
-## Archivos exactos
+## Archivos exactos e interfaces
 
 **Crear:**
 
@@ -26,22 +26,7 @@ Commit: `feat: add MCP discovery and SSE client`.
 
 - `tests/e2e/test_mcp_discovery.py` — solo si `MCP_SSE_URL` definida
 
-## Interfaces
-
-```python
-# discovery.py
-async def list_tools(tenant: TenantContext, target: McpTarget) -> DiscoveredToolCatalog: ...
-
-# client.py
-async def call_tool(
-    tenant: TenantContext,
-    target: McpTarget,
-    name: str,
-    arguments: Mapping[str, Any],
-) -> ToolResult: ...
-```
-
-Todo método público recibe `TenantContext`. Auth reference se resuelve fuera del LLM. Validar host+scheme allowlist fail-closed antes de conectar.
+Produce `list_tools(tenant, target) -> DiscoveredToolCatalog` y `call_tool(tenant, target, name, arguments) -> ToolResult`. Consume `McpTarget` (endpoint, auth_reference, allowed_tools) y `HostAllowlist` para validación fail-closed.
 
 ## Exclusiones
 
@@ -50,33 +35,6 @@ Todo método público recibe `TenantContext`. Auth reference se resuelve fuera d
 - No hardcodear `192.168.1.247` ni hosts de producción en tests obligatorios.
 - No secret values en código, docs ni fixtures.
 
-## TDD — rojo / verde
+## TDD/evidencia
 
-**Rojo:**
-
-```bash
-pytest tests/unit/mcp/test_discovery.py::test_list_tools_returns_catalog_from_fake -v
-pytest tests/unit/mcp/test_client.py::test_call_tool_invokes_fake_sse -v
-pytest tests/unit/mcp/test_client.py::test_rejects_non_allowlisted_host -v
-```
-
-**Verde:**
-
-```bash
-pytest tests/unit/mcp/test_discovery.py tests/unit/mcp/test_client.py -v
-mypy src/ia_mcp/mcp/discovery.py src/ia_mcp/mcp/client.py
-```
-
-**E2E opcional:**
-
-```bash
-MCP_SSE_URL=http://127.0.0.1:8765 pytest -m e2e tests/e2e/test_mcp_discovery.py -v
-```
-
-## Criterios
-
-AC-P09-005, AC-P09-006, AC-P09-012
-
-## Evidencia
-
-`docs/phases/phase-09-mcp-discovery/evidence/P09-T03.md`
+Rojo: discovery/client ausentes o host no allowlisted no rechazado; verde `pytest tests/unit/mcp/test_discovery.py tests/unit/mcp/test_client.py -v && mypy src/ia_mcp/mcp/discovery.py src/ia_mcp/mcp/client.py`. E2E opcional: `MCP_SSE_URL=http://127.0.0.1:8765 pytest -m e2e tests/e2e/test_mcp_discovery.py -v`. Criterios AC-P09-005, AC-P09-006, AC-P09-012. Adjuntar salida y commit.

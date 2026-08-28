@@ -272,7 +272,18 @@ class McpResolver(Protocol):
     ) -> McpTarget: ...
 ```
 
-`McpTarget` contiene server id, endpoint, auth reference y política de transporte. El auth reference se resuelve dentro del transporte/adapter; no se devuelve al modelo ni se serializa en fixtures.
+`McpTarget` contiene:
+
+```python
+@dataclass(frozen=True, slots=True)
+class McpTarget:
+    server_id: str
+    endpoint: str
+    auth_reference: str
+    allowed_tools: frozenset[str]  # allowlist de tenant al resolver; no sustituye el catálogo descubierto
+```
+
+El auth reference se resuelve dentro del transporte/adapter; no se devuelve al modelo ni se serializa en fixtures. El catálogo descubierto (`tools/list`) alimenta el argumento `server=` de `available()`. La política host+scheme se aplica vía `HostAllowlist` inyectada en executor/cliente (fail-closed; `http` solo si el par está allowlisted), no como campo de `McpTarget`.
 
 ### Discovery e invocación (ADR-005)
 

@@ -2,7 +2,7 @@
 
 **Estado:** ready · **Wave:** W8 · **Depends on:** P09-T01 accepted
 
-Eliminar el uso de `KNOWN_TOOLS` como deny-list en autorización. `available()` = intersección discovered/server ∩ tenant ∩ skill únicamente. Alinear skills, compiler y validators.
+Eliminar el uso de `KNOWN_TOOLS` como deny-list en autorización. `available()` = intersección `server` (catálogo descubierto) ∩ tenant ∩ skill únicamente. Alinear skills, compiler y validators.
 
 Commit: `feat: authorize discovered MCP tools by intersection`.
 
@@ -12,16 +12,16 @@ Commit: `feat: authorize discovered MCP tools by intersection`.
 - [../TDD.md](../TDD.md)
 - [../acceptance-criteria.md](../acceptance-criteria.md) — AC-P09-002–004, AC-P09-009–010
 
-## Archivos exactos
+## Archivos exactos e interfaces
 
 **Modificar:**
 
-- `src/ia_mcp/mcp/registry.py`
+- `src/ia_mcp/mcp/registry.py` — `available()` intersección pura; conservar `KNOWN_TOOLS` como alias canónico
 - `src/ia_mcp/skills/registry.py`
 - `src/ia_mcp/skills/appointments.py`
 - `src/ia_mcp/evals/validator.py`
 - `src/ia_mcp/onboarding/validator.py`
-- `src/ia_mcp/agent_runtime/context_compiler.py`
+- `src/ia_mcp/agent_runtime/context_compiler.py` — `server=` desde catálogo descubierto → `tool_schemas`
 
 **Tests:**
 
@@ -29,14 +29,16 @@ Commit: `feat: authorize discovered MCP tools by intersection`.
 - `tests/unit/skills/test_registry.py`
 - `tests/unit/agent/test_context_compiler.py`
 - `tests/unit/onboarding/test_validator.py`
-- `tests/unit/evals/test_validator.py` _(crear si no existe)_
+- `tests/evals/unit/test_validator.py` _(crear si no existe; hoy validación en `test_dataset.py`)_
+
+Produce `available(server, tenant, skill) -> frozenset[str]` sin filtro deny-list y compiler que expone `CompiledContext.tool_schemas` desde intersección con nombres descubiertos.
 
 ## Comportamiento
 
 - `KNOWN_TOOLS` permanece como alias set canónico de appointments para workflows/fakes; **no** filtra `available()`.
 - `appointments` skill: pasa nombres desde config/discovery intersectados; no clamp a `KNOWN_TOOLS`.
 - `faq` / `human_handoff`: sin tools salvo config explícita.
-- Context compiler: `server=` desde catálogo descubierto o catálogo inyectado en tests, no desde `KNOWN_TOOLS`.
+- Context compiler: argumento `server=` de `available()` = catálogo descubierto (o inyectado en tests), no `KNOWN_TOOLS`.
 - Onboarding/evals: no fallar nombre solo por estar fuera de `KNOWN_TOOLS`; seguir fallando overlap allowed∩forbidden y eval allowlist vacía fail-closed si ya existe.
 
 ## Exclusiones
@@ -46,26 +48,6 @@ Commit: `feat: authorize discovered MCP tools by intersection`.
 - No condiciones por tenant slug.
 - No secret values en fixtures.
 
-## TDD — rojo / verde
+## TDD/evidencia
 
-**Rojo:**
-
-```bash
-pytest tests/unit/mcp/test_registry.py::test_available_includes_discovered_non_canonical_name -v
-pytest tests/unit/onboarding/test_validator.py::test_accepts_tool_name_outside_known_tools -v
-```
-
-**Verde:**
-
-```bash
-pytest tests/unit/mcp/test_registry.py tests/unit/skills/test_registry.py tests/unit/agent/test_context_compiler.py tests/unit/onboarding/test_validator.py tests/unit/evals/ -v
-pytest tests/security/test_tool_contracts.py -v
-```
-
-## Criterios
-
-AC-P09-002, AC-P09-003, AC-P09-004, AC-P09-009, AC-P09-010, AC-P09-011
-
-## Evidencia
-
-`docs/phases/phase-09-mcp-discovery/evidence/P09-T02.md`
+Rojo: tool descubierta allowlisted falla autorización o compiler sigue usando `KNOWN_TOOLS` como `server=`; verde `pytest tests/unit/mcp/test_registry.py tests/unit/skills/test_registry.py tests/unit/agent/test_context_compiler.py tests/unit/onboarding/test_validator.py tests/evals/unit/ -v && pytest tests/security/test_tool_contracts.py -v`. Criterios AC-P09-002–004, AC-P09-009–011. Adjuntar comandos en evidence y commit.

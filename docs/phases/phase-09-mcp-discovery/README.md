@@ -1,7 +1,7 @@
 # Fase 9 — MCP discovery e invocación genérica
 
 **Estado:** ready  
-**Gate de entrada:** Fase 8 aceptada (P08-T04); ADR-005 aceptado  
+**Gate de entrada:** G5, P08-T04 aceptada; ADR-005 aceptado  
 **Gate de salida:** G6 — MCP institucional descubierto e invocable sin catálogo cerrado en Core
 
 ## Objetivo
