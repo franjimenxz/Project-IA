@@ -1,7 +1,8 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from ia_mcp.mcp.executor import McpTarget
 from ia_mcp.tenancy.models import TenantContext
 
 
@@ -13,24 +14,15 @@ class DiscoveredTool:
 
 
 @dataclass(frozen=True, slots=True)
-class McpEndpoint:
+class DiscoveredToolCatalog:
     server_id: str
-    endpoint: str
-    auth_reference: str = ""
-
-
-class ToolCatalog:
-    def __init__(self, tools: Iterable[DiscoveredTool]) -> None:
-        self._tools = tuple(tools)
+    tools: tuple[DiscoveredTool, ...]
 
     def names(self) -> frozenset[str]:
-        return frozenset(tool.name for tool in self._tools)
-
-    def tools(self) -> tuple[DiscoveredTool, ...]:
-        return self._tools
+        return frozenset(tool.name for tool in self.tools)
 
 
 class McpDiscovery(Protocol):
     async def list_tools(
-        self, tenant: TenantContext, target: McpEndpoint
-    ) -> ToolCatalog: ...
+        self, tenant: TenantContext, target: McpTarget
+    ) -> DiscoveredToolCatalog: ...

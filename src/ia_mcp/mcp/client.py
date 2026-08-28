@@ -13,29 +13,37 @@ from uuid import UUID
 
 from ia_mcp.contracts.common import ToolResult
 from ia_mcp.contracts.errors import ToolError, ToolErrorCode
-from ia_mcp.mcp.discovery import DiscoveredTool, McpEndpoint, ToolCatalog
+from ia_mcp.mcp.discovery import DiscoveredTool, DiscoveredToolCatalog
+from ia_mcp.mcp.executor import HostAllowlist, McpTarget
 from ia_mcp.observability.redaction import redact
+from ia_mcp.shared.errors import DomainError
 from ia_mcp.tenancy.models import TenantContext
 
 _PROTOCOL = "2024-11-05"
 _CLIENT_INFO = {"name": "ia-mcp", "version": "0.0.0"}
+_RETRYABLE = frozenset(
+    {ToolErrorCode.UPSTREAM_TIMEOUT, ToolErrorCode.UPSTREAM_UNAVAILABLE}
+)
 
 
 class SseMcpClient:
-    def __init__(self, *, timeout_seconds: float = 10.0) -> None:
+    def __init__(
+        self, *, allowlist: HostAllowlist, timeout_seconds: float = 10.0
+    ) -> None:
+        self._allowlist = allowlist
         self._timeout = timeout_seconds
         self._sessions: dict[tuple[UUID, str, str], _SseSession] = {}
         self._lock = threading.Lock()
 
     async def list_tools(
-        self, tenant: TenantContext, target: McpEndpoint
-    ) -> ToolCatalog:
+        self, tenant: TenantContext, target: McpTarget
+    ) -> DiscoveredToolCatalog:
         return await asyncio.to_thread(self._list_tools_sync, tenant, target)
 
     async def call_tool(
         self,
         tenant: TenantContext,
-        target: McpEndpoint,
+        target: McpTarget,
         name: str,
         arguments: Mapping[str, Any],
     ) -> ToolResult[Any]:
@@ -44,49 +52,72 @@ class SseMcpClient:
         )
 
     def _list_tools_sync(
-        self, tenant: TenantContext, target: McpEndpoint
-    ) -> ToolCatalog:
-        session = self._session(tenant, target)
-        message = session.request("tools/list", {})
-        result = _require_result(message)
+        self, tenant: TenantContext, target: McpTarget
+    ) -> DiscoveredToolCatalog:
+        try:
+            self._require_permitted(_sse_url(target.endpoint), target)
+            session = self._session(tenant, target)
+            message = session.request("tools/list", {})
+            result = _require_result(message)
+        except DomainError:
+            raise
+        except _ClientError as exc:
+            raise _public_error(exc) from None
         raw_tools = result.get("tools")
         if not isinstance(raw_tools, list):
-            raise _ClientError(
-                ToolErrorCode.CONTRACT_VIOLATION,
-                _safe_text("The upstream response is not valid JSON-RPC.", target),
+            raise _public_error(
+                _ClientError(
+                    ToolErrorCode.CONTRACT_VIOLATION,
+                    _safe_text("The upstream response is not valid JSON-RPC.", target),
+                )
             )
         tools: list[DiscoveredTool] = []
         for item in raw_tools:
             if not isinstance(item, Mapping) or not item.get("name"):
-                raise _ClientError(
-                    ToolErrorCode.CONTRACT_VIOLATION,
-                    _safe_text("The upstream response is not valid JSON-RPC.", target),
+                raise _public_error(
+                    _ClientError(
+                        ToolErrorCode.CONTRACT_VIOLATION,
+                        _safe_text(
+                            "The upstream response is not valid JSON-RPC.", target
+                        ),
+                    )
                 )
             schema = item.get("inputSchema") or {}
             if not isinstance(schema, Mapping):
                 schema = {}
+            name = str(item["name"])
+            if name not in target.allowed_tools:
+                continue
             tools.append(
                 DiscoveredTool(
-                    name=str(item["name"]),
+                    name=name,
                     description=str(item.get("description") or ""),
                     input_schema=dict(schema),
                 )
             )
-        return ToolCatalog(tools)
+        return DiscoveredToolCatalog(server_id=target.server_id, tools=tuple(tools))
 
     def _call_tool_sync(
         self,
         tenant: TenantContext,
-        target: McpEndpoint,
+        target: McpTarget,
         name: str,
         arguments: Mapping[str, Any],
     ) -> ToolResult[Any]:
         try:
+            self._require_permitted(_sse_url(target.endpoint), target)
+            if name not in target.allowed_tools:
+                return _failure(
+                    ToolErrorCode.FORBIDDEN,
+                    _safe_text("Action is not allowed.", target),
+                )
             session = self._session(tenant, target)
             message = session.request(
                 "tools/call",
                 {"name": name, "arguments": dict(arguments)},
             )
+        except DomainError as exc:
+            return _failure(ToolErrorCode(exc.code), exc.safe_message)
         except _ClientError as exc:
             return _failure(exc.code, exc.safe_message)
         except TimeoutError:
@@ -115,7 +146,16 @@ class SseMcpClient:
             value = result["structuredContent"]
         return ToolResult[Any](ok=True, value=value)
 
-    def _session(self, tenant: TenantContext, target: McpEndpoint) -> _SseSession:
+    def _require_permitted(self, endpoint: str, target: McpTarget) -> None:
+        if self._allowlist.permits(endpoint):
+            return
+        raise DomainError(
+            code=ToolErrorCode.FORBIDDEN.value,
+            safe_message=_safe_text("Action is not allowed.", target),
+            retryable=False,
+        )
+
+    def _session(self, tenant: TenantContext, target: McpTarget) -> _SseSession:
         key = (tenant.tenant_id, target.server_id, _sse_url(target.endpoint))
         with self._lock:
             existing = self._sessions.get(key)
@@ -125,9 +165,14 @@ class SseMcpClient:
             sse_url=_sse_url(target.endpoint),
             timeout=self._timeout,
             target=target,
+            allowlist=self._allowlist,
         )
-        session.connect()
-        session.handshake()
+        try:
+            session.connect()
+            session.handshake()
+        except _ClientError as exc:
+            session.close()
+            raise _public_error(exc) from None
         with self._lock:
             current = self._sessions.get(key)
             if current is not None and current.alive:
@@ -145,11 +190,20 @@ class _ClientError(Exception):
 
 
 class _SseSession:
-    def __init__(self, *, sse_url: str, timeout: float, target: McpEndpoint) -> None:
+    def __init__(
+        self,
+        *,
+        sse_url: str,
+        timeout: float,
+        target: McpTarget,
+        allowlist: HostAllowlist,
+    ) -> None:
         self._sse_url = sse_url
         self._timeout = timeout
         self._target = target
+        self._allowlist = allowlist
         self._events: queue.Queue[dict[str, str]] = queue.Queue()
+        self._pending: dict[int, queue.Queue[dict[str, Any]]] = {}
         self._stop = threading.Event()
         self._alive = False
         self._messages_url = ""
@@ -165,7 +219,13 @@ class _SseSession:
     def connect(self) -> None:
         self._reader.start()
         event = self._wait_event("endpoint")
-        self._messages_url = urljoin(self._sse_url, event["data"].strip())
+        messages_url = urljoin(self._sse_url, event["data"].strip())
+        if not self._allowlist.permits(messages_url):
+            raise _ClientError(
+                ToolErrorCode.FORBIDDEN,
+                _safe_text("Action is not allowed.", self._target),
+            )
+        self._messages_url = messages_url
         self._alive = True
 
     def handshake(self) -> None:
@@ -180,9 +240,11 @@ class _SseSession:
         self.notify("notifications/initialized")
 
     def request(self, method: str, params: Mapping[str, Any] | None) -> dict[str, Any]:
+        waiter: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=1)
         with self._lock:
             rpc_id = self._next_id
             self._next_id += 1
+            self._pending[rpc_id] = waiter
         payload: dict[str, Any] = {
             "jsonrpc": "2.0",
             "id": rpc_id,
@@ -190,8 +252,26 @@ class _SseSession:
         }
         if params is not None:
             payload["params"] = dict(params)
-        self._post(payload)
-        return self._wait_rpc(rpc_id)
+        try:
+            self._post(payload)
+            try:
+                message = waiter.get(timeout=self._timeout)
+            except queue.Empty:
+                raise _ClientError(
+                    ToolErrorCode.UPSTREAM_TIMEOUT,
+                    _safe_text("The MCP server timed out.", self._target),
+                ) from None
+            if message.get("_malformed") or not _is_jsonrpc(message):
+                raise _ClientError(
+                    ToolErrorCode.CONTRACT_VIOLATION,
+                    _safe_text(
+                        "The upstream response is not valid JSON-RPC.", self._target
+                    ),
+                )
+            return message
+        finally:
+            with self._lock:
+                self._pending.pop(rpc_id, None)
 
     def notify(self, method: str) -> None:
         self._post({"jsonrpc": "2.0", "method": method})
@@ -204,6 +284,11 @@ class _SseSession:
             stream.close()
 
     def _post(self, payload: Mapping[str, Any]) -> None:
+        if self._messages_url and not self._allowlist.permits(self._messages_url):
+            raise _ClientError(
+                ToolErrorCode.FORBIDDEN,
+                _safe_text("Action is not allowed.", self._target),
+            )
         body = json.dumps(payload).encode("utf-8")
         try:
             connection, response = _http_request(
@@ -238,57 +323,11 @@ class _SseSession:
                 _safe_text("The MCP server is unavailable.", self._target),
             ) from exc
 
-    def _wait_rpc(self, rpc_id: int) -> dict[str, Any]:
-        deadline = _deadline(self._timeout)
-        while True:
-            remaining = deadline - _now()
-            if remaining <= 0:
-                raise _ClientError(
-                    ToolErrorCode.UPSTREAM_TIMEOUT,
-                    _safe_text("The MCP server timed out.", self._target),
-                )
-            event = self._wait_event("message", timeout=remaining)
-            raw = event["data"]
-            try:
-                message = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                raise _ClientError(
-                    ToolErrorCode.CONTRACT_VIOLATION,
-                    _safe_text(
-                        "The upstream response is not valid JSON-RPC.", self._target
-                    ),
-                ) from exc
-            if not isinstance(message, dict):
-                raise _ClientError(
-                    ToolErrorCode.CONTRACT_VIOLATION,
-                    _safe_text(
-                        "The upstream response is not valid JSON-RPC.", self._target
-                    ),
-                )
-            if message.get("id") != rpc_id:
-                if not _is_jsonrpc(message):
-                    raise _ClientError(
-                        ToolErrorCode.CONTRACT_VIOLATION,
-                        _safe_text(
-                            "The upstream response is not valid JSON-RPC.",
-                            self._target,
-                        ),
-                    )
-                continue
-            if not _is_jsonrpc(message):
-                raise _ClientError(
-                    ToolErrorCode.CONTRACT_VIOLATION,
-                    _safe_text(
-                        "The upstream response is not valid JSON-RPC.", self._target
-                    ),
-                )
-            return message
-
     def _wait_event(self, name: str, timeout: float | None = None) -> dict[str, str]:
         remaining = self._timeout if timeout is None else timeout
-        deadline = _deadline(remaining)
+        deadline = time.monotonic() + remaining
         while True:
-            left = deadline - _now()
+            left = deadline - time.monotonic()
             if left <= 0:
                 raise _ClientError(
                     ToolErrorCode.UPSTREAM_TIMEOUT,
@@ -308,6 +347,30 @@ class _SseSession:
                 )
             if event["event"] == name:
                 return event
+
+    def _offer_message(self, raw: str) -> None:
+        try:
+            message = json.loads(raw)
+        except json.JSONDecodeError:
+            self._broadcast({"_malformed": True})
+            return
+        if not isinstance(message, dict):
+            self._broadcast({"_malformed": True})
+            return
+        rpc_id = message.get("id")
+        with self._lock:
+            waiter = self._pending.get(rpc_id) if isinstance(rpc_id, int) else None
+        if waiter is not None:
+            waiter.put(message)
+            return
+        if not _is_jsonrpc(message):
+            self._broadcast({"_malformed": True})
+
+    def _broadcast(self, payload: dict[str, Any]) -> None:
+        with self._lock:
+            waiters = list(self._pending.values())
+        for waiter in waiters:
+            waiter.put(payload)
 
     def _read_loop(self) -> None:
         try:
@@ -330,12 +393,11 @@ class _SseSession:
                 line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
                 if line == "":
                     if data_lines:
-                        self._events.put(
-                            {
-                                "event": event_name,
-                                "data": "\n".join(data_lines),
-                            }
-                        )
+                        data = "\n".join(data_lines)
+                        if event_name == "message":
+                            self._offer_message(data)
+                        else:
+                            self._events.put({"event": event_name, "data": data})
                     event_name = "message"
                     data_lines = []
                     continue
@@ -404,9 +466,7 @@ def _require_result(message: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _map_rpc_error(
-    message: Mapping[str, Any], target: McpEndpoint
-) -> ToolResult[Any]:
+def _map_rpc_error(message: Mapping[str, Any], target: McpTarget) -> ToolResult[Any]:
     payload = message.get("error")
     rpc_code = payload.get("code") if isinstance(payload, Mapping) else None
     if rpc_code in {-32700, -32600}:
@@ -421,27 +481,25 @@ def _map_rpc_error(
 
 
 def _failure(code: ToolErrorCode, safe_message: str) -> ToolResult[Any]:
-    retryable = code in {
-        ToolErrorCode.UPSTREAM_TIMEOUT,
-        ToolErrorCode.UPSTREAM_UNAVAILABLE,
-    }
     return ToolResult[Any](
         ok=False,
-        error=ToolError(code=code, retryable=retryable, safe_message=safe_message),
+        error=ToolError(
+            code=code, retryable=code in _RETRYABLE, safe_message=safe_message
+        ),
     )
 
 
-def _safe_text(message: str, target: McpEndpoint) -> str:
+def _public_error(exc: _ClientError) -> DomainError:
+    return DomainError(
+        code=exc.code.value,
+        safe_message=exc.safe_message,
+        retryable=exc.code in _RETRYABLE,
+    )
+
+
+def _safe_text(message: str, target: McpTarget) -> str:
     text = redact(message)
     secret = target.auth_reference
     if secret:
         text = text.replace(secret, "[REDACTED]")
     return text
-
-
-def _now() -> float:
-    return time.monotonic()
-
-
-def _deadline(timeout: float) -> float:
-    return _now() + timeout
