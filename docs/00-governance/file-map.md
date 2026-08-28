@@ -29,7 +29,7 @@
 | `src/ia_mcp/contracts/` | modelos canónicos públicos | P03-T01 |
 | `src/ia_mcp/knowledge/` | ingestión, documentos y retrieval | P04-T03 |
 | `src/ia_mcp/workflows/` | engine y definitions de negocio | P04-T06 |
-| `src/ia_mcp/mcp/` | registry, resolver, executor y capabilities | P03-T03/P03-T04/P03-T05 |
+| `src/ia_mcp/mcp/` | registry, resolver, discovery, client, executor y capabilities | P03-T03/P03-T04/P03-T05, P09-T02–T04 |
 | `src/ia_mcp/integrations/` | adapters institucionales | P05-T02 |
 | `src/ia_mcp/handoff/` | transferencia y ownership | P04-T11 |
 | `src/ia_mcp/scheduling/` | jobs, clock, reminder | P04-T12 |

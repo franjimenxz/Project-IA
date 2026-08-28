@@ -1,7 +1,10 @@
 # ADR-003 — Contratos canónicos y workflows determinísticos
 
 **Estado:** accepted  
-**Fecha:** 2026-08-27
+**Fecha:** 2026-08-27  
+**Amended by:** [ADR-005](ADR-005-mcp-discovery-and-generic-invoke.md) (2026-08-28)
+
+> Los MCPs institucionales **no** están obligados a implementar los seis tools Pydantic canónicos de appointments. Discovery dinámico (`tools/list`) más intersección tenant/skill/server es el gate de autorización. ADR-003 sigue vigente para contratos canónicos internos, fakes, workflows determinísticos y dispatch especializado cuando el nombre de tool coincide con `appointments.*`.
 
 ## Contexto
 
@@ -9,7 +12,9 @@ Cada institución puede tener APIs diferentes. El LLM interpreta lenguaje, pero 
 
 ## Decisión
 
-Definir contratos Pydantic canónicos para capacidades comunes y exigirlos a fakes, MCPs y adapters. Las operaciones mutables se ejecutan mediante workflows persistentes con state machine, commands idempotentes, outbox y errores tipados.
+Definir contratos Pydantic canónicos para capacidades comunes y exigirlos a **fakes** y **adapters** institucionales (REST, Fase 5). Los **MCPs institucionales** no están obligados a implementar esos contratos: se autorizan por discovery (`tools/list`) e intersección tenant/skill/servidor ([ADR-005](ADR-005-mcp-discovery-and-generic-invoke.md)). Cuando un nombre descubierto coincide con `appointments.*`, el executor puede despachar al contrato canónico y workflow.
+
+Las operaciones mutables se ejecutan mediante workflows persistentes con state machine, commands idempotentes, outbox y errores tipados.
 
 El LLM sólo propone intención/datos dentro de schemas; el workflow autoriza y ejecuta.
 

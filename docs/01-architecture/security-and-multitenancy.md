@@ -101,12 +101,12 @@ Cada límite valida autenticidad, autorización, esquema, tamaño, timeout y san
 
 ### MCP
 
-- resolver valida ownership;
-- target hosts allowlisted;
+- resolver valida ownership y host+scheme allowlist (fail-closed; `http` solo si explícitamente allowlisted);
+- discovery vía `tools/list`; catálogo descubierto intersectado con allowlists de tenant y skill;
 - auth reference resuelta fuera del modelo;
-- tool allowlist intersectada con config;
+- `KNOWN_TOOLS` es alias set canónico de appointments, no deny-list de nombres institucionales;
 - timeout y size limits;
-- respuesta validada contra schema.
+- respuesta validada; invocación genérica auditada con `TenantContext`.
 
 ## Datos y privacidad
 
