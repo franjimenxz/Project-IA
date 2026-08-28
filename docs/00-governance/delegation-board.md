@@ -56,14 +56,14 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P07-T02 | W6 | ready | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
 | P07-T03 | W6 | blocked | P07-T02 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T03-admin-view.md) |
 | P07-T04 | W6 | blocked | P07-T01–P07-T03 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T04-runbooks-alerts.md) |
-| P08-T01 | W7 | ready | P04-T13 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T01-package-validator.md) |
-| P08-T02 | W7 | blocked | P08-T01 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T02-provision-service.md) |
+| P08-T01 | W7 | accepted | P04-T13 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T01-package-validator.md) |
+| P08-T02 | W7 | ready | P08-T01 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T02-provision-service.md) |
 | P08-T03 | W7 | blocked | P08-T02, P06-T05, P07-T04 | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T03-preflight-activation.md) |
 | P08-T04 | W7 | blocked | P08-T03, P05-T04 para integración real | [brief](../phases/phase-08-second-tenant-onboarding/agent-briefs/P08-T04-second-tenant.md) |
 
 ## Primer paso
 
-P06-T01 in_review (PR #26; conformidad PASS, calidad PASS). Ready: P06-T03, P06-T04, P07-T01, P07-T02, P08-T01. Imp1–3 idle.
+P08-T01 accepted (PR #28). P06-T01 in_review (PR #26). Ready: P06-T03, P06-T04, P07-T01, P07-T02, P08-T02. Imp1–3 idle.
 
 ## Actualización
 
@@ -162,3 +162,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P07-T02 | `blocked → ready` | dependencia P04-T13 aceptada | [P04-T13](../phases/phase-04-mvp-vertical-slices/evidence/P04-T13.md) |
 | P08-T01 | `blocked → ready` | dependencia P04-T13 aceptada | [P04-T13](../phases/phase-04-mvp-vertical-slices/evidence/P04-T13.md) |
 | P06-T01 | `ready → in_review` | `9d0b1ba`, `ecda2b9` | https://github.com/franjimenxz/Project-IA/pull/26 |
+| P08-T01 | `ready → in_review → accepted` | `ed5c4a3` merged `a225261` | https://github.com/franjimenxz/Project-IA/pull/28 |
+| P08-T02 | `blocked → ready` | dependencia P08-T01 aceptada | [P08-T01](../phases/phase-08-second-tenant-onboarding/evidence/P08-T01.md) |
