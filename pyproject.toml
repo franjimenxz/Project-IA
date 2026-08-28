@@ -29,7 +29,7 @@ namespaces = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]
-markers = ["integration: requires PostgreSQL"]
+markers = ["integration: requires PostgreSQL", "contract: appointment capability contract suite"]
 
 [tool.ruff]
 target-version = "py313"
