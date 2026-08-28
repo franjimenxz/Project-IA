@@ -47,8 +47,8 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P05-T02 | W6-build | blocked | P05-T01, EXT-003 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T02-transport-auth.md) |
 | P05-T03 | W6-build | blocked | P05-T01, P05-T02 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T03-appointment-adapter.md) |
 | P05-T04 | W6-sandbox | blocked | P05-T03, EXT-002 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T04-sandbox-rollout.md) |
-| P06-T01 | W6 | in_review | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
-| P06-T02 | W6 | blocked | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
+| P06-T01 | W6 | accepted | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
+| P06-T02 | W6 | ready | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
 | P06-T03 | W6 | in_progress | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
 | P06-T04 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
 | P06-T05 | W6 | blocked | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P07-T01 accepted (PR #32). P06-T04 accepted (PR #29). P06-T05 stays blocked until P06-T02 and P06-T03 also accepted. P08-T01 accepted (PR #28). P06-T01 in_review (PR #26). En curso: `P06-T03`. Ready: `P07-T02`, `P08-T02`.
+P07-T01 accepted (PR #32). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T05 stays blocked until P06-T02 and P06-T03 also accepted. P08-T01 accepted (PR #28). En curso: `P06-T03`. Ready: `P06-T02`, `P07-T02`, `P08-T02`.
 
 ## Actualización
 
@@ -162,6 +162,8 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P07-T02 | `blocked → ready` | dependencia P04-T13 aceptada | [P04-T13](../phases/phase-04-mvp-vertical-slices/evidence/P04-T13.md) |
 | P08-T01 | `blocked → ready` | dependencia P04-T13 aceptada | [P04-T13](../phases/phase-04-mvp-vertical-slices/evidence/P04-T13.md) |
 | P06-T01 | `ready → in_review` | `9d0b1ba`, `ecda2b9` | https://github.com/franjimenxz/Project-IA/pull/26 |
+| P06-T01 | `in_review → accepted` | `31fd3dd` merged `3da861c` | https://github.com/franjimenxz/Project-IA/pull/26 |
+| P06-T02 | `blocked → ready` | dependencia P06-T01 aceptada | [P06-T01](../phases/phase-06-verification-and-evals/evidence/P06-T01.md) |
 | P08-T01 | `ready → in_review → accepted` | `ed5c4a3` merged `a225261` | https://github.com/franjimenxz/Project-IA/pull/28 |
 | P08-T02 | `blocked → ready` | dependencia P08-T01 aceptada | [P08-T01](../phases/phase-08-second-tenant-onboarding/evidence/P08-T01.md) |
 | P06-T03 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P06-T03-security-suite` |
@@ -170,4 +172,4 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P06-T04 | `in_progress → in_review` | `5c47db7`, `06b9a01` | https://github.com/franjimenxz/Project-IA/pull/29 |
 | P06-T04 | `in_review → accepted` | `06b9a01` merged `c411002` | https://github.com/franjimenxz/Project-IA/pull/29 |
 | P07-T01 | `in_progress → in_review → accepted` | `349a3d5` merged `e2cb470` | https://github.com/franjimenxz/Project-IA/pull/32 |
-| P07-T02 | remains `ready` | P07-T01 accepted; conflicto `src/ia_mcp/observability` y `tests/security/test_observability.py` liberado | [P07-T01](../phases/phase-07-operability-and-observability/evidence/P07-T01.md) |
+| P07-T02 | `blocked/ready → ready` | P07-T01 accepted; conflicto `src/ia_mcp/observability` y `tests/security/test_observability.py` liberado | [P07-T01](../phases/phase-07-operability-and-observability/evidence/P07-T01.md) |
