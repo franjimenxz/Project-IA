@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from ia_mcp.scheduling.models import (
     JOB_TYPE,
     DispatchResult,
+    JobClaim,
     JobStatus,
     OutboundReminder,
     ScheduledJob,
@@ -22,7 +23,6 @@ from ia_mcp.scheduling.ports import (
 from ia_mcp.tenancy.models import TenantContext
 
 _SKIP_STATUSES = frozenset({"confirmed", "cancelled"})
-_LOCK_TTL = timedelta(minutes=5)
 _ACTION = "appointment_reminder.dispatch"
 
 
@@ -83,6 +83,7 @@ class JobWorker:
         policy: SchedulingPolicy,
         audit: AuditSink,
         owner: str,
+        lock_ttl: timedelta = timedelta(minutes=5),
     ) -> None:
         self._store = store
         self._clock = clock
@@ -91,20 +92,28 @@ class JobWorker:
         self._policy = policy
         self._audit = audit
         self._owner = owner
+        self._lock_ttl = lock_ttl
 
-    async def claim(self) -> ScheduledJob | None:
+    async def claim(self) -> JobClaim | None:
         now = self._clock.now()
-        return await self._store.claim_due(
-            now=now, owner=self._owner, lock_until=now + _LOCK_TTL
+        job = await self._store.claim_due(
+            now=now, owner=self._owner, lock_until=now + self._lock_ttl
+        )
+        if job is None:
+            return None
+        return JobClaim(
+            job=job,
+            schedule_version=job.schedule_version,
+            owner=job.lock_owner or self._owner,
         )
 
-    async def dispatch(self, claim: ScheduledJob) -> DispatchResult:
+    async def dispatch(self, claim: JobClaim) -> DispatchResult:
         now = self._clock.now()
-        job = await self._store.get(claim.tenant_id, claim.id)
+        job = await self._store.get(claim.job.tenant_id, claim.job.id)
         if job is None or job.schedule_version != claim.schedule_version:
             return DispatchResult(
                 status="stale",
-                job=job if job is not None else claim,
+                job=job if job is not None else claim.job,
                 reason="stale_schedule_version",
             )
         tenant = _tenant_from_job(job)
