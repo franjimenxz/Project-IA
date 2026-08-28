@@ -6,7 +6,11 @@ from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
+from ia_mcp.agent_runtime.harness import AgentHarness
+from ia_mcp.agent_runtime.models import AgentTurnResult
 from ia_mcp.api.app import create_app
+from ia_mcp.configuration.models import AgentConfig, TenantConfig
+from ia_mcp.configuration.service import ConfigurationService
 from ia_mcp.observability.context import CORRELATION_HEADER
 from ia_mcp.observability.propagation import (
     TRACEPARENT_HEADER,
@@ -22,6 +26,12 @@ from ia_mcp.observability.semconv import (
     SPAN_TOOL_EXECUTE,
     metric_labels,
     span_attributes,
+)
+from ia_mcp.tenancy.models import TenantContext, TenantIdentity
+from tests.integration.api.test_simulated_messages import (
+    make_client,
+    signed_simulated_headers,
+    valid_body,
 )
 
 
@@ -113,3 +123,68 @@ def test_unauthenticated_request_ignores_foreign_correlation() -> None:
     assert ctx.correlation_id != tenant_b
     assert ctx.trace_id != "b" * 32
     assert "b" * 32 not in response.headers[TRACEPARENT_HEADER]
+
+
+CHANNEL_A = UUID("aa111111-1111-1111-1111-111111111111")
+
+
+class _StubHarness(AgentHarness):
+    def __init__(self) -> None:
+        pass
+
+    async def handle_message(self, tenant: TenantContext, message: object) -> AgentTurnResult:
+        del message
+        return AgentTurnResult(
+            kind="answer",
+            text="ok",
+            source_ids=(),
+            tenant_id=tenant.tenant_id,
+            run_id=None,
+            trajectory=(),
+        )
+
+
+class _StubConfigService(ConfigurationService):
+    def __init__(self) -> None:
+        pass
+
+    async def capture(
+        self, identity: TenantIdentity, correlation_id: UUID
+    ) -> tuple[TenantContext, TenantConfig]:
+        return (
+            TenantContext(
+                tenant_id=identity.tenant_id,
+                tenant_slug=identity.tenant_slug,
+                config_version=1,
+                correlation_id=correlation_id,
+            ),
+            TenantConfig(
+                tenant_id=identity.tenant_id,
+                version=1,
+                agent=AgentConfig(tone="cordial"),
+            ),
+        )
+
+
+def test_signed_simulated_message_ignores_forged_correlation_header() -> None:
+    """HMAC does not cover X-Correlation-ID; the route must use the server mint."""
+    forged = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    client, _recorder = make_client()
+    client.app.state.agent_harness = _StubHarness()
+    client.app.state.config_service = _StubConfigService()
+    client.app.state.channel_integration_ids = {("simulated", "acct-a"): CHANNEL_A}
+
+    body = valid_body()
+    headers = signed_simulated_headers(account="acct-a", body=body)
+    headers[CORRELATION_HEADER] = str(forged)
+    response = client.post("/v1/simulated/messages", json=body, headers=headers)
+
+    assert response.status_code == 202
+    payload = response.json()
+    header_id = response.headers[CORRELATION_HEADER]
+    assert payload["correlation_id"] == header_id
+    assert payload["correlation_id"] != str(forged)
+    UUID(header_id)
+    deliveries = client.app.state.outbox.list()
+    assert len(deliveries) == 1
+    assert str(deliveries[0].correlation_id) == header_id

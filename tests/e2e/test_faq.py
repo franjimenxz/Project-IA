@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 
-from tests.e2e.conftest import CORR_SHARED, post_faq
+from tests.e2e.conftest import post_faq
 
 
 @pytest.mark.anyio
@@ -31,14 +33,19 @@ async def test_tenants_receive_distinct_faq_answers_and_source_ids(faq_stack) ->
     assert "canary-b" in body_b["text"]
     assert "canary-b" not in body_a["text"]
     assert "canary-a" not in body_b["text"]
-    assert body_a["correlation_id"] == str(CORR_SHARED)
-    assert body_b["correlation_id"] == str(CORR_SHARED)
+    header_a = response_a.headers["x-correlation-id"]
+    header_b = response_b.headers["x-correlation-id"]
+    assert body_a["correlation_id"] == header_a
+    assert body_b["correlation_id"] == header_b
+    assert header_a != header_b
     assert body_a["config_version"] == 1
     assert body_b["config_version"] == 1
     deliveries = outbox.list()
     assert len(deliveries) == 2
     assert {item.tenant_slug for item in deliveries} == {"tenant-a", "tenant-b"}
-    assert all(item.correlation_id == CORR_SHARED for item in deliveries)
+    by_slug = {item.tenant_slug: item for item in deliveries}
+    assert str(by_slug["tenant-a"].correlation_id) == header_a
+    assert str(by_slug["tenant-b"].correlation_id) == header_b
     assert {tuple(item.source_ids) for item in deliveries} == {
         tuple(body_a["source_ids"]),
         tuple(body_b["source_ids"]),
@@ -65,3 +72,26 @@ async def test_duplicate_external_message_reuses_run_and_outbox(faq_stack) -> No
     assert first.json()["run_id"] == second.json()["run_id"]
     assert first.json()["source_ids"] == second.json()["source_ids"]
     assert len(outbox.list()) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.e2e
+async def test_forged_correlation_header_is_ignored(faq_stack) -> None:
+    client, outbox, clock = faq_stack
+    forged = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    response = await post_faq(
+        client,
+        account="acct-a",
+        text="hours",
+        external_message_id="m-forged",
+        now=clock.now,
+        correlation_id=forged,
+    )
+    assert response.status_code == 202
+    body = response.json()
+    header = response.headers["x-correlation-id"]
+    assert body["correlation_id"] == header
+    assert body["correlation_id"] != str(forged)
+    deliveries = outbox.list()
+    assert len(deliveries) == 1
+    assert str(deliveries[0].correlation_id) == header

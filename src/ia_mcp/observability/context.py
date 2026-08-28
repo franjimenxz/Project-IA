@@ -44,10 +44,10 @@ def parse_correlation_id(raw: str | None) -> UUID:
 class CorrelationMiddleware(BaseHTTPMiddleware):
     """Public HTTP boundary: always mint server correlation/trace.
 
-    Unauthenticated callers cannot attach to another tenant's trace by sending
-    `traceparent` or `X-Correlation-ID`. Authenticated adapters (e.g. signed
-    simulated channel) may adopt a client correlation after verifying the
-    caller, independent of this middleware.
+    Inbound `traceparent` and `X-Correlation-ID` are ignored, including on
+    signed simulated routes. HMAC covers account.timestamp.body only, so a
+    client correlation header is not an authenticated claim. Routes must use
+    `request.state.correlation_id` / `current_correlation_id()`.
     """
 
     async def dispatch(
