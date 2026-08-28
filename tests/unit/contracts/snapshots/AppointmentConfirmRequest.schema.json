@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "appointment_id": {
+      "minLength": 1,
+      "title": "Appointment Id",
+      "type": "string"
+    },
+    "confirmed": {
+      "const": true,
+      "default": true,
+      "title": "Confirmed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "appointment_id"
+  ],
+  "title": "AppointmentConfirmRequest",
+  "type": "object"
+}

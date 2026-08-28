@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "appointment_id": {
+      "minLength": 1,
+      "title": "Appointment Id",
+      "type": "string"
+    },
+    "new_slot_id": {
+      "minLength": 1,
+      "title": "New Slot Id",
+      "type": "string"
+    },
+    "booking_token": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Booking Token"
+    }
+  },
+  "required": [
+    "appointment_id",
+    "new_slot_id"
+  ],
+  "title": "AppointmentRescheduleRequest",
+  "type": "object"
+}
