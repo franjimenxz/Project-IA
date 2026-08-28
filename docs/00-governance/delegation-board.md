@@ -19,8 +19,8 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 |---|---|---|---|---|
 | P01-T01 | W0 | accepted | — | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T01-document-validator.md) |
 | P01-T02 | W0 | accepted | P01-T01 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T02-traceability-checker.md) |
-| P01-T03 | W0 | ready | P01-T01, P01-T02 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T03-docs-ci.md) |
-| P02-T01 | W1 | blocked | P01-T03 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T01-bootstrap.md) |
+| P01-T03 | W0 | accepted | P01-T01, P01-T02 | [brief](../phases/phase-01-functional-specification/agent-briefs/P01-T03-docs-ci.md) |
+| P02-T01 | W1 | ready | P01-T03 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T01-bootstrap.md) |
 | P02-T02 | W1 | blocked | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T02-tenancy.md) |
 | P02-T03 | W1 | blocked | P02-T02 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T03-configuration.md) |
 | P02-T04 | W1 | blocked | P02-T01 | [brief](../phases/phase-02-technical-foundations/agent-briefs/P02-T04-observability-errors.md) |
@@ -77,3 +77,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P01-T02 | `blocked → ready` | dependencia P01-T01 aceptada | [P01-T01](../phases/phase-01-functional-specification/evidence/P01-T01.md) |
 | P01-T02 | `ready → in_review → accepted` | `154d26a` | [P01-T02](../phases/phase-01-functional-specification/evidence/P01-T02.md) |
 | P01-T03 | `blocked → ready` | dependencias P01-T01/P01-T02 aceptadas | [P01-T02](../phases/phase-01-functional-specification/evidence/P01-T02.md) |
+| P01-T03 | `ready → in_review → accepted` | `87fc14d` | [P01-T03](../phases/phase-01-functional-specification/evidence/P01-T03.md) |
+| P02-T01 | `blocked → ready` | dependencia P01-T03 aceptada | [P01-T03](../phases/phase-01-functional-specification/evidence/P01-T03.md) |
