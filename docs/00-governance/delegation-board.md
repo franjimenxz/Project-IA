@@ -51,7 +51,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P06-T02 | W6 | accepted | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
 | P06-T03 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
 | P06-T04 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
-| P06-T05 | W6 | ready | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
+| P06-T05 | W6 | in_progress | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
 | P07-T01 | W6 | accepted | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
 | P07-T02 | W6 | in_progress | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
 | P07-T03 | W6 | blocked | P07-T02 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T03-admin-view.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P07-T01 accepted (PR #32). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T02 accepted (PR #35). P06-T03 accepted (PR #37). P06-T05 ready (T02/T03/T04 accepted; not started). Residual no bloqueante: ReDoS quadratic `_KEY` en `redaction.py` (escalado; no FAIL de re-review). Append-only DB, allowlist prod y SAST CI siguen escalados. P08-T01 accepted (PR #28). En curso: `P07-T02`, `P08-T02`.
+P07-T01 accepted (PR #32). P06-T01 accepted (PR #26). P06-T04 accepted (PR #29). P06-T02 accepted (PR #35). P06-T03 accepted (PR #37). Residual no bloqueante: ReDoS quadratic `_KEY` en `redaction.py` (escalado; no FAIL de re-review). Append-only DB, allowlist prod y SAST CI siguen escalados. P08-T01 accepted (PR #28). En curso: `P06-T05`, `P07-T02`, `P08-T02`.
 
 ## Actualización
 
@@ -179,3 +179,4 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P06-T02 | `in_progress → in_review → accepted` | `589b1bf` merged `771ac06` | https://github.com/franjimenxz/Project-IA/pull/35 |
 | P06-T03 | `in_progress → in_review → accepted` | `6719d11` rebased `e1a6dda` merged `9cba6b4` | https://github.com/franjimenxz/Project-IA/pull/37 |
 | P06-T05 | `blocked → ready` | dependencias P06-T02, P06-T03 y P06-T04 aceptadas | [P06-T03](../phases/phase-06-verification-and-evals/evidence/P06-T03.md) |
+| P06-T05 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P06-T05-performance`, branch `implementation/P06-T05-performance` |
