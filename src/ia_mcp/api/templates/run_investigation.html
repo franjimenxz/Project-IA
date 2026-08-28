@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Run investigation $run_id</title>
+</head>
+<body>
+  <h1>Run investigation</h1>
+  <p>Read-only summary. All timestamps are timezone-aware UTC.</p>
+
+  <section id="run">
+    <h2>Run</h2>
+    <dl>
+      <dt>id</dt><dd>$run_id</dd>
+      <dt>status</dt><dd>$status</dd>
+      <dt>skill</dt><dd>$skill</dd>
+      <dt>workflow type</dt><dd>$workflow_type</dd>
+      <dt>mcp server</dt><dd>$mcp_server_id</dd>
+      <dt>started at (UTC)</dt><dd>$started_at</dd>
+      <dt>finished at (UTC)</dt><dd>$finished_at</dd>
+      <dt>error code</dt><dd>$error_code</dd>
+      <dt>latency ms</dt><dd>$latency_ms</dd>
+    </dl>
+  </section>
+
+  <section id="conversation">
+    <h2>Conversation</h2>
+    <dl>
+      <dt>id</dt><dd>$conversation_id</dd>
+      <dt>status</dt><dd>$conversation_status</dd>
+      <dt>last message at (UTC)</dt><dd>$last_message_at</dd>
+      <dt>trigger direction</dt><dd>$trigger_direction</dd>
+      <dt>trigger content type</dt><dd>$trigger_content_type</dd>
+    </dl>
+  </section>
+
+  <section id="workflow">
+    <h2>Workflow</h2>
+    $workflow_block
+  </section>
+
+  <section id="timeline">
+    <h2>Timeline (UTC)</h2>
+    <table>
+      <thead><tr><th>when (UTC)</th><th>kind</th><th>label</th><th>error</th></tr></thead>
+      <tbody>$timeline_rows</tbody>
+    </table>
+  </section>
+
+  <section id="retrievals">
+    <h2>Retrievals</h2>
+    <table>
+      <thead><tr><th>source id</th><th>when (UTC)</th></tr></thead>
+      <tbody>$retrievals_rows</tbody>
+    </table>
+  </section>
+
+  <section id="tools">
+    <h2>Tools</h2>
+    <table>
+      <thead><tr><th>tool</th><th>status</th><th>when (UTC)</th><th>retries</th></tr></thead>
+      <tbody>$tools_rows</tbody>
+    </table>
+    $tools_pagination
+  </section>
+
+  <section id="jobs">
+    <h2>Jobs</h2>
+    <table>
+      <thead><tr><th>type</th><th>status</th><th>attempts</th><th>scheduled for (UTC)</th><th>error</th></tr></thead>
+      <tbody>$jobs_rows</tbody>
+    </table>
+  </section>
+
+  <section id="handoff">
+    <h2>Handoff</h2>
+    $handoff_block
+  </section>
+
+  <section id="audit">
+    <h2>Audit</h2>
+    <table>
+      <thead><tr><th>action</th><th>when (UTC)</th><th>version</th></tr></thead>
+      <tbody>$audit_rows</tbody>
+    </table>
+    $audit_pagination
+  </section>
+
+  <section id="trace">
+    $trace_block
+  </section>
+</body>
+</html>

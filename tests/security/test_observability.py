@@ -36,6 +36,14 @@ from ia_mcp.observability.semconv import (
     span_attributes,
 )
 from ia_mcp.tenancy.models import TenantContext, TenantIdentity
+from tests.integration.api.test_run_investigation import (
+    MISSING_RUN_ID,
+    make_admin_client,
+    operator_a,
+    operator_b,
+    tenant_admin_a,
+    tenant_admin_b,
+)
 from tests.integration.api.test_simulated_messages import (
     make_client,
     signed_simulated_headers,
@@ -276,6 +284,112 @@ async def test_authorized_investigation_query_writes_audit() -> None:
         query = SqlAlchemyRunInvestigationQuery(engine)
         result = await query.get(TENANT_A_CTX, seeded.run_a_id)
         assert result.run.id == seeded.run_a_id
+        async with engine.connect() as connection:
+            actions = (
+                await connection.execute(
+                    select(audit_event_table.c.action).where(
+                        audit_event_table.c.tenant_id == TENANT_A,
+                        audit_event_table.c.action == AUDIT_INVESTIGATION_ACTION,
+                    )
+                )
+            ).scalars().all()
+        assert AUDIT_INVESTIGATION_ACTION in actions
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+@pytest.mark.integration
+async def test_unauthenticated_http_cannot_read_run_investigation() -> None:
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        seeded = await seed_investigation_fixture(engine)
+        query = SqlAlchemyRunInvestigationQuery(engine)
+        client = make_admin_client(query=query)
+        json_response = client.get(f"/v1/admin/runs/{seeded.run_a_id}")
+        html_response = client.get(f"/admin/runs/{seeded.run_a_id}")
+        assert json_response.status_code == 401
+        assert html_response.status_code == 401
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+@pytest.mark.integration
+async def test_operator_b_http_404_matches_missing_run() -> None:
+    """AC-P07-004: operator of tenant B cannot distinguish run A from missing."""
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        seeded = await seed_investigation_fixture(engine)
+        query = SqlAlchemyRunInvestigationQuery(engine)
+        client = make_admin_client(principal=operator_b(), query=query)
+        missing = client.get(f"/v1/admin/runs/{MISSING_RUN_ID}")
+        cross = client.get(f"/v1/admin/runs/{seeded.run_a_id}")
+        html_cross = client.get(f"/admin/runs/{seeded.run_a_id}")
+        assert missing.status_code == 404
+        assert cross.status_code == 404
+        assert html_cross.status_code == 404
+        missing_body = missing.json()
+        cross_body = cross.json()
+        assert missing_body["title"] == cross_body["title"] == "not_found"
+        assert missing_body["detail"] == cross_body["detail"] == "Resource not found"
+        assert html_cross.json()["title"] == "not_found"
+        assert html_cross.json()["detail"] == "Resource not found"
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+@pytest.mark.integration
+async def test_tenant_admin_cannot_read_assigned_or_foreign_run() -> None:
+    """TDD: tenant_admin is not a run-view role, including same-tenant."""
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        seeded = await seed_investigation_fixture(engine)
+        query = SqlAlchemyRunInvestigationQuery(engine)
+        own = make_admin_client(principal=tenant_admin_a(), query=query)
+        foreign = make_admin_client(principal=tenant_admin_b(), query=query)
+        assert own.get(f"/v1/admin/runs/{seeded.run_a_id}").status_code == 403
+        assert own.get(f"/admin/runs/{seeded.run_a_id}").status_code == 403
+        assert foreign.get(f"/v1/admin/runs/{seeded.run_a_id}").status_code == 403
+        operator = make_admin_client(principal=operator_a(), query=query)
+        assert operator.get(f"/v1/admin/runs/{seeded.run_a_id}").status_code == 200
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+@pytest.mark.integration
+async def test_html_investigation_view_does_not_leak_payloads() -> None:
+    """AC-P07-003: HTML summary omits bodies, chunks, prompts and patient ids."""
+    _reset_schema()
+    _seed_tenants_and_channels()
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        seeded = await seed_investigation_fixture(engine)
+        query = SqlAlchemyRunInvestigationQuery(engine)
+        client = make_admin_client(principal=operator_a(), query=query)
+        response = client.get(f"/admin/runs/{seeded.run_a_id}")
+        assert response.status_code == 200
+        body = response.text
+        assert MESSAGE_BODY not in body
+        assert CHUNK_TEXT not in body
+        assert PROMPT not in body
+        assert PATIENT_REF not in body
+        assert "30111222" not in body
+        assert "secret-token" not in body
+        assert "<button" not in body.lower()
+        assert AUDIT_INVESTIGATION_ACTION  # query still records access
         async with engine.connect() as connection:
             actions = (
                 await connection.execute(
