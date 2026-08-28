@@ -1,6 +1,7 @@
 from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -68,6 +69,30 @@ class ToolAuditEvent:
     mcp_server_id: str | None = None
 
 
+class HostAllowlist:
+    """Network allowlist for resolved MCP endpoints.
+
+    A resolved target is data: the record may be stale, misconfigured or
+    tenant-controlled. Once an allowlist is configured nothing outside it is
+    reachable, plaintext transport is refused and a missing endpoint fails
+    closed instead of defaulting to "no restriction".
+    """
+
+    def __init__(self, hosts: Iterable[str]) -> None:
+        self._hosts = frozenset(
+            host.strip().lower() for host in hosts if host and host.strip()
+        )
+
+    def permits(self, endpoint: str) -> bool:
+        if not endpoint:
+            return False
+        parsed = urlsplit(endpoint)
+        if parsed.scheme != "https":
+            return False
+        host = (parsed.hostname or "").lower()
+        return bool(host) and host in self._hosts
+
+
 class ToolRegistry:
     """Wraps registry.authorize with construction-time allowlists."""
 
@@ -101,11 +126,21 @@ class ToolExecutor:
         capability: AppointmentCapability,
         resolver: McpResolver | None = None,
         audit_hook: Callable[[ToolAuditEvent], None] | None = None,
+        allowed_hosts: Iterable[str] | None = None,
     ) -> None:
+        if allowed_hosts is not None and resolver is None:
+            # Only a resolved target carries an endpoint. Accepting the allowlist
+            # here would advertise a network restriction that never runs, so the
+            # wiring error fails closed instead of dispatching every call.
+            raise ValueError(
+                "allowed_hosts requires a resolver: without one there is no "
+                "endpoint to validate and the allowlist would never apply"
+            )
         self._registry = ToolRegistry(server=server, tenant=tenant, skill=skill)
         self._capability = capability
         self._resolver = resolver
         self._audit_hook = audit_hook
+        self._hosts = None if allowed_hosts is None else HostAllowlist(allowed_hosts)
 
     async def execute(
         self,
@@ -160,7 +195,10 @@ class ToolExecutor:
             with start_span(SPAN_MCP_RESOLVE) as span:
                 target = await self._resolver.resolve(tenant, capability_name)
                 span.set_attribute("mcp_server_id", target.server_id)
-            if call.name not in target.allowed_tools:
+            denied = call.name not in target.allowed_tools or (
+                self._hosts is not None and not self._hosts.permits(target.endpoint)
+            )
+            if denied:
                 self._audit(
                     ToolAuditEvent(
                         run_id=run_id,
