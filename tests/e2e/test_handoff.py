@@ -178,6 +178,7 @@ async def stack() -> AsyncIterator[
 
 
 @pytest.mark.anyio
+@pytest.mark.e2e
 async def test_explicit_request_reaches_operator_fake(stack) -> None:  # type: ignore[no-untyped-def]
     conversations, service, provider, _harness, _knowledge, repository = stack
     received = await conversations.receive(
@@ -213,6 +214,7 @@ async def test_explicit_request_reaches_operator_fake(stack) -> None:  # type: i
 
 
 @pytest.mark.anyio
+@pytest.mark.e2e
 async def test_human_owned_blocks_mutations_after_handoff(stack) -> None:  # type: ignore[no-untyped-def]
     conversations, service, _provider, harness, knowledge, _repository = stack
     first = await conversations.receive(
@@ -257,6 +259,7 @@ async def test_human_owned_blocks_mutations_after_handoff(stack) -> None:  # typ
 
 
 @pytest.mark.anyio
+@pytest.mark.e2e
 async def test_two_tenants_operator_inboxes_are_isolated(stack) -> None:  # type: ignore[no-untyped-def]
     conversations, service, provider, _harness, _knowledge, _repository = stack
     received_a = await conversations.receive(

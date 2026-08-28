@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -118,6 +119,34 @@ class StaticConfigs:
         )
 
 
+class CountingCapability(FakeAppointmentCapability):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.operations: list[str] = []
+
+    async def get(self, tenant: TenantContext, request: Any):
+        self.operations.append("get")
+        return await super().get(tenant, request)
+
+    async def create(self, tenant: TenantContext, request: Any, idempotency_key: str):
+        self.operations.append("create")
+        return await super().create(tenant, request, idempotency_key)
+
+    async def cancel(self, tenant: TenantContext, request: Any, idempotency_key: str):
+        self.operations.append("cancel")
+        return await super().cancel(tenant, request, idempotency_key)
+
+    async def reschedule(
+        self, tenant: TenantContext, request: Any, idempotency_key: str
+    ):
+        self.operations.append("reschedule")
+        return await super().reschedule(tenant, request, idempotency_key)
+
+    async def confirm(self, tenant: TenantContext, request: Any, idempotency_key: str):
+        self.operations.append("confirm")
+        return await super().confirm(tenant, request, idempotency_key)
+
+
 class CapabilityAppointmentLookup:
     def __init__(self, capability: FakeAppointmentCapability) -> None:
         self._capability = capability
@@ -220,13 +249,13 @@ def reset_and_seed(*, channels: bool = False) -> None:
     seed.dispose()
 
 
-def make_capability(*, timeout_create: bool = False) -> FakeAppointmentCapability:
+def make_capability(*, timeout_create: bool = False) -> CountingCapability:
     fault = (
         FaultPlan(fault="timeout", operations=frozenset({"create"}))
         if timeout_create
         else None
     )
-    return FakeAppointmentCapability(
+    return CountingCapability(
         clock=lambda: CAPABILITY_CLOCK,
         initial_slots={
             TENANT_A: (

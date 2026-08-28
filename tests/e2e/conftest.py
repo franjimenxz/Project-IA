@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -40,14 +41,6 @@ from ia_mcp.tenancy.service import TenantService
 from tests.integration.api.test_simulated_messages import signed_simulated_headers
 from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
 
-
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    marker = pytest.mark.e2e
-    for item in items:
-        if item.get_closest_marker("e2e") is None:
-            item.add_marker(marker)
-
-
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
@@ -59,6 +52,16 @@ CORR_SHARED = UUID("55555555-5555-5555-5555-555555555555")
 FROZEN_NOW = datetime(2026, 8, 28, 4, 20, 0, tzinfo=UTC)
 CANARY_A = b"canary-a clinic hours eight to sixteen"
 CANARY_B = b"canary-b night hours closed exclusive"
+APPOINTMENT_TOOLS = frozenset(
+    {
+        "appointments.search",
+        "appointments.get",
+        "appointments.create",
+        "appointments.cancel",
+        "appointments.reschedule",
+        "appointments.confirm",
+    }
+)
 
 
 class FakeChannelRepository:
@@ -166,8 +169,17 @@ def _admin(identity: TenantIdentity) -> TenantAdminContext:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class FaqRuntime:
+    client: AsyncClient
+    outbox: ChannelOutbox
+    clock: MutableClock
+    harness: AgentHarness
+    compiler: ContextCompiler
+
+
 @pytest.fixture
-async def faq_stack() -> AsyncIterator[tuple[AsyncClient, ChannelOutbox, MutableClock]]:
+async def faq_runtime() -> AsyncIterator[FaqRuntime]:
     _reset_schema()
     _seed_tenants_and_channels()
     engine = create_async_engine(DATABASE_URL)
@@ -219,7 +231,7 @@ async def faq_stack() -> AsyncIterator[tuple[AsyncClient, ChannelOutbox, Mutable
     compiler = ContextCompiler(
         configs=config_repo,
         skills=skills,
-        tenant_tools={TENANT_A: frozenset(), TENANT_B: frozenset()},
+        tenant_tools={TENANT_A: APPOINTMENT_TOOLS, TENANT_B: APPOINTMENT_TOOLS},
     )
     harness = AgentHarness(
         conversations=SqlAlchemyConversationRepository(engine),
@@ -250,9 +262,22 @@ async def faq_stack() -> AsyncIterator[tuple[AsyncClient, ChannelOutbox, Mutable
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         try:
-            yield client, outbox, clock
+            yield FaqRuntime(
+                client=client,
+                outbox=outbox,
+                clock=clock,
+                harness=harness,
+                compiler=compiler,
+            )
         finally:
             await engine.dispose()
+
+
+@pytest.fixture
+async def faq_stack(
+    faq_runtime: FaqRuntime,
+) -> AsyncIterator[tuple[AsyncClient, ChannelOutbox, MutableClock]]:
+    yield faq_runtime.client, faq_runtime.outbox, faq_runtime.clock
 
 
 async def post_faq(

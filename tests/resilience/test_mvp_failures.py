@@ -16,8 +16,8 @@ from ia_mcp.workflows.engine import WorkflowEngine
 from tests.fixtures.mvp import (
     ALL_TOOLS,
     DATABASE_URL,
+    DUE_AT,
     PATIENT,
-    STARTS_RESCHEDULED,
     TENANT_A_CTX,
     CapabilityAppointmentLookup,
     appointment_config,
@@ -40,6 +40,7 @@ pytestmark = [pytest.mark.anyio, pytest.mark.resilience]
 
 
 async def test_restarted_workflow_and_job_resume() -> None:
+    """Workflow SQL restart is real; job resume uses test-side ReminderScheduler.upsert."""
     reset_and_seed()
     capability = make_capability()
     executor = make_executor(capability, skill=ALL_TOOLS)
@@ -90,7 +91,7 @@ async def test_restarted_workflow_and_job_resume() -> None:
     third_db = create_async_engine(DATABASE_URL)
     try:
         store = SqlAlchemyJobStore(third_db)
-        clock = AdjustableClock(STARTS_RESCHEDULED)
+        clock = AdjustableClock(DUE_AT + timedelta(seconds=1))
         policy = SchedulingPolicy()
         channel = FakeChannelAdapter()
         audit = InMemoryAuditSink()
@@ -113,6 +114,7 @@ async def test_restarted_workflow_and_job_resume() -> None:
 
 
 async def test_reminder_channel_failure_after_create_is_retried_and_audited() -> None:
+    """Composition: upsert after create, then channel fault injection on the worker."""
     reset_and_seed()
     db = create_async_engine(DATABASE_URL)
     try:
