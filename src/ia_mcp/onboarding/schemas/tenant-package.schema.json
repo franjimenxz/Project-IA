@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ia-mcp.local/schemas/tenant-package.schema.json",
+  "title": "Declarative tenant package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenant", "config", "policies", "knowledge", "integrations", "evals"],
+  "$defs": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "referenceUri": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9+.-]*://\\S+$"
+    },
+    "skillName": {
+      "type": "string",
+      "enum": ["faq", "appointments", "human_handoff"]
+    },
+    "tenant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "slug", "display_name"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "display_name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "version",
+        "agent",
+        "enabled_skills",
+        "knowledge",
+        "mcp"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "version": { "type": "integer", "minimum": 1 },
+        "agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tone"],
+          "properties": { "tone": { "type": "string", "minLength": 1 } }
+        },
+        "enabled_skills": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skillName" }
+        },
+        "enabled_tools": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "appointments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "required_fields": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "credentials_reference": { "$ref": "#/$defs/referenceUri" }
+          }
+        },
+        "knowledge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["namespace"],
+          "properties": {
+            "namespace": { "type": "string", "minLength": 1 },
+            "credentials_reference": { "$ref": "#/$defs/referenceUri" }
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["server_id"],
+          "properties": {
+            "server_id": { "type": "string", "minLength": 1 },
+            "credentials_reference": { "$ref": "#/$defs/referenceUri" }
+          }
+        },
+        "handoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "credentials_reference": { "$ref": "#/$defs/referenceUri" }
+          }
+        },
+        "feature_flags": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "channels"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["channel", "external_account_id", "secret_reference"],
+            "properties": {
+              "channel": { "type": "string", "enum": ["simulated", "whatsapp"] },
+              "external_account_id": { "type": "string", "minLength": 1 },
+              "secret_reference": { "$ref": "#/$defs/referenceUri" }
+            }
+          }
+        },
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "credentials_reference"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["mcp", "channel", "handoff", "storage"]
+              },
+              "server_id": { "type": "string", "minLength": 1 },
+              "credentials_reference": { "$ref": "#/$defs/referenceUri" },
+              "capabilities": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "knowledgeManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "namespace"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "namespace": { "type": "string", "minLength": 1 },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["logical_name", "source", "checksum", "mime_type"],
+            "properties": {
+              "logical_name": { "type": "string", "minLength": 1 },
+              "source": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9+.-]*://\\S+$"
+              },
+              "checksum": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "mime_type": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "skill"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schemaVersion" },
+        "skill": { "$ref": "#/$defs/skillName" }
+      }
+    },
+    "evalCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "tenant_fixture", "expected_skill"],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "tenant_fixture": { "type": "string", "minLength": 1 },
+        "config_version": { "type": "integer", "minimum": 1 },
+        "expected_skill": { "$ref": "#/$defs/skillName" },
+        "allowed_tools": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "forbidden_tools": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "text"],
+            "properties": {
+              "role": { "type": "string", "enum": ["user", "assistant"] },
+              "text": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "tenant": { "$ref": "#/$defs/tenant" },
+    "config": { "$ref": "#/$defs/config" },
+    "policies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/policy" }
+    },
+    "knowledge": { "$ref": "#/$defs/knowledgeManifest" },
+    "integrations": { "$ref": "#/$defs/integrations" },
+    "evals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evalCase" }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+schema_version: 1
+channels:
+  - channel: simulated
+    external_account_id: tenant-b-simulated
+    secret_reference: sm://tenant-b/channel/simulated
+integrations:
+  - kind: mcp
+    server_id: fake-appointments-b
+    credentials_reference: sm://tenant-b/mcp/appointments
+    capabilities:
+      - appointments.search
+      - appointments.get
+      - appointments.create

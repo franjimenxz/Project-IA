@@ -1,0 +1,7 @@
+schema_version: 1
+namespace: tenant-b
+documents:
+  - logical_name: hours-b
+    source: object://synthetic/tenant-b/hours
+    checksum: a0bd220ca3d2738be3a0cdeb1e5c9aa0866e716043ea9bf081637a432c1ab1ab
+    mime_type: text/plain

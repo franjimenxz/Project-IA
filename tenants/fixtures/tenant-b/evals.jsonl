@@ -1,0 +1,1 @@
+{"case_id":"tb-faq-001","tenant_fixture":"tenant-b","config_version":1,"expected_skill":"faq","allowed_tools":[],"forbidden_tools":["appointments.create"],"messages":[{"role":"user","text":"horario sucursal norte"}]}
