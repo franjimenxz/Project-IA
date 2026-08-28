@@ -41,6 +41,7 @@ from tests.integration.api.test_run_investigation import (
     make_admin_client,
     operator_a,
     operator_b,
+    tenant_admin_a,
     tenant_admin_b,
 )
 from tests.integration.api.test_simulated_messages import (
@@ -347,21 +348,21 @@ async def test_operator_b_http_404_matches_missing_run() -> None:
 @pytest.mark.anyio
 @pytest.mark.security
 @pytest.mark.integration
-async def test_tenant_admin_b_cannot_read_foreign_run_over_http() -> None:
+async def test_tenant_admin_cannot_read_assigned_or_foreign_run() -> None:
+    """TDD: tenant_admin is not a run-view role, including same-tenant."""
     _reset_schema()
     _seed_tenants_and_channels()
     engine = create_async_engine(DATABASE_URL)
     try:
         seeded = await seed_investigation_fixture(engine)
         query = SqlAlchemyRunInvestigationQuery(engine)
-        client = make_admin_client(principal=tenant_admin_b(), query=query)
-        missing = client.get(f"/v1/admin/runs/{MISSING_RUN_ID}")
-        foreign = client.get(f"/v1/admin/runs/{seeded.run_a_id}")
-        assert missing.status_code == foreign.status_code
-        assert foreign.status_code in {403, 404}
-        if foreign.status_code == 404:
-            assert missing.json()["title"] == foreign.json()["title"] == "not_found"
-            assert missing.json()["detail"] == foreign.json()["detail"] == "Resource not found"
+        own = make_admin_client(principal=tenant_admin_a(), query=query)
+        foreign = make_admin_client(principal=tenant_admin_b(), query=query)
+        assert own.get(f"/v1/admin/runs/{seeded.run_a_id}").status_code == 403
+        assert own.get(f"/admin/runs/{seeded.run_a_id}").status_code == 403
+        assert foreign.get(f"/v1/admin/runs/{seeded.run_a_id}").status_code == 403
+        operator = make_admin_client(principal=operator_a(), query=query)
+        assert operator.get(f"/v1/admin/runs/{seeded.run_a_id}").status_code == 200
     finally:
         await engine.dispose()
 

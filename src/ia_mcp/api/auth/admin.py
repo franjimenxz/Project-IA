@@ -8,7 +8,7 @@ from ia_mcp.observability.context import current_correlation_id
 from ia_mcp.onboarding.commands import Principal
 from ia_mcp.tenancy.models import TenantContext
 
-TENANT_SCOPED_ROLES = frozenset({"operator", "auditor", "tenant_admin"})
+VIEW_ROLES = frozenset({"operator", "auditor"})
 
 
 def get_principal(request: Request) -> Principal:
@@ -23,7 +23,7 @@ def get_principal(request: Request) -> Principal:
 
 def require_run_investigator(request: Request) -> Principal:
     principal = get_principal(request)
-    if principal.roles.isdisjoint(TENANT_SCOPED_ROLES):
+    if principal.roles.isdisjoint(VIEW_ROLES):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Administrator is not allowed to perform this action.",

@@ -45,6 +45,7 @@ XSS_ERROR = '<img src=x onerror=alert("err")>'
 OPERATOR_A_ID = UUID("aaaaaaaa-0000-4000-8000-0000000000aa")
 OPERATOR_B_ID = UUID("bbbbbbbb-0000-4000-8000-0000000000bb")
 AUDITOR_A_ID = UUID("aaaaaaaa-0000-4000-8000-0000000000ad")
+TENANT_ADMIN_A_ID = UUID("aaaaaaaa-0000-4000-8000-0000000000ae")
 TENANT_ADMIN_B_ID = UUID("bbbbbbbb-0000-4000-8000-0000000000ad")
 
 
@@ -116,6 +117,15 @@ def auditor_a() -> Principal:
     return _principal(
         principal_id=AUDITOR_A_ID,
         roles=frozenset({"auditor"}),
+        tenant_id=TENANT_A,
+        tenant_slug="tenant-a",
+    )
+
+
+def tenant_admin_a() -> Principal:
+    return _principal(
+        principal_id=TENANT_ADMIN_A_ID,
+        roles=frozenset({"tenant_admin"}),
         tenant_id=TENANT_A,
         tenant_slug="tenant-a",
     )
@@ -307,6 +317,18 @@ def test_inbound_tenant_header_does_not_bypass_assignment() -> None:
     assert query.calls[0][0].tenant_slug == "tenant-b"
 
 
+def test_same_tenant_tenant_admin_is_forbidden() -> None:
+    """TDD: HTML/JSON view is operator/auditor only, even on the assigned tenant."""
+    run_id = uuid4()
+    query = _ScriptedQuery(_xss_investigation(run_id))
+    client = make_admin_client(principal=tenant_admin_a(), query=query)
+    json_response = client.get(f"/v1/admin/runs/{run_id}")
+    html_response = client.get(f"/admin/runs/{run_id}")
+    assert json_response.status_code == 403
+    assert html_response.status_code == 403
+    assert query.calls == []
+
+
 def test_json_and_html_reject_mutations() -> None:
     run_id = uuid4()
     client = make_admin_client(
@@ -361,23 +383,22 @@ async def test_operator_b_cannot_read_run_a() -> None:
 
 @pytest.mark.anyio
 @pytest.mark.integration
-async def test_tenant_admin_of_b_cannot_read_tenant_a_run() -> None:
-    """tenant_admin of B must not read C/A; same 404 as missing."""
+async def test_tenant_admin_is_forbidden_for_any_run() -> None:
+    """tenant_admin is not a view role; same-tenant and foreign both 403."""
     _reset_schema()
     _seed_tenants_and_channels()
     engine = create_async_engine(DATABASE_URL)
     try:
         seeded = await seed_investigation_fixture(engine)
         query = SqlAlchemyRunInvestigationQuery(engine)
-        client = make_admin_client(principal=tenant_admin_b(), query=query)
-        missing = client.get(f"/v1/admin/runs/{MISSING_RUN_ID}")
-        foreign = client.get(f"/v1/admin/runs/{seeded.run_a_id}")
-        assert missing.status_code != 200
-        assert foreign.status_code != 200
-        assert _error_shape(missing) == _error_shape(foreign)
-        assert foreign.status_code in {403, 404}
-        if foreign.status_code == 404:
-            assert _error_shape(foreign) == (404, "not_found", "Resource not found")
+        own = make_admin_client(principal=tenant_admin_a(), query=query)
+        foreign = make_admin_client(principal=tenant_admin_b(), query=query)
+        own_json = own.get(f"/v1/admin/runs/{seeded.run_a_id}")
+        own_html = own.get(f"/admin/runs/{seeded.run_a_id}")
+        foreign_json = foreign.get(f"/v1/admin/runs/{seeded.run_a_id}")
+        assert own_json.status_code == 403
+        assert own_html.status_code == 403
+        assert foreign_json.status_code == 403
     finally:
         await engine.dispose()
 
