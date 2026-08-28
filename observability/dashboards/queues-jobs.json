@@ -1,0 +1,38 @@
+{
+  "schema": "ia-mcp.observability.dashboard/v1",
+  "id": "queues-jobs",
+  "title": "Queues, jobs, and reminders",
+  "access": "platform-operator",
+  "panels": [
+    {
+      "title": "Queue depth",
+      "metric": "queue_depth",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Queue age",
+      "metric": "queue_age_seconds",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Reminders scheduled",
+      "metric": "reminder_scheduled_count",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Reminders sent",
+      "metric": "reminder_sent_count",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Reminders skipped",
+      "metric": "reminder_skipped_count",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Reminder duplicates",
+      "metric": "reminder_duplicate_count",
+      "labels": ["status", "tenant_id"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "ia-mcp.observability.alert/v1",
+  "id": "rollback-config-integration",
+  "title": "Rollback config or integration",
+  "owner": "config-oncall",
+  "severity": "high",
+  "window": "10m",
+  "threshold": {
+    "metric": "config_activation_error_count",
+    "operator": ">=",
+    "value": 1
+  },
+  "dedupe": {
+    "key": ["alert_id", "tenant_id"],
+    "window": "60m"
+  },
+  "runbook": "docs/runbooks/rollback.md",
+  "signal": {
+    "metric": "config_activation_error_count",
+    "description": "Failed config activate, integration allowlist fault, or error-rate spike immediately after an activate audit event",
+    "labels": ["status", "tenant_id"]
+  }
+}

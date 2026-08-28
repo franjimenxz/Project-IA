@@ -1,0 +1,23 @@
+{
+  "schema": "ia-mcp.observability.alert/v1",
+  "id": "upstream-outage",
+  "title": "Upstream outage",
+  "owner": "integration-oncall",
+  "severity": "high",
+  "window": "5m",
+  "threshold": {
+    "metric": "tool_error_ratio",
+    "operator": ">=",
+    "value": 0.1
+  },
+  "dedupe": {
+    "key": ["alert_id", "tenant_id", "mcp_server_id", "error_code"],
+    "window": "20m"
+  },
+  "runbook": "docs/runbooks/upstream.md",
+  "signal": {
+    "metric": "tool_error_ratio",
+    "description": "Ratio of tool executions with upstream_unavailable or upstream_timeout over completed tool executions",
+    "labels": ["tool_name", "mcp_server_id", "error_code", "status", "tenant_id"]
+  }
+}

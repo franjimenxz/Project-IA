@@ -1,0 +1,28 @@
+{
+  "schema": "ia-mcp.observability.dashboard/v1",
+  "id": "security-isolation",
+  "title": "Security and isolation signals",
+  "access": "platform-security",
+  "panels": [
+    {
+      "title": "Isolation violations",
+      "metric": "isolation_violation_count",
+      "labels": ["error_code", "tenant_id"]
+    },
+    {
+      "title": "Secret detection",
+      "metric": "secret_detection_count",
+      "labels": ["status"]
+    },
+    {
+      "title": "Audit persistence failures",
+      "metric": "audit_persist_failure_count",
+      "labels": ["status"]
+    },
+    {
+      "title": "Denied tenant resolution",
+      "metric": "tenant_denied_count",
+      "labels": ["status"]
+    }
+  ]
+}

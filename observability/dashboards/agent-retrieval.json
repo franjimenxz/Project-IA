@@ -1,0 +1,38 @@
+{
+  "schema": "ia-mcp.observability.dashboard/v1",
+  "id": "agent-retrieval",
+  "title": "Agent and retrieval",
+  "access": "rbac-tenant-assignment",
+  "panels": [
+    {
+      "title": "Runs by status",
+      "metric": "agent_run_count",
+      "labels": ["status", "skill", "tenant_id"]
+    },
+    {
+      "title": "Model latency",
+      "metric": "llm_generate_duration_ms",
+      "labels": ["status", "skill"]
+    },
+    {
+      "title": "Context tokens",
+      "metric": "context_token_count",
+      "labels": ["skill", "tenant_id"]
+    },
+    {
+      "title": "Retrieval duration",
+      "metric": "knowledge_search_duration_ms",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Retrieval hit count",
+      "metric": "knowledge_search_hit_count",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Insufficient knowledge rate",
+      "metric": "retrieval_insufficient_rate",
+      "labels": ["skill", "tenant_id"]
+    }
+  ]
+}

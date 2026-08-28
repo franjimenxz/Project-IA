@@ -1,0 +1,29 @@
+{
+  "schema": "ia-mcp.observability.dashboard/v1",
+  "id": "tenant-operations",
+  "title": "Per-tenant operational view",
+  "access": "rbac-tenant-assignment",
+  "scope": "TenantContext from the assigned principal; never from an inbound tenant header",
+  "panels": [
+    {
+      "title": "Runs",
+      "metric": "agent_run_count",
+      "labels": ["status", "skill", "tenant_id"]
+    },
+    {
+      "title": "Workflows",
+      "metric": "workflow_completion_count",
+      "labels": ["workflow_type", "status", "tenant_id"]
+    },
+    {
+      "title": "Queue age",
+      "metric": "queue_age_seconds",
+      "labels": ["status", "tenant_id"]
+    },
+    {
+      "title": "Handoffs",
+      "metric": "handoff_count",
+      "labels": ["status", "tenant_id"]
+    }
+  ]
+}
