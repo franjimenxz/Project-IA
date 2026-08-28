@@ -411,6 +411,9 @@ def test_quality_extra_is_installable_with_the_locked_documentation_tools(
     )
     assert set(project["requires_dist"]) == {
         "fastapi==0.141.1",
+        "sqlalchemy[asyncio]==2.0.43",
+        "alembic==1.16.5",
+        "psycopg[binary]==3.3.4",
         'pytest==9.1.1; extra == "quality"',
         'ruff==0.16.5; extra == "quality"',
         'httpx==0.28.1; extra == "quality"',
