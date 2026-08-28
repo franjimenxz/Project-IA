@@ -18,6 +18,8 @@ class FakeSseMcpServer:
     def __init__(self) -> None:
         self.call_error: CallErrorMode = None
         self.call_delay_seconds = 0.0
+        self.reverse_call_responses = False
+        self.notify_before_call: Mapping[str, Any] | None = None
         self.sessions: dict[str, dict[str, Any]] = {}
         self.post_session_ids: list[str] = []
         self.http_gets = 0
@@ -106,8 +108,19 @@ def _handler_for(server: FakeSseMcpServer) -> type[BaseHTTPRequestHandler]:
             self.send_response(202)
             self.send_header("Content-Length", "0")
             self.end_headers()
-            if response is not None:
-                with session["lock"]:
+            if response is None:
+                return
+            method = request.get("method")
+            with session["lock"]:
+                if method == "tools/call" and server.notify_before_call is not None:
+                    session["outbound"].append(json.dumps(server.notify_before_call))
+                if method == "tools/call" and server.reverse_call_responses:
+                    held = session.setdefault("held_calls", [])
+                    held.append(response)
+                    if len(held) >= 2:
+                        session["outbound"].extend(reversed(held))
+                        held.clear()
+                else:
                     session["outbound"].append(response)
 
     return Handler

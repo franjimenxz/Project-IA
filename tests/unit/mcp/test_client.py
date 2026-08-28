@@ -169,17 +169,36 @@ def test_concurrent_calls_on_same_session_both_succeed(
     target: McpTarget,
 ) -> None:
     fake_server.call_delay_seconds = 0.1
+    fake_server.reverse_call_responses = True
     client = _client()
 
-    async def _both() -> None:
-        first, second = await asyncio.gather(
+    async def _both() -> tuple[object, object]:
+        return await asyncio.gather(
             client.call_tool(TENANT_A, target, "crear_turno", {"slot": "one"}),
             client.call_tool(TENANT_A, target, "crear_turno", {"slot": "two"}),
         )
-        assert first.ok is True
-        assert second.ok is True
 
-    _run(_both())
+    first, second = _run(_both())
+    assert first.ok is True
+    assert second.ok is True
+    assert _slot(first.value) == "one"
+    assert _slot(second.value) == "two"
+
+
+def test_notification_mid_call_does_not_fail_tools_call(
+    fake_server: FakeSseMcpServer,
+    target: McpTarget,
+) -> None:
+    fake_server.notify_before_call = {
+        "jsonrpc": "2.0",
+        "method": "notifications/progress",
+        "params": {"progress": 0.5},
+    }
+    result = _run(
+        _client().call_tool(TENANT_A, target, "crear_turno", {"slot": "after-notify"})
+    )
+    assert result.ok is True
+    assert _slot(result.value) == "after-notify"
 
 
 def test_jsonrpc_error_object_is_not_ok(fake_server: FakeSseMcpServer) -> None:
@@ -265,6 +284,14 @@ def test_list_tools_failure_is_public_domain_error(
     assert SECRET_AUTH_REFERENCE not in caught.value.safe_message
     assert SECRET_AUTH_REFERENCE not in str(caught.value)
     assert type(caught.value) is DomainError
+
+
+def _slot(value: object) -> str:
+    if isinstance(value, dict):
+        arguments = value.get("arguments")
+        if isinstance(arguments, dict) and arguments.get("slot") is not None:
+            return str(arguments["slot"])
+    raise AssertionError(f"missing slot in {value!r}")
 
 
 def _events(value: object) -> list[dict[str, Any]]:

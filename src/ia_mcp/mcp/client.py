@@ -357,14 +357,16 @@ class _SseSession:
         if not isinstance(message, dict):
             self._broadcast({"_malformed": True})
             return
+        if "method" in message and "result" not in message and "error" not in message:
+            return
+        if not _is_jsonrpc(message):
+            self._broadcast({"_malformed": True})
+            return
         rpc_id = message.get("id")
         with self._lock:
             waiter = self._pending.get(rpc_id) if isinstance(rpc_id, int) else None
         if waiter is not None:
             waiter.put(message)
-            return
-        if not _is_jsonrpc(message):
-            self._broadcast({"_malformed": True})
 
     def _broadcast(self, payload: dict[str, Any]) -> None:
         with self._lock:
