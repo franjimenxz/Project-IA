@@ -29,8 +29,7 @@ def available(
     tenant: Iterable[str],
     skill: Iterable[str],
 ) -> frozenset[str]:
-    names = frozenset(server) & frozenset(tenant) & frozenset(skill)
-    return frozenset(name for name in names if name in KNOWN_TOOLS)
+    return frozenset(server) & frozenset(tenant) & frozenset(skill)
 
 
 def authorize(

@@ -49,6 +49,7 @@ class TenantConfigDraft(BaseModel):
     schema_version: Literal[1] = 1
     agent: AgentConfig
     enabled_skills: frozenset[SkillName] = Field(default_factory=frozenset)
+    enabled_tools: frozenset[str] = Field(default_factory=frozenset)
     appointments: AppointmentPolicy = Field(default_factory=AppointmentPolicy)
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     mcp: McpConfig = Field(default_factory=McpConfig)

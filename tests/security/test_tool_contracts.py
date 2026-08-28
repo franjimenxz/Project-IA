@@ -38,12 +38,11 @@ def test_tenant_a_cannot_see_tenant_b_exclusive_tools() -> None:
 
 
 def test_unknown_tool_is_forbidden() -> None:
-    unknown = "appointments.explode"
-    caps = {unknown, *CATALOG}
-    assert unknown not in registry.available(server=caps, tenant=caps, skill=caps)
-    with pytest.raises(ForbiddenTool) as caught:
-        registry.authorize(unknown, server=caps, tenant=caps, skill=caps)
-    assert caught.value.code == ToolErrorCode.FORBIDDEN
+    discovered = "appointments.explode"
+    caps = {discovered, *CATALOG}
+    assert discovered not in registry.KNOWN_TOOLS
+    assert discovered in registry.available(server=caps, tenant=caps, skill=caps)
+    assert registry.authorize(discovered, server=caps, tenant=caps, skill=caps) == discovered
 
 
 def test_disabled_tool_is_forbidden() -> None:

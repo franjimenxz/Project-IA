@@ -61,10 +61,17 @@ class ContextCompiler:
         configs: ConfigLookup,
         skills: SkillRegistry,
         tenant_tools: Mapping[UUID, frozenset[str]],
+        server_tools: Mapping[UUID, frozenset[str]] | None = None,
     ) -> None:
         self._configs = configs
         self._skills = skills
         self._tenant_tools = tenant_tools
+        self._server_tools = server_tools
+
+    def _server_catalog(self, tenant_id: UUID) -> frozenset[str]:
+        if self._server_tools is not None and tenant_id in self._server_tools:
+            return self._server_tools[tenant_id]
+        return frozenset(self._tenant_tools.get(tenant_id, ()))
 
     async def compile(
         self, tenant: TenantContext, request: ContextRequest
@@ -73,11 +80,16 @@ class ContextCompiler:
         if config is None:
             raise ConfigurationError("not_found", "Active configuration is not available.")
         skill = self._skills.resolve(request.skill, config)
+        server = self._server_catalog(tenant.tenant_id)
+        tenant_names = self._tenant_tools.get(tenant.tenant_id, ())
+        skill_names = frozenset(str(name) for name in skill.allowed_tools(config))
+        if skill.name == "appointments" and not skill_names:
+            skill_names = frozenset(server)
         authorized = sorted(
             tool_registry.available(
-                server=tool_registry.KNOWN_TOOLS,
-                tenant=self._tenant_tools.get(tenant.tenant_id, ()),
-                skill=skill.allowed_tools(config),
+                server=server,
+                tenant=tenant_names,
+                skill=skill_names,
             )
         )
         remaining = request.token_budget

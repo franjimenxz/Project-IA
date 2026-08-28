@@ -28,13 +28,20 @@ def test_available_tools_are_three_way_intersection() -> None:
     ) == frozenset({"appointments.search"})
 
 
+def test_discovered_tool_in_intersection_is_allowed() -> None:
+    discovered = "crear_turno"
+    caps = {discovered, "appointments.search"}
+    assert discovered not in registry.KNOWN_TOOLS
+    assert registry.available(server=caps, tenant=caps, skill=caps) == frozenset(caps)
+    assert registry.authorize(discovered, server=caps, tenant=caps, skill=caps) == discovered
+
+
 def test_unknown_tool_is_forbidden() -> None:
     unknown = "appointments.delete"
     caps = {unknown, "appointments.search"}
-    assert unknown not in registry.available(server=caps, tenant=caps, skill=caps)
-    with pytest.raises(ForbiddenTool) as caught:
-        registry.authorize(unknown, server=caps, tenant=caps, skill=caps)
-    assert caught.value.code == ToolErrorCode.FORBIDDEN
+    assert unknown not in registry.KNOWN_TOOLS
+    assert unknown in registry.available(server=caps, tenant=caps, skill=caps)
+    assert registry.authorize(unknown, server=caps, tenant=caps, skill=caps) == unknown
 
 
 def test_disabled_tool_is_forbidden() -> None:

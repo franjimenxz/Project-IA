@@ -32,12 +32,14 @@ def config_for(
     *,
     skills: frozenset[str],
     tone: str = "cordial",
+    enabled_tools: frozenset[str] = frozenset(),
 ) -> TenantConfig:
     return TenantConfig(
         tenant_id=tenant_id,
         version=1,
         agent=AgentConfig(tone=tone),
         enabled_skills=skills,
+        enabled_tools=enabled_tools,
         mcp=McpConfig(credentials_reference="secret://mcp/tenant"),
     )
 
@@ -127,6 +129,34 @@ async def test_appointments_skill_emits_only_authorized_tool_schemas() -> None:
     context = await compiler.compile(tenant_b, request(skill="appointments"))
     assert [schema.name for schema in context.tool_schemas] == ["appointments.search"]
     assert "appointments.create" not in context.model_dump_json()
+    assert "credentials_reference" not in context.model_dump_json()
+
+
+@pytest.mark.anyio
+async def test_discovered_tool_appears_in_schemas_when_tenant_and_skill_allow() -> None:
+    tenant_b = tenant_context(tenant_id=TENANT_B, slug="tenant-b")
+    discovered = "crear_turno"
+    compiler = ContextCompiler(
+        configs=FakeConfigRepository(
+            {
+                TENANT_B: config_for(
+                    TENANT_B,
+                    skills=frozenset({"appointments"}),
+                    enabled_tools=frozenset({discovered, "appointments.search"}),
+                )
+            }
+        ),
+        skills=SkillRegistry(),
+        tenant_tools={TENANT_B: frozenset({discovered, "appointments.search"})},
+        server_tools={
+            TENANT_B: frozenset({discovered, "appointments.search", "other.unused"}),
+        },
+    )
+    context = await compiler.compile(tenant_b, request(skill="appointments"))
+    names = [schema.name for schema in context.tool_schemas]
+    assert discovered in names
+    assert "appointments.search" in names
+    assert "other.unused" not in names
     assert "credentials_reference" not in context.model_dump_json()
 
 
