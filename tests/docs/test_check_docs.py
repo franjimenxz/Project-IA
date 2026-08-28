@@ -410,8 +410,11 @@ def test_quality_extra_is_installable_with_the_locked_documentation_tools(
         if item["metadata"]["name"] == "ia-mcp"
     )
     assert set(project["requires_dist"]) == {
+        "fastapi==0.141.1",
         'pytest==9.1.1; extra == "quality"',
         'ruff==0.16.5; extra == "quality"',
+        'httpx==0.28.1; extra == "quality"',
+        'mypy==2.3.1; extra == "quality"',
     }
 
 
