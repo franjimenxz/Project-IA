@@ -33,4 +33,4 @@ jobs:
         run: |
           ruff check .
           mypy src
-          pytest tests/unit -v
+          pytest tests/unit tests/performance tests/evals/unit -v
