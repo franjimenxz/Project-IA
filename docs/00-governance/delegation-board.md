@@ -49,10 +49,10 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P05-T04 | W6-sandbox | blocked | P05-T03, EXT-002 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T04-sandbox-rollout.md) |
 | P06-T01 | W6 | in_review | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
 | P06-T02 | W6 | blocked | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
-| P06-T03 | W6 | ready | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
-| P06-T04 | W6 | ready | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
+| P06-T03 | W6 | in_progress | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
+| P06-T04 | W6 | in_progress | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
 | P06-T05 | W6 | blocked | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
-| P07-T01 | W6 | ready | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
+| P07-T01 | W6 | in_progress | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
 | P07-T02 | W6 | ready | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
 | P07-T03 | W6 | blocked | P07-T02 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T03-admin-view.md) |
 | P07-T04 | W6 | blocked | P07-T01–P07-T03 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T04-runbooks-alerts.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P08-T01 accepted (PR #28). P06-T01 in_review (PR #26). Ready: P06-T03, P06-T04, P07-T01, P07-T02, P08-T02. Imp1–3 idle.
+P08-T01 accepted (PR #28). P06-T01 in_review (PR #26). En curso: `P06-T03`, `P06-T04`, `P07-T01`. Ready: `P07-T02` (espera P07-T01; conflicto `src/ia_mcp/observability`, `tests/security/test_observability.py`), `P08-T02`.
 
 ## Actualización
 
@@ -164,3 +164,6 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P06-T01 | `ready → in_review` | `9d0b1ba`, `ecda2b9` | https://github.com/franjimenxz/Project-IA/pull/26 |
 | P08-T01 | `ready → in_review → accepted` | `ed5c4a3` merged `a225261` | https://github.com/franjimenxz/Project-IA/pull/28 |
 | P08-T02 | `blocked → ready` | dependencia P08-T01 aceptada | [P08-T01](../phases/phase-08-second-tenant-onboarding/evidence/P08-T01.md) |
+| P06-T03 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P06-T03-security-suite` |
+| P06-T04 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P06-T04-resilience` |
+| P07-T01 | `ready → in_progress` | asignada a Implementador | worktree `.worktrees/P07-T01-telemetry` |
