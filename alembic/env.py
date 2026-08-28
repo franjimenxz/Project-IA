@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from ia_mcp.configuration.adapters.sqlalchemy import metadata
+from ia_mcp.scheduling.service import metadata as _scheduling_metadata  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
