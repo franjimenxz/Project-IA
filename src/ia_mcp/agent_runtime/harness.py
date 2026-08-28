@@ -55,6 +55,24 @@ class AgentHarness:
         trajectory: list[str] = []
         received = await self._conversations.receive(tenant, message)
         trajectory.append("receive")
+        if received.conversation.status == "human_owned":
+            trajectory.append("guard")
+            run = await self._runs.start(
+                tenant,
+                received.conversation.id,
+                received.message.id,
+                skill=None,
+            )
+            await self._runs.finish(tenant, run.id, "handed_off")
+            return AgentTurnResult(
+                kind="handoff",
+                text=SAFE_HANDOFF,
+                source_ids=(),
+                tenant_id=tenant.tenant_id,
+                run_id=run.id,
+                trajectory=tuple(trajectory),
+                tool_names=(),
+            )
         config = await self._get_config(tenant)
         try:
             self._skills.resolve("faq", config)

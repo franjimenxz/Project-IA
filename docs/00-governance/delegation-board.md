@@ -36,11 +36,11 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P04-T04 | W3 | accepted | P04-T01–P04-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T04-faq-harness.md) |
 | P04-T05 | W3 | accepted | P04-T04 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T05-faq-e2e.md) |
 | P04-T06 | W3 | accepted | P02-T03 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T06-workflow-engine.md) |
-| P04-T07 | W3 | in_review | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
-| P04-T08 | W3 | blocked | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
+| P04-T07 | W3 | accepted | P04-T06, P03-T05 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T07-appointment-search.md) |
+| P04-T08 | W3 | in_progress | P04-T07 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T08-appointment-create.md) |
 | P04-T09 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T09-cancel.md) |
 | P04-T10 | W4 | blocked | P04-T08 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T10-reschedule-confirm.md) |
-| P04-T11 | W4 | in_progress | P04-T04, P04-T06 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T11-handoff.md) |
+| P04-T11 | W4 | accepted | P04-T04, P04-T06 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T11-handoff.md) |
 | P04-T12 | W5 | blocked | P04-T08, P04-T10 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T12-scheduler.md) |
 | P04-T13 | W5 | blocked | P04-T05, P04-T09–P04-T12 | [brief](../phases/phase-04-mvp-vertical-slices/agent-briefs/P04-T13-mvp-e2e.md) |
 | P05-T01 | W6-intake | blocked | P03-T05, P04-T10, EXT-001 | [brief](../phases/phase-05-real-integration/agent-briefs/P05-T01-api-intake.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P04-T05 accepted (PR #15) and P04-T06 accepted (PR #14). En curso: `P04-T07` in_review PR #17, `P04-T11` in_review PR #16. Implementador idle.
+P04-T07 accepted (PR #17) and P04-T11 accepted (PR #16). En curso: `P04-T08` (Implementador 2). Implementador y Implementador 3 idle.
 
 ## Actualización
 
@@ -140,3 +140,6 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P04-T11 | `blocked → ready → in_progress` | dependencias P04-T04 y P04-T06 aceptadas | asignada a Implementador 3 |
 | P04-T07 | `in_progress → in_review` | `38a9158` | https://github.com/franjimenxz/Project-IA/pull/17 |
 | P04-T11 | `in_progress → in_review` | `ed308d3` | https://github.com/franjimenxz/Project-IA/pull/16 |
+| P04-T11 | `in_review → accepted` | `ed308d3` merged `b2e4e0d` | https://github.com/franjimenxz/Project-IA/pull/16 |
+| P04-T07 | `in_review → accepted` | `38a9158` merged PR #17 | https://github.com/franjimenxz/Project-IA/pull/17 |
+| P04-T08 | `blocked → ready → in_progress` | dependencia P04-T07 aceptada | asignada a Implementador 2 |
