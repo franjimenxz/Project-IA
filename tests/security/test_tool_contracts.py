@@ -201,3 +201,24 @@ def test_tool_outside_intersection_never_invokes_transport() -> None:
     assert result.error is not None
     assert result.error.code == ToolErrorCode.FORBIDDEN
     transport.call_tool.assert_not_called()
+
+
+@pytest.mark.security
+def test_transport_without_allowed_hosts_cannot_build() -> None:
+    transport = _TransportSpy()
+    discovered = "crear_turno"
+    tools = {discovered, *CATALOG}
+    with pytest.raises(ValueError) as caught:
+        ToolExecutor(
+            server=tools,
+            tenant=tools,
+            skill=tools,
+            capability=_CapabilitySpy(),
+            resolver=_Resolver(
+                endpoint="http://evil.example/sse",
+                allowed_tools=frozenset(tools),
+            ),
+            transport=transport,
+        )
+    assert "allowed_hosts" in str(caught.value)
+    transport.call_tool.assert_not_called()

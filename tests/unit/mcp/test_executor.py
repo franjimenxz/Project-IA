@@ -479,3 +479,38 @@ def test_tool_outside_intersection_is_forbidden_without_calling_client(
     transport.assert_not_called()
     capability_spy.assert_not_called()
     resolver.assert_not_called()
+
+
+def test_transport_without_allowed_hosts_cannot_build(
+    capability_spy: CapabilitySpy,
+    resolver_spy: ResolverSpy,
+) -> None:
+    transport = TransportSpy()
+    with pytest.raises(ValueError) as caught:
+        ToolExecutor(
+            server=CATALOG | {CREAR_TURNO},
+            tenant=CATALOG | {CREAR_TURNO},
+            skill=CATALOG | {CREAR_TURNO},
+            capability=capability_spy,
+            resolver=resolver_spy,
+            transport=transport,
+        )
+    assert "allowed_hosts" in str(caught.value)
+    transport.assert_not_called()
+
+
+def test_transport_without_resolver_cannot_build(
+    capability_spy: CapabilitySpy,
+) -> None:
+    with pytest.raises(ValueError) as caught:
+        ToolExecutor(
+            server=CATALOG | {CREAR_TURNO},
+            tenant=CATALOG | {CREAR_TURNO},
+            skill=CATALOG | {CREAR_TURNO},
+            capability=capability_spy,
+            allowed_hosts=(ALLOWED_MCP_HOST,),
+            transport=TransportSpy(),
+        )
+    message = str(caught.value)
+    assert "resolver" in message
+    assert "transport" in message or "allowed_hosts" in message
