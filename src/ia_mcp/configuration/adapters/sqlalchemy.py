@@ -85,6 +85,7 @@ audit_event_table = Table(
     Column("actor_id", PGUUID(as_uuid=True), nullable=False),
     Column("action", String(64), nullable=False),
     Column("version", Integer, nullable=True),
+    Column("payload", JSONB, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     ForeignKeyConstraint(["tenant_id"], ["tenant.id"]),
 )

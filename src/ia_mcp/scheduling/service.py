@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
+from ia_mcp.configuration.adapters.sqlalchemy import tenant_table
 from ia_mcp.observability.propagation import inject_payload
 from ia_mcp.scheduling.models import (
     JOB_TYPE,
@@ -31,6 +32,7 @@ from ia_mcp.scheduling.models import (
     SchedulingPolicy,
 )
 from ia_mcp.scheduling.ports import Clock, JobStore
+from ia_mcp.shared.errors import DomainError
 from ia_mcp.tenancy.models import TenantContext
 
 metadata = MetaData()
@@ -277,6 +279,15 @@ class SqlAlchemyJobStore:
 
     async def put(self, job: ScheduledJob) -> ScheduledJob:
         async with self._session_factory() as session, session.begin():
+            status = await session.scalar(
+                select(tenant_table.c.status).where(tenant_table.c.id == job.tenant_id)
+            )
+            if status != "active":
+                raise DomainError(
+                    "tenant_disabled",
+                    "Tenant is not available.",
+                    retryable=False,
+                )
             existing = (
                 (
                     await session.execute(
@@ -330,7 +341,14 @@ class SqlAlchemyJobStore:
                 (
                     await session.execute(
                         select(scheduled_job_table)
+                        .select_from(
+                            scheduled_job_table.join(
+                                tenant_table,
+                                tenant_table.c.id == scheduled_job_table.c.tenant_id,
+                            )
+                        )
                         .where(
+                            tenant_table.c.status == "active",
                             scheduled_job_table.c.scheduled_for <= now,
                             or_(
                                 scheduled_job_table.c.status == "pending",
