@@ -1,11 +1,10 @@
 name: Quality evidence
 
 on:
+  pull_request:
   schedule:
     - cron: "17 6 * * 1"
   workflow_dispatch:
-  release:
-    types: [published]
 
 jobs:
   quality-evidence:
@@ -24,8 +23,8 @@ jobs:
       - name: Performance baseline
         run: python -m ia_mcp.performance run --scenario mvp-baseline --output build/performance.json --baseline evals/baselines/mvp-performance.json
       - name: Resilience suite
-        run: pytest -m resilience tests/resilience -v
+        run: pytest -m resilience tests/resilience -v --junitxml=build/resilience-junit.xml
       - name: Record resilience evidence
-        run: python -m ia_mcp.evals.quality_report record-resilience --passed --source tests/resilience --output build/resilience.json
+        run: python -m ia_mcp.evals.quality_report record-resilience --junit build/resilience-junit.xml --source tests/resilience --output build/resilience.json
       - name: Gate release on quality evidence
         run: python -m ia_mcp.evals.quality_report gate --eval build/evals.json --resilience build/resilience.json --performance build/performance.json --baseline evals/baselines/mvp-performance.json --output build/quality.json

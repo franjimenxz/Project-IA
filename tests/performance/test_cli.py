@@ -48,6 +48,34 @@ def test_cli_run_mvp_baseline_writes_report_and_exits_zero(tmp_path: Path) -> No
     assert report.production_slo_declared is False
 
 
+def test_cli_compare_missing_baseline_exits_nonzero(tmp_path: Path) -> None:
+    current = tmp_path / "current.json"
+    current.write_text(run_scenario("mvp-baseline").model_dump_json(), encoding="utf-8")
+    try:
+        code = main(
+            ["compare", "--baseline", str(tmp_path / "absent.json"), "--current", str(current)]
+        )
+    except OSError as exc:
+        raise AssertionError("compare must fail closed with an exit code") from exc
+    assert code != 0
+
+
+def test_cli_run_missing_baseline_exits_nonzero(tmp_path: Path) -> None:
+    output = tmp_path / "performance.json"
+    code = main(
+        [
+            "run",
+            "--scenario",
+            "mvp-baseline",
+            "--output",
+            str(output),
+            "--baseline",
+            str(tmp_path / "absent.json"),
+        ]
+    )
+    assert code != 0
+
+
 def test_cli_compare_fails_on_latency_regression(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     current = tmp_path / "current.json"

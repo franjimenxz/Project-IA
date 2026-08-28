@@ -53,22 +53,30 @@ def _run(scenario: str, output: Path, baseline: Path) -> int:
     print(report_to_markdown(report), end="")
     if not report.passed:
         return 1
-    if baseline.is_file():
-        comparison = compare_reports(
-            baseline=PerformanceReport.model_validate_json(
-                baseline.read_text(encoding="utf-8")
-            ),
-            current=report,
-        )
-        print(f"baseline_compare: {'PASS' if comparison.passed else 'FAIL'} ({comparison.gate_reason})")
-        return 0 if comparison.passed else 1
-    return 0
+    baseline_text = _read_required(baseline)
+    if baseline_text is None:
+        print(f"missing baseline: {baseline}", file=sys.stderr)
+        return 1
+    comparison = compare_reports(
+        baseline=PerformanceReport.model_validate_json(baseline_text),
+        current=report,
+    )
+    print(f"baseline_compare: {'PASS' if comparison.passed else 'FAIL'} ({comparison.gate_reason})")
+    return 0 if comparison.passed else 1
 
 
 def _compare(baseline: Path, current: Path) -> int:
+    baseline_text = _read_required(baseline)
+    current_text = _read_required(current)
+    if baseline_text is None:
+        print(f"missing baseline: {baseline}", file=sys.stderr)
+        return 1
+    if current_text is None:
+        print(f"missing current report: {current}", file=sys.stderr)
+        return 1
     comparison = compare_reports(
-        baseline=PerformanceReport.model_validate_json(baseline.read_text(encoding="utf-8")),
-        current=PerformanceReport.model_validate_json(current.read_text(encoding="utf-8")),
+        baseline=PerformanceReport.model_validate_json(baseline_text),
+        current=PerformanceReport.model_validate_json(current_text),
     )
     payload = {
         "passed": comparison.passed,
@@ -79,6 +87,13 @@ def _compare(baseline: Path, current: Path) -> int:
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if comparison.passed else 1
+
+
+def _read_required(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None
 
 
 if __name__ == "__main__":

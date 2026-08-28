@@ -6,12 +6,18 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
+from xml.etree.ElementTree import ParseError, parse
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from ia_mcp.evals.report import EvalReport, capture_commit, capture_environment
 from ia_mcp.observability.redaction import redact
-from ia_mcp.performance.models import PerformanceReport, compare_reports
+from ia_mcp.performance.models import (
+    PerformanceReport,
+    compare_reports,
+    file_bytes_hash,
+    report_hash,
+)
 
 DEFAULT_OUTPUT = Path("build/quality.json")
 
@@ -25,6 +31,12 @@ class ResilienceEvidence(BaseModel):
     commit: str
     source: str
     outcomes: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def passed_requires_collected_tests(self) -> ResilienceEvidence:
+        if self.passed and self.test_count < 1:
+            raise ValueError("passed resilience evidence requires test_count > 0")
+        return self
 
 
 class QualityReport(BaseModel):
@@ -83,6 +95,7 @@ def aggregate_quality(
     resilience: ResilienceEvidence,
     performance: PerformanceReport,
     performance_baseline: PerformanceReport | None = None,
+    performance_baseline_hash: str | None = None,
 ) -> QualityReport:
     performance_reason = performance.gate_reason
     performance_passed = performance.passed
@@ -93,8 +106,15 @@ def aggregate_quality(
         performance_reason = (
             "performance_regression" if not comparison.passed else comparison.gate_reason
         )
-        baseline_hash = performance_baseline.baseline_hash
-    if not eval_report.passed:
+        baseline_hash = (
+            performance_baseline_hash
+            if performance_baseline_hash is not None
+            else report_hash(performance_baseline)
+        )
+    if len({eval_report.commit, resilience.commit, performance.commit}) != 1:
+        reason = "provenance_mismatch"
+        passed = False
+    elif not eval_report.passed:
         reason = "eval_failed"
         passed = False
     elif not resilience.passed:
@@ -145,6 +165,42 @@ def record_resilience_evidence(
     )
 
 
+def evidence_from_junit(
+    path: Path,
+    *,
+    source: str,
+    commit: str | None = None,
+) -> ResilienceEvidence:
+    tree = parse(path)
+    root = tree.getroot()
+    suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
+    tests = 0
+    failures = 0
+    errors = 0
+    skipped = 0
+    failed_names: list[str] = []
+    for suite in suites:
+        tests += int(suite.attrib.get("tests", "0"))
+        failures += int(suite.attrib.get("failures", "0"))
+        errors += int(suite.attrib.get("errors", "0"))
+        skipped += int(suite.attrib.get("skipped", "0"))
+        for case in suite.findall("testcase"):
+            if case.find("failure") is None and case.find("error") is None:
+                continue
+            classname = case.attrib.get("classname", "unknown")
+            name = case.attrib.get("name", "unknown")
+            failed_names.append(f"{classname}::{name}")
+    executed = max(tests - skipped, 0)
+    passed = failures == 0 and errors == 0 and executed > 0
+    return record_resilience_evidence(
+        passed=passed,
+        source=source,
+        test_count=executed,
+        failed=tuple(failed_names),
+        commit=commit,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m ia_mcp.evals.quality_report")
     subparsers = parser.add_subparsers(dest="command")
@@ -157,13 +213,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     record = subparsers.add_parser("record-resilience")
     record.add_argument("--source", required=True)
     record.add_argument("--output", type=Path, required=True)
+    record.add_argument("--junit", type=Path, default=None)
     record.add_argument("--test-count", type=int, default=0)
     record.add_argument("--passed", action="store_true")
     args = parser.parse_args(list(argv) if argv is not None else None)
     if args.command == "gate":
         return _gate(args.eval, args.resilience, args.performance, args.baseline, args.output)
     if args.command == "record-resilience":
-        return _record(args.source, args.output, args.test_count, args.passed)
+        return _record(args.source, args.output, args.test_count, args.passed, args.junit)
     parser.print_help(sys.stderr)
     return 2
 
@@ -175,23 +232,24 @@ def _gate(
     baseline_path: Path | None,
     output: Path,
 ) -> int:
-    eval_report = EvalReport.model_validate_json(eval_path.read_text(encoding="utf-8"))
-    resilience = ResilienceEvidence.model_validate_json(
-        resilience_path.read_text(encoding="utf-8")
-    )
-    performance = PerformanceReport.model_validate_json(
-        performance_path.read_text(encoding="utf-8")
-    )
+    eval_report = EvalReport.model_validate_json(_require_text(eval_path))
+    resilience = ResilienceEvidence.model_validate_json(_require_text(resilience_path))
+    performance = PerformanceReport.model_validate_json(_require_text(performance_path))
     baseline = None
-    if baseline_path is not None and baseline_path.is_file():
-        baseline = PerformanceReport.model_validate_json(
-            baseline_path.read_text(encoding="utf-8")
-        )
+    baseline_hash: str | None = None
+    if baseline_path is not None:
+        raw = _require_bytes(baseline_path)
+        if raw is None:
+            print(f"missing baseline: {baseline_path}", file=sys.stderr)
+            return 1
+        baseline = PerformanceReport.model_validate_json(raw.decode("utf-8"))
+        baseline_hash = file_bytes_hash(raw)
     report = aggregate_quality(
         eval_report=eval_report,
         resilience=resilience,
         performance=performance,
         performance_baseline=baseline,
+        performance_baseline_hash=baseline_hash,
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
@@ -204,15 +262,39 @@ def _gate(
     return 0 if report.passed else 1
 
 
-def _record(source: str, output: Path, test_count: int, passed: bool) -> int:
-    evidence = record_resilience_evidence(
-        passed=passed,
-        source=source,
-        test_count=test_count,
-    )
+def _record(
+    source: str,
+    output: Path,
+    test_count: int,
+    passed: bool,
+    junit: Path | None,
+) -> int:
+    del test_count, passed
+    if junit is None:
+        print("resilience evidence must come from pytest junit XML", file=sys.stderr)
+        return 1
+    try:
+        evidence = evidence_from_junit(junit, source=source)
+    except (OSError, ParseError, ValidationError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(evidence.model_dump_json(indent=2), encoding="utf-8")
-    return 0 if passed else 1
+    return 0 if evidence.passed else 1
+
+
+def _require_text(path: Path) -> str:
+    raw = _require_bytes(path)
+    if raw is None:
+        raise OSError(f"missing file: {path}")
+    return raw.decode("utf-8")
+
+
+def _require_bytes(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
 
 
 if __name__ == "__main__":

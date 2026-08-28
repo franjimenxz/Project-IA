@@ -5,6 +5,7 @@ from ia_mcp.performance.models import (
     PerformanceReport,
     QueueAgeMetrics,
     ThroughputMetrics,
+    build_report,
     compare_reports,
     span_latency,
 )
@@ -127,3 +128,46 @@ def test_span_latency_records_percentiles_and_budget() -> None:
     _ = ThroughputMetrics(operations_per_second=1.0, completed=1, duration_ms=1000.0)
     _ = ErrorMetrics(count=0, rate=0.0)
     _ = QueueAgeMetrics(p50_ms=1.0, p95_ms=2.0, max_ms=3.0, depth=1)
+
+
+def test_build_report_fails_when_span_p95_exceeds_budget() -> None:
+    search = span_latency("knowledge.search", (10.0, 250.0), budget_ms=200.0)
+    report = build_report(
+        scenario="mvp-baseline",
+        latency_by_span={"knowledge.search": search},
+        throughput=ThroughputMetrics(operations_per_second=10.0, completed=2, duration_ms=200.0),
+        errors=ErrorMetrics(count=0, rate=0.0),
+        queue_age_metrics=QueueAgeMetrics(p50_ms=1.0, p95_ms=2.0, max_ms=3.0, depth=1),
+        dataset_hash="d" * 64,
+        dataset_path="evals/datasets/mvp.jsonl",
+        model_provider="fake",
+        model_name="fake-llm",
+        config_summary={"scenario": "mvp-baseline"},
+        commit="abc123",
+        environment={"python": "3.13.12", "platform": "test"},
+    )
+    assert search.p95_ms > search.budget_ms
+    assert report.passed is False
+    assert "knowledge.search:p95>" in report.gate_reason
+
+
+def test_compare_reports_fails_when_current_omits_baseline_span() -> None:
+    baseline = _report(search_p95=20.0)
+    current = PerformanceReport.model_validate(
+        _payload(
+            latency_by_span={
+                "llm.generate": {
+                    "span_name": "llm.generate",
+                    "p50_ms": 10.0,
+                    "p95_ms": 20.0,
+                    "p99_ms": 20.0,
+                    "max_ms": 20.0,
+                    "count": 2,
+                    "budget_ms": 500.0,
+                }
+            }
+        )
+    )
+    comparison = compare_reports(baseline=baseline, current=current)
+    assert comparison.passed is False
+    assert any(item.metric == "latency.knowledge.search.missing" for item in comparison.regressions)

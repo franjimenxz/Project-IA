@@ -188,6 +188,10 @@ def report_hash(report: PerformanceReport) -> str:
     return sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def file_bytes_hash(payload: bytes) -> str:
+    return sha256(payload).hexdigest()
+
+
 def build_report(
     *,
     scenario: str,
