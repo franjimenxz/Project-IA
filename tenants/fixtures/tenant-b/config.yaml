@@ -1,0 +1,24 @@
+schema_version: 1
+version: 1
+agent:
+  tone: formal
+enabled_skills:
+  - faq
+  - appointments
+enabled_tools:
+  - appointments.search
+  - appointments.get
+  - appointments.create
+appointments:
+  required_fields:
+    - specialty
+    - practitioner
+    - date_from
+    - date_to
+knowledge:
+  namespace: tenant-b
+mcp:
+  server_id: fake-appointments-b
+handoff: {}
+feature_flags:
+  simulated_channel: true
