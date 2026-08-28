@@ -30,7 +30,15 @@ namespaces = true
 testpaths = ["tests"]
 pythonpath = [".", "src"]
 addopts = ["--import-mode=importlib"]
-markers = ["integration: requires PostgreSQL", "contract: appointment capability contract suite", "security: tenant isolation and authz", "e2e: end-to-end slice suites", "resilience: crash, timeout, and concurrent failure suites"]
+markers = [
+    "integration: requires PostgreSQL",
+    "contract: appointment capability contract suite",
+    "security: tenant isolation and authz",
+    "e2e: end-to-end slice suites",
+    "resilience: crash, timeout, and concurrent failure suites",
+    "eval: agent trajectory evaluation",
+    "performance: controlled load and design-budget scenarios",
+]
 
 [tool.ruff]
 target-version = "py313"

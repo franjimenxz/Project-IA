@@ -1,0 +1,31 @@
+name: Quality evidence
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  quality-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install quality dependencies
+        run: python -m pip install ".[quality]"
+      - name: Performance and quality unit tests
+        run: pytest tests/performance tests/evals/unit -v
+      - name: Eval smoke
+        run: python -m ia_mcp.evals run --suite smoke --provider fake --output build/evals.json
+      - name: Performance baseline
+        run: python -m ia_mcp.performance run --scenario mvp-baseline --output build/performance.json --baseline evals/baselines/mvp-performance.json
+      - name: Resilience suite
+        run: pytest -m resilience tests/resilience -v
+      - name: Record resilience evidence
+        run: python -m ia_mcp.evals.quality_report record-resilience --passed --source tests/resilience --output build/resilience.json
+      - name: Gate release on quality evidence
+        run: python -m ia_mcp.evals.quality_report gate --eval build/evals.json --resilience build/resilience.json --performance build/performance.json --baseline evals/baselines/mvp-performance.json --output build/quality.json
