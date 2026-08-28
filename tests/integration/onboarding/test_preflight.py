@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 from alembic.config import Config
 from sqlalchemy import create_engine, func, select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from alembic import command
@@ -23,7 +25,16 @@ from ia_mcp.configuration.models import (
     TenantConfigDraft,
 )
 from ia_mcp.configuration.service import ConfigurationService
-from ia_mcp.onboarding.commands import OnboardingError, Principal, load_tenant_package
+from ia_mcp.knowledge.adapters.object_store import InMemoryObjectStore
+from ia_mcp.knowledge.adapters.sqlalchemy import SqlAlchemyKnowledgeRepository
+from ia_mcp.knowledge.models import DocumentSource
+from ia_mcp.knowledge.service import KnowledgeService
+from ia_mcp.onboarding.commands import (
+    OnboardingError,
+    Principal,
+    ProvisionedTenant,
+    load_tenant_package,
+)
 from ia_mcp.onboarding.preflight import (
     PREFLIGHT_CHECK_NAMES,
     CheckOutcome,
@@ -35,6 +46,7 @@ from ia_mcp.onboarding.validator import validate_package
 from ia_mcp.shared.errors import TenantIsolationViolation
 from ia_mcp.tenancy.models import TenantContext
 from ia_mcp.tenancy.service import TenantResolutionError, TenantService
+from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
 from tests.unit.onboarding.helpers import write_package
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -105,6 +117,17 @@ def _package_root(root: Path, slug: str = "tenant-b") -> Path:
             ],
         },
         knowledge={"namespace": slug},
+        evals=[
+            {
+                "case_id": f"{slug}-faq-001",
+                "tenant_fixture": slug,
+                "config_version": 1,
+                "expected_skill": "faq",
+                "allowed_tools": [],
+                "forbidden_tools": ["appointments.create"],
+                "messages": [{"role": "user", "text": "horario sucursal norte"}],
+            }
+        ],
     )
 
 
@@ -417,3 +440,221 @@ async def test_activate_enables_channel_then_disable_blocks_resolve(
     with pytest.raises(TenantResolutionError) as after:
         await resolver.resolve("simulated", "tenant-b-simulated")
     assert after.value.code == "disabled_channel_account"
+
+
+def _admin_for(provisioned: ProvisionedTenant) -> TenantAdminContext:
+    return TenantAdminContext(
+        identity=provisioned.identity,
+        principal_id=PLATFORM.principal_id,
+        roles=PLATFORM.roles,
+        correlation_id=uuid4(),
+    )
+
+
+def _passing_check_payload() -> list[dict[str, object]]:
+    return [
+        {
+            "name": name,
+            "passed": True,
+            "severity": "critical",
+            "code": "ok",
+            "message": "ok",
+        }
+        for name in PREFLIGHT_CHECK_NAMES
+    ]
+
+
+async def _tenant_status(engine: AsyncEngine, tenant_id: UUID) -> str | None:
+    async with engine.connect() as connection:
+        status = await connection.scalar(
+            select(tenant_table.c.status).where(tenant_table.c.id == tenant_id)
+        )
+    return str(status) if status is not None else None
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_updated_failed_report_cannot_activate(
+    tmp_path: Path, engine: AsyncEngine
+) -> None:
+    service = _service(engine, checks=stub_checks(fail="retrieval_canary"))
+    root = _package_root(tmp_path / "b")
+    h1 = validate_package(root).content_hash
+    assert h1 is not None
+    provisioned = await service.provision(load_tenant_package(root), PLATFORM)
+    report = await service.preflight(tenant_context_for(provisioned), content_hash=h1)
+    assert report.passed is False
+    admin = _admin_for(provisioned)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE preflight_report SET passed = true, "
+                    "checks = CAST(:checks AS jsonb) WHERE report_hash = :h"
+                ),
+                {
+                    "checks": json.dumps(_passing_check_payload()),
+                    "h": report.report_hash,
+                },
+            )
+    except DBAPIError as exc:
+        assert "immutable" in str(exc).lower()
+    with pytest.raises(OnboardingError) as denied:
+        await service.activate(admin, report.report_hash)
+    assert denied.value.code in {"stale_preflight", "preflight_failed"}
+    assert await _tenant_status(engine, provisioned.identity.tenant_id) == "disabled"
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_rewritten_content_hash_cannot_activate_with_old_hash(
+    tmp_path: Path, engine: AsyncEngine
+) -> None:
+    service = _service(engine)
+    root = _package_root(tmp_path / "b")
+    h1 = validate_package(root).content_hash
+    assert h1 is not None
+    provisioned = await service.provision(load_tenant_package(root), PLATFORM)
+    report = await service.preflight(tenant_context_for(provisioned), content_hash=h1)
+    assert report.passed is True
+    h2 = "b" * 64
+    assert h2 != h1
+    admin = _admin_for(provisioned)
+    mutated = True
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "UPDATE preflight_report SET content_hash = :h2 "
+                    "WHERE report_hash = :h"
+                ),
+                {"h2": h2, "h": report.report_hash},
+            )
+            await connection.execute(
+                text(
+                    "UPDATE tenant_onboarding_state SET package_content_hash = :h2 "
+                    "WHERE tenant_id = :tenant_id"
+                ),
+                {"h2": h2, "tenant_id": provisioned.identity.tenant_id},
+            )
+    except DBAPIError as exc:
+        assert "immutable" in str(exc).lower()
+        mutated = False
+    if mutated:
+        with pytest.raises(OnboardingError) as denied:
+            await service.activate(admin, report.report_hash)
+        assert denied.value.code == "stale_preflight"
+    else:
+        async with engine.connect() as connection:
+            stored = await connection.scalar(
+                text("SELECT content_hash FROM preflight_report WHERE report_hash = :h"),
+                {"h": report.report_hash},
+            )
+        assert stored == h1
+    assert await _tenant_status(engine, provisioned.identity.tenant_id) == "disabled"
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_preflight_report_delete_is_rejected(
+    tmp_path: Path, engine: AsyncEngine
+) -> None:
+    service = _service(engine, checks=stub_checks(fail="retrieval_canary"))
+    root = _package_root(tmp_path / "b")
+    h1 = validate_package(root).content_hash
+    assert h1 is not None
+    provisioned = await service.provision(load_tenant_package(root), PLATFORM)
+    report = await service.preflight(tenant_context_for(provisioned), content_hash=h1)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM preflight_report WHERE report_hash = :h"),
+                {"h": report.report_hash},
+            )
+    except DBAPIError as exc:
+        assert "immutable" in str(exc).lower()
+    else:
+        pytest.fail("preflight_report DELETE must be rejected")
+    with pytest.raises(OnboardingError):
+        await service.activate(_admin_for(provisioned), report.report_hash)
+    assert await _tenant_status(engine, provisioned.identity.tenant_id) == "disabled"
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_retrieval_canary_fails_when_knowledge_unpublished(
+    tmp_path: Path, engine: AsyncEngine
+) -> None:
+    service = TenantOnboardingService(engine)
+    root = _package_root(tmp_path / "b")
+    h1 = validate_package(root).content_hash
+    assert h1 is not None
+    provisioned = await service.provision(load_tenant_package(root), PLATFORM)
+    report = await service.preflight(tenant_context_for(provisioned), content_hash=h1)
+    retrieval = next(item for item in report.checks if item.name == "retrieval_canary")
+    assert retrieval.passed is False
+    assert retrieval.code == "knowledge_unpublished"
+    admin = _admin_for(provisioned)
+    with pytest.raises(OnboardingError) as denied:
+        await service.activate(admin, report.report_hash)
+    assert denied.value.code == "preflight_failed"
+    assert await _tenant_status(engine, provisioned.identity.tenant_id) == "disabled"
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_retrieval_canary_observes_published_own_not_foreign(
+    tmp_path: Path, engine: AsyncEngine
+) -> None:
+    service = TenantOnboardingService(engine)
+    root_a = _package_root(tmp_path / "a", slug="tenant-a")
+    root_b = _package_root(tmp_path / "b", slug="tenant-b")
+    tenant_a = await service.provision(load_tenant_package(root_a), PLATFORM)
+    tenant_b = await service.provision(load_tenant_package(root_b), PLATFORM)
+    knowledge = KnowledgeService(
+        repository=SqlAlchemyKnowledgeRepository(engine),
+        parser=FakeParser(),
+        chunker=FakeChunker(),
+        embeddings=FakeEmbedding(),
+        object_store=InMemoryObjectStore(),
+    )
+    draft_a = await knowledge.ingest(
+        tenant_context_for(tenant_a),
+        DocumentSource(
+            filename="hours-a.txt",
+            payload=b"canary-tenant-a clinic hours eight to sixteen",
+            mime_type="text/plain",
+        ),
+    )
+    draft_b = await knowledge.ingest(
+        tenant_context_for(tenant_b),
+        DocumentSource(
+            filename="hours-b.txt",
+            payload=b"canary-tenant-b night hours closed exclusive",
+            mime_type="text/plain",
+        ),
+    )
+    await knowledge.publish(tenant_context_for(tenant_a), draft_a.document_id, draft_a.version)
+    await knowledge.publish(tenant_context_for(tenant_b), draft_b.document_id, draft_b.version)
+    h_b = validate_package(root_b).content_hash
+    assert h_b is not None
+    report = await service.preflight(tenant_context_for(tenant_b), content_hash=h_b)
+    retrieval = next(item for item in report.checks if item.name == "retrieval_canary")
+    assert retrieval.passed is True
+    assert retrieval.code == "ok"
+
+    leaked = await knowledge.ingest(
+        tenant_context_for(tenant_b),
+        DocumentSource(
+            filename="leaked.txt",
+            payload=b"canary-tenant-a should never be retrieved for tenant-b",
+            mime_type="text/plain",
+        ),
+    )
+    await knowledge.publish(tenant_context_for(tenant_b), leaked.document_id, leaked.version)
+    leaked_report = await service.preflight(tenant_context_for(tenant_b), content_hash=h_b)
+    leaked_retrieval = next(
+        item for item in leaked_report.checks if item.name == "retrieval_canary"
+    )
+    assert leaked_retrieval.passed is False
+    assert leaked_retrieval.code == "foreign_canary"

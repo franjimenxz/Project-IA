@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Literal, Protocol
@@ -30,6 +31,7 @@ from ia_mcp.configuration.adapters.sqlalchemy import (
     tenant_table,
 )
 from ia_mcp.configuration.models import TenantConfigDraft
+from ia_mcp.knowledge.adapters.sqlalchemy import SqlAlchemyKnowledgeRepository
 from ia_mcp.observability.redaction import redact
 from ia_mcp.observability.run_query import RunInvestigationQuery, RunNotFound
 from ia_mcp.shared.errors import TenantIsolationViolation
@@ -223,7 +225,7 @@ def default_preflight_checks(
         SchemaPolicyCheck(engine),
         SecretResolvabilityCheck(engine, secrets or _FailClosedSecrets()),
         UniqueChannelCheck(engine),
-        RetrievalCanaryCheck(retrieval or _UnpublishedRetrieval()),
+        RetrievalCanaryCheck(retrieval or KnowledgeStoreRetrieval(engine)),
         McpHealthCheck(mcp_health or _FailClosedMcp()),
         EvalSmokeCheck(eval_smoke or _FailClosedEval()),
         ObservabilityQueryCheck(investigation_query),
@@ -302,6 +304,35 @@ class UniqueChannelCheck:
         if len(keys) != len(set(keys)):
             return _failed(self.name, "duplicate_channel", "Channel mapping must be unique.")
         return _passed(self.name)
+
+
+_CANARY_RE = re.compile(r"canary-([a-z0-9]+(?:-[a-z0-9]+)*)")
+
+
+class KnowledgeStoreRetrieval:
+    def __init__(self, engine: AsyncEngine) -> None:
+        self._repository = SqlAlchemyKnowledgeRepository(engine)
+
+    async def observe(self, tenant: TenantContext) -> RetrievalCanaryObservation:
+        chunks = await self._repository.search_published(tenant, 50)
+        if not chunks:
+            return RetrievalCanaryObservation(
+                published=False, own_hit=False, foreign_hit=False
+            )
+        own_hit = False
+        foreign_hit = False
+        for chunk in chunks:
+            if chunk.tenant_id != tenant.tenant_id:
+                foreign_hit = True
+                continue
+            for marker in _CANARY_RE.findall(chunk.text):
+                if marker == tenant.tenant_slug:
+                    own_hit = True
+                else:
+                    foreign_hit = True
+        return RetrievalCanaryObservation(
+            published=True, own_hit=own_hit, foreign_hit=foreign_hit
+        )
 
 
 class RetrievalCanaryCheck:
@@ -424,13 +455,6 @@ class RollbackInputsCheck:
 class _FailClosedSecrets:
     async def resolvable(self, tenant: TenantContext, reference: str) -> bool:
         return False
-
-
-class _UnpublishedRetrieval:
-    async def observe(self, tenant: TenantContext) -> RetrievalCanaryObservation:
-        return RetrievalCanaryObservation(
-            published=False, own_hit=False, foreign_hit=False
-        )
 
 
 class _FailClosedMcp:
