@@ -3,5 +3,5 @@ namespace: tenant-b
 documents:
   - logical_name: hours-b
     source: object://synthetic/tenant-b/hours
-    checksum: a0bd220ca3d2738be3a0cdeb1e5c9aa0866e716043ea9bf081637a432c1ab1ab
+    checksum: c96e699c463d70be3a85e4ef43ab96d7e2d4aff65b340c68c4bc70a3a5bb1460
     mime_type: text/plain
