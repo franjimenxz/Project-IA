@@ -50,7 +50,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 | P06-T01 | W6 | in_review | P04-T05, P04-T08 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T01-eval-dataset.md) |
 | P06-T02 | W6 | blocked | P06-T01 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T02-eval-runner.md) |
 | P06-T03 | W6 | ready | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T03-security-suite.md) |
-| P06-T04 | W6 | ready | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
+| P06-T04 | W6 | accepted | P04-T13 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T04-resilience.md) |
 | P06-T05 | W6 | blocked | P06-T02–P06-T04 | [brief](../phases/phase-06-verification-and-evals/agent-briefs/P06-T05-performance-report.md) |
 | P07-T01 | W6 | ready | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T01-telemetry.md) |
 | P07-T02 | W6 | ready | P04-T13 | [brief](../phases/phase-07-operability-and-observability/agent-briefs/P07-T02-run-query.md) |
@@ -63,7 +63,7 @@ Un brief `ready` significa que su especificación está completa; no habilita ej
 
 ## Primer paso
 
-P06-T01 in_review (PR #26; conformidad PASS, calidad PASS). Ready: P06-T03, P06-T04, P07-T01, P07-T02, P08-T01. Imp1–3 idle.
+P06-T04 accepted (PR #29). P06-T05 stays blocked until P06-T02 and P06-T03 also accepted. P06-T01 in_review (PR #26). Ready: P06-T03, P07-T01, P07-T02, P08-T01. Imp1–3 idle.
 
 ## Actualización
 
@@ -162,3 +162,5 @@ Sólo el coordinador edita estados. Cada transición cita commit y evidencia en 
 | P07-T02 | `blocked → ready` | dependencia P04-T13 aceptada | [P04-T13](../phases/phase-04-mvp-vertical-slices/evidence/P04-T13.md) |
 | P08-T01 | `blocked → ready` | dependencia P04-T13 aceptada | [P04-T13](../phases/phase-04-mvp-vertical-slices/evidence/P04-T13.md) |
 | P06-T01 | `ready → in_review` | `9d0b1ba`, `ecda2b9` | https://github.com/franjimenxz/Project-IA/pull/26 |
+| P06-T04 | `ready → in_review` | `5c47db7`, `06b9a01` | https://github.com/franjimenxz/Project-IA/pull/29 |
+| P06-T04 | `in_review → accepted` | `06b9a01` merged `c411002` | https://github.com/franjimenxz/Project-IA/pull/29 |
