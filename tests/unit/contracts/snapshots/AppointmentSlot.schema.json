@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "slot_id": {
+      "minLength": 1,
+      "title": "Slot Id",
+      "type": "string"
+    },
+    "starts_at": {
+      "format": "date-time",
+      "title": "Starts At",
+      "type": "string"
+    },
+    "ends_at": {
+      "format": "date-time",
+      "title": "Ends At",
+      "type": "string"
+    },
+    "specialty": {
+      "minLength": 1,
+      "title": "Specialty",
+      "type": "string"
+    },
+    "practitioner": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Practitioner"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Location"
+    },
+    "booking_token": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Booking Token"
+    }
+  },
+  "required": [
+    "slot_id",
+    "starts_at",
+    "ends_at",
+    "specialty"
+  ],
+  "title": "AppointmentSlot",
+  "type": "object"
+}

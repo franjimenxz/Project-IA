@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "AppointmentStatus": {
+      "enum": [
+        "scheduled",
+        "pending_confirmation",
+        "confirmed",
+        "cancelled",
+        "rescheduled"
+      ],
+      "title": "AppointmentStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "appointment_id": {
+      "minLength": 1,
+      "title": "Appointment Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/AppointmentStatus"
+    },
+    "starts_at": {
+      "format": "date-time",
+      "title": "Starts At",
+      "type": "string"
+    },
+    "ends_at": {
+      "format": "date-time",
+      "title": "Ends At",
+      "type": "string"
+    },
+    "specialty": {
+      "minLength": 1,
+      "title": "Specialty",
+      "type": "string"
+    },
+    "practitioner": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Practitioner"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Location"
+    }
+  },
+  "required": [
+    "appointment_id",
+    "status",
+    "starts_at",
+    "ends_at",
+    "specialty"
+  ],
+  "title": "Appointment",
+  "type": "object"
+}
