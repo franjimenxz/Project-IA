@@ -192,6 +192,43 @@ async def test_concurrent_publish_allocates_distinct_versions(
 
 @pytest.mark.anyio
 @pytest.mark.integration
+async def test_repeated_publish_tolerates_an_existing_tenant_row(
+    config_service: ConfigurationService,
+) -> None:
+    """A second publish must not trip over the tenant row the first one wrote.
+
+    `tenant` carries a unique index on `slug` besides its primary key, so the
+    insert that ensures the row exists has to stay silent on either of them.
+    """
+    await config_service.publish(TENANT_A_ADMIN_CTX, draft(tone="cordial"))
+    republished = await config_service.publish(TENANT_A_ADMIN_CTX, draft(tone="formal"))
+    assert republished.version == 2
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
+async def test_publish_rejects_a_slug_another_tenant_already_owns(
+    config_service: ConfigurationService,
+) -> None:
+    """Two tenants claiming one slug is a conflict, not a race.
+
+    Staying silent here would defer the failure to a foreign key violation, so
+    the caller gets a typed error naming the real cause instead.
+    """
+    await config_service.publish(TENANT_A_ADMIN_CTX, draft(tone="cordial"))
+    impostor = TenantAdminContext(
+        identity=TenantIdentity(tenant_id=uuid4(), tenant_slug="tenant-a"),
+        principal_id=TENANT_A_ADMIN_CTX.principal_id,
+        roles=TENANT_A_ADMIN_CTX.roles,
+        correlation_id=uuid4(),
+    )
+    with pytest.raises(ConfigurationError) as error:
+        await config_service.publish(impostor, draft(tone="formal"))
+    assert error.value.code == "slug_taken"
+
+
+@pytest.mark.anyio
+@pytest.mark.integration
 async def test_repository_rejects_cross_tenant_access(
     config_service: ConfigurationService,
 ) -> None:
