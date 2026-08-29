@@ -26,6 +26,8 @@ flowchart LR
     P6 --> P8
     P7 --> P8
     P8 --> P9[Fase 9\nMCP discovery]
+    P9 --> P10[Fase 10\nComposition root]
+    P10 --> P11[Fase 11\nLoop de tool calls]
 ```
 
 ## Estrategia de entrega
@@ -48,6 +50,8 @@ La arquitectura y los contratos se estabilizan primero. A continuación se imple
 | W7-prep | Fase 8 package/provision disabled | Fase 4 aceptada | Segundo package validado sin activar |
 | W7-activate | Fase 8 preflight/activación/prueba final | Fases 5, 6 y 7 aceptadas | Segundo tenant sin cambios específicos en Core |
 | W8 | Fase 9 MCP discovery e invocación genérica | Fase 8 aceptada (P08-T04); ADR-005 aceptado | Instituciones usan catálogo MCP propio vía `tools/list`; Core sin catálogo cerrado |
+| W9 | Fase 10 composition root | Fase 9 aceptada (P09-T04) | Un proceso real deja listos los collaborators que hoy sólo inyectan los tests |
+| W10 | Fase 11 loop de tool calls en el turno | P10-T01 aceptada; ADR-006 aceptado | El modelo ejecuta una tool de lectura ya autorizada y su resultado vuelve en la iteración siguiente |
 
 ## Gates globales
 
@@ -108,6 +112,10 @@ Gate de salida de Fase 9. Entrada: G5 y P08-T04 aceptada.
 - invocación genérica `tools/call` con host/scheme allowlist fail-closed;
 - dispatch canónico `appointments.*` preservado (ADR-003);
 - AC-P09-001–AC-P09-012 aceptados.
+
+### Fases 10 y 11
+
+No agregan gate global. Cierran contra sus propios criterios: `AC-P10-001`–`AC-P10-006` y `AC-P11-001`–`AC-P11-012`, según declaran sus README. G6 sigue siendo el último gate global del roadmap.
 
 ## Política de replanificación
 
