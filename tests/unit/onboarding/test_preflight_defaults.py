@@ -16,12 +16,17 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ia_mcp.configuration.adapters.environment_secrets import (
+    EnvironmentSecretResolver,
+)
 from ia_mcp.onboarding.activation import assert_report_allows_activation
 from ia_mcp.onboarding.commands import OnboardingError
 from ia_mcp.onboarding.preflight import (
     PREFLIGHT_CHECK_NAMES,
     CheckOutcome,
     PreflightCheckPort,
+    ResolvableSecretReferences,
+    SecretResolvabilityCheck,
     default_preflight_checks,
     report_from_outcomes,
 )
@@ -32,6 +37,8 @@ UNREACHABLE_DATABASE_URL = "postgresql+psycopg://ia_mcp@127.0.0.1:1/ia_mcp_prefl
 TENANT_ID = UUID("33333333-3333-3333-3333-333333333333")
 CONTENT_HASH = "a" * 64
 CONFIG_HASH = "b" * 64
+REFERENCE = "sm://tenant-b/mcp/appointments"
+VARIABLE = "IA_MCP_SECRET_TENANT_B_MCP_APPOINTMENTS"
 
 # Checks whose port has no adapter in `src/` and that hold no database session.
 SESSIONLESS_FAIL_CLOSED = {
@@ -57,6 +64,19 @@ def _defaults() -> dict[str, PreflightCheckPort]:
 
 def test_defaults_cover_every_required_check() -> None:
     assert tuple(_defaults()) == PREFLIGHT_CHECK_NAMES
+
+
+def test_the_fail_closed_secret_port_is_replaceable_by_the_real_resolver() -> None:
+    """The default refuses every reference; a wired resolver answers for real."""
+    default = _defaults()["secrets_resolvable"]
+    assert isinstance(default, SecretResolvabilityCheck)
+    assert asyncio.run(default.secrets.resolvable(_tenant(), REFERENCE)) is False
+    wired = SecretResolvabilityCheck(
+        create_async_engine(UNREACHABLE_DATABASE_URL),
+        ResolvableSecretReferences(EnvironmentSecretResolver({VARIABLE: "canary"})),
+    )
+    assert asyncio.run(wired.secrets.resolvable(_tenant(), REFERENCE)) is True
+    assert asyncio.run(wired.secrets.resolvable(_tenant(), "sm://tenant-b/absent")) is False
 
 
 def test_ports_without_an_adapter_fail_closed() -> None:

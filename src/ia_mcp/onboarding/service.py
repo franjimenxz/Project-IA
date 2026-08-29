@@ -669,6 +669,15 @@ class TenantOnboardingService:
             )
         )
 
+    @property
+    def preflight_checks(self) -> tuple[PreflightCheckPort, ...]:
+        """The checks a preflight will run.
+
+        Published so a composition root's wiring is verifiable: which ports a
+        deployment ended up with decides whether activation is reachable.
+        """
+        return self._checks
+
     async def get_by_slug(self, slug: str) -> ProvisionedTenant | None:
         return await self._store.get_by_slug(slug)
 

@@ -20,6 +20,7 @@ from ia_mcp.onboarding.models import TenantPackage
 from ia_mcp.onboarding.preflight import PreflightReport
 from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.tenancy.models import TenantContext, TenantIdentity
+from tests.fixtures.admin_auth import admin_authenticator, bearer
 from tests.unit.onboarding.helpers import write_package
 
 PLATFORM = Principal(
@@ -28,6 +29,7 @@ PLATFORM = Principal(
 )
 TENANT_ID = UUID("22222222-2222-2222-2222-222222222222")
 SLUG = "tenant-b"
+TOKEN = "svctest-package-path-token"
 ZERO_HASH = "0" * 64
 ONE_HASH = "1" * 64
 
@@ -77,6 +79,7 @@ def _client(
     packages_dir: Path | None = None,
     principal: Principal | None = PLATFORM,
 ) -> TestClient:
+    """A client that presents `TOKEN`, authenticated as `principal`."""
     app = FastAPI()
     app.include_router(create_onboarding_router())
     if service is not None:
@@ -84,8 +87,8 @@ def _client(
     if packages_dir is not None:
         app.state.tenant_packages_dir = packages_dir
     if principal is not None:
-        app.state.principal = principal
-    return TestClient(app)
+        app.state.admin_authenticator = admin_authenticator({TOKEN: principal})
+    return TestClient(app, headers=bearer(TOKEN))
 
 
 def _escaping_symlink(tmp_path: Path) -> tuple[Path, str]:
@@ -260,6 +263,19 @@ def test_missing_identity_is_refused_before_the_wiring_is_reported(
         json={"package_path": "b"},
     )
     assert response.status_code == 401
+
+
+def test_a_token_the_process_does_not_know_is_refused(tmp_path: Path) -> None:
+    """The root is configured and the package is valid; only the token is not."""
+    service = StubOnboardingService()
+    write_package(tmp_path / "b")
+    response = _client(service, packages_dir=tmp_path).post(
+        "/v1/admin/tenants/provision",
+        json={"package_path": "b"},
+        headers=bearer("svctest-not-the-configured-one"),
+    )
+    assert response.status_code == 401
+    assert service.packages == []
 
 
 def test_non_platform_admin_is_refused_before_the_root_is_read(tmp_path: Path) -> None:

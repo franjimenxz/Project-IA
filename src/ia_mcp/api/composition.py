@@ -16,6 +16,18 @@ Development reads three variables:
   HTTP boundary may read tenant packages from. It is the only root that
   boundary accepts, so without it every request naming a `package_path` is
   refused. The CLI is unaffected: an operator keeps passing local paths.
+
+Two more are read in every environment, not only in development, because they
+decide who may reach the administrative plane and how a credential is found:
+
+- `IA_MCP_ADMIN_PRINCIPALS`, the roster of administrative principals and the
+  `sm://` reference naming each one's service token (see
+  `ia_mcp.api.auth.service_token`). Without it no principal is declared and
+  every administrative endpoint answers 401.
+- `IA_MCP_SECRET_*`, the values those references resolve to, read by
+  `EnvironmentSecretResolver`. The same resolver backs the preflight secret
+  check, so a tenant whose declared references are not exported cannot be
+  activated.
 """
 
 from __future__ import annotations
@@ -36,6 +48,11 @@ from ia_mcp.agent_runtime.harness import AgentHarness
 from ia_mcp.agent_runtime.models import LLMDecision
 from ia_mcp.agent_runtime.ports import FakeLLM
 from ia_mcp.agent_runtime.run_repository import SqlAlchemyAgentRunRepository
+from ia_mcp.api.auth.service_token import (
+    ServiceTokenAuthenticator,
+    admin_bindings_from,
+)
+from ia_mcp.configuration.adapters.environment_secrets import EnvironmentSecretResolver
 from ia_mcp.configuration.adapters.sqlalchemy import SqlAlchemyConfigRepository
 from ia_mcp.configuration.models import TenantConfig
 from ia_mcp.configuration.service import ConfigurationService
@@ -50,6 +67,10 @@ from ia_mcp.mcp.executor import (
     ToolExecutor,
 )
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
+from ia_mcp.onboarding.preflight import (
+    ResolvableSecretReferences,
+    default_preflight_checks,
+)
 from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.adapters.sqlalchemy import (
@@ -164,6 +185,21 @@ def mcp_endpoints_from(environ: Mapping[str, str]) -> dict[str, str]:
     return endpoints
 
 
+def admin_authenticator_from(
+    environ: Mapping[str, str],
+) -> ServiceTokenAuthenticator | None:
+    """Authenticator for the administrative plane, or nothing when unconfigured.
+
+    Built in every environment, unlike the runtime graph: authentication is not
+    a development convenience. An empty roster publishes no authenticator at
+    all, so the boundary refuses every caller instead of trusting one.
+    """
+    bindings = admin_bindings_from(environ)
+    if not bindings:
+        return None
+    return ServiceTokenAuthenticator(bindings, EnvironmentSecretResolver(environ))
+
+
 def tenant_packages_dir_from(environ: Mapping[str, str]) -> Path | None:
     """Root the onboarding HTTP boundary may read tenant packages from.
 
@@ -237,7 +273,13 @@ def build_runtime(
             allowed_hosts=hosts,
             transport=transport,
         ),
-        onboarding_service=TenantOnboardingService(engine),
+        onboarding_service=TenantOnboardingService(
+            engine,
+            checks=default_preflight_checks(
+                engine,
+                secrets=ResolvableSecretReferences(EnvironmentSecretResolver(environ)),
+            ),
+        ),
         tenant_packages_dir=tenant_packages_dir_from(environ),
     )
 

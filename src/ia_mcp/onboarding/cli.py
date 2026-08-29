@@ -9,8 +9,13 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ia_mcp.configuration.adapters.environment_secrets import EnvironmentSecretResolver
 from ia_mcp.observability.redaction import redact
 from ia_mcp.onboarding.commands import OnboardingError, Principal, load_tenant_package
+from ia_mcp.onboarding.preflight import (
+    ResolvableSecretReferences,
+    default_preflight_checks,
+)
 from ia_mcp.onboarding.service import (
     TenantOnboardingService,
     admin_context_for,
@@ -61,10 +66,23 @@ def main(
 
 
 def default_onboarding_service() -> TenantOnboardingService | None:
+    """Compose the service an operator's command runs against.
+
+    The secret check reads the same environment the HTTP process does, so a
+    `preflight` from the CLI and one from the API agree on which references
+    this host can resolve.
+    """
     url = os.environ.get("DATABASE_URL", "").strip()
     if not url:
         return None
-    return TenantOnboardingService(create_async_engine(url))
+    engine = create_async_engine(url)
+    return TenantOnboardingService(
+        engine,
+        checks=default_preflight_checks(
+            engine,
+            secrets=ResolvableSecretReferences(EnvironmentSecretResolver(os.environ)),
+        ),
+    )
 
 
 async def _dispatch(args: argparse.Namespace, service: TenantOnboardingService) -> int:
