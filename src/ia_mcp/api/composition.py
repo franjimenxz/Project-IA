@@ -4,7 +4,7 @@ Builds the collaborator graph the HTTP process needs to run a turn and hands it
 to `create_app`. It only constructs and connects existing collaborators: no
 domain rule, no tenant branch and no credential value lives here.
 
-Development reads two variables:
+Development reads three variables:
 
 - `DATABASE_URL`, already used by `ia_mcp.onboarding.cli`.
 - `IA_MCP_MCP_ENDPOINTS`, an optional `server_id=endpoint` list (comma
@@ -12,6 +12,10 @@ Development reads two variables:
   deployment may reach. It is the only source of MCP hosts, and the host
   allowlist is derived from it, so no host is hardcoded in Core. Without it
   there is no generic MCP transport at all.
+- `IA_MCP_TENANT_PACKAGES_DIR`, an optional absolute directory the onboarding
+  HTTP boundary may read tenant packages from. It is the only root that
+  boundary accepts, so without it every request naming a `package_path` is
+  refused. The CLI is unaffected: an operator keeps passing local paths.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -45,6 +50,7 @@ from ia_mcp.mcp.executor import (
     ToolExecutor,
 )
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
+from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.adapters.sqlalchemy import (
     SqlAlchemyChannelIntegrationRepository,
@@ -56,6 +62,7 @@ from ia_mcp.tenancy.service import TenantService
 DEVELOPMENT = "development"
 DATABASE_URL = "DATABASE_URL"
 MCP_ENDPOINTS = "IA_MCP_MCP_ENDPOINTS"
+TENANT_PACKAGES_DIR = "IA_MCP_TENANT_PACKAGES_DIR"
 
 
 class TenantMcpIntegrations(Protocol):
@@ -139,6 +146,8 @@ class RuntimeGraph:
     agent_harness: AgentHarness
     channel_integration_ids: dict[tuple[str, str], UUID]
     tool_executor: TenantToolExecutors
+    onboarding_service: TenantOnboardingService
+    tenant_packages_dir: Path | None
 
 
 def mcp_endpoints_from(environ: Mapping[str, str]) -> dict[str, str]:
@@ -153,6 +162,18 @@ def mcp_endpoints_from(environ: Mapping[str, str]) -> dict[str, str]:
             raise ValueError(f"{MCP_ENDPOINTS} entries must be server_id=endpoint")
         endpoints[server_id.strip()] = endpoint.strip()
     return endpoints
+
+
+def tenant_packages_dir_from(environ: Mapping[str, str]) -> Path | None:
+    """Root the onboarding HTTP boundary may read tenant packages from.
+
+    Nothing is substituted when the variable is unset or blank: the boundary
+    refuses every `package_path` instead of widening back into an arbitrary
+    filesystem read. Containment is decided at the boundary, on the resolved
+    path, so this returns the configured value unchanged.
+    """
+    value = environ.get(TENANT_PACKAGES_DIR, "").strip()
+    return Path(value) if value else None
 
 
 def allowed_hosts_for(endpoints: Mapping[str, str]) -> tuple[str, ...]:
@@ -216,6 +237,8 @@ def build_runtime(
             allowed_hosts=hosts,
             transport=transport,
         ),
+        onboarding_service=TenantOnboardingService(engine),
+        tenant_packages_dir=tenant_packages_dir_from(environ),
     )
 
 
@@ -226,6 +249,8 @@ def attach_runtime(app: FastAPI, runtime: RuntimeGraph) -> None:
     app.state.agent_harness = runtime.agent_harness
     app.state.channel_integration_ids = runtime.channel_integration_ids
     app.state.tool_executor = runtime.tool_executor
+    app.state.onboarding_service = runtime.onboarding_service
+    app.state.tenant_packages_dir = runtime.tenant_packages_dir
 
 
 def runtime_lifespan(
