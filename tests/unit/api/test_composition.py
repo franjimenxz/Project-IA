@@ -211,8 +211,11 @@ def test_production_mounts_no_simulated_route_and_no_fakes(
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", UNREACHABLE_DATABASE_URL)
     app = create_app(environment="production")
-    paths = {getattr(route, "path", "") for route in app.routes}
+    # Included routers are not flattened into `app.routes` on this FastAPI
+    # version, so reading them there would pass even if the route were mounted.
+    paths = set(app.openapi()["paths"])
     assert "/v1/simulated/messages" not in paths
+    assert TestClient(app).post("/v1/simulated/messages", json={}).status_code == 404
     for name in RUNTIME_STATE:
         assert getattr(app.state, name, None) is None
 
