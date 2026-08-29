@@ -400,9 +400,7 @@ def _commit_is_reachable(revision: str) -> bool:
     return completed.returncode == 0
 
 
-def test_core_guard_rejects_slug_branches_and_tenant_b_onboarding_touched_no_core() -> (
-    None
-):
+def test_core_guard_rejects_slug_branches_and_passes_tenant_b_changeset() -> None:
     from scripts.check_tenant_specific_core import (
         collect_range_files,
         review_changeset,
