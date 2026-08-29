@@ -568,6 +568,7 @@ async def test_api_provision_creates_disabled_tenant(
     app = FastAPI()
     app.include_router(create_onboarding_router())
     app.state.onboarding_service = service
+    app.state.tenant_packages_dir = tmp_path
     app.state.principal = PLATFORM_PRINCIPAL
     client = TestClient(app)
     created = client.post(
