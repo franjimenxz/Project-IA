@@ -6,6 +6,7 @@ from ia_mcp.api.composition import attach_runtime, build_runtime, runtime_lifesp
 from ia_mcp.api.routes.admin_runs import create_admin_runs_router
 from ia_mcp.channels.outbox import ChannelOutbox
 from ia_mcp.observability.context import CorrelationMiddleware
+from ia_mcp.onboarding.api import create_onboarding_router
 
 _NON_PRODUCTION_ENVIRONMENTS = frozenset({"test", "development"})
 
@@ -30,7 +31,7 @@ def create_app(*, environment: str | None = None) -> FastAPI:
         return {"status": "alive"}
 
     app.include_router(create_admin_runs_router())
-    # P08-T03 may add create_onboarding_router() here; keep both include_router calls.
+    app.include_router(create_onboarding_router())
 
     if resolved in _NON_PRODUCTION_ENVIRONMENTS:
         from ia_mcp.api.routes.simulated import router as simulated_router

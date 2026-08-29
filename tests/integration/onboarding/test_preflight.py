@@ -46,11 +46,11 @@ from ia_mcp.onboarding.validator import validate_package
 from ia_mcp.shared.errors import TenantIsolationViolation
 from ia_mcp.tenancy.models import TenantContext
 from ia_mcp.tenancy.service import TenantResolutionError, TenantService
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
 from tests.unit.onboarding.helpers import write_package
 
 ROOT = Path(__file__).resolve().parents[3]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 PLATFORM = Principal(
     principal_id=UUID("11111111-1111-1111-1111-111111111111"),

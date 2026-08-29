@@ -1,7 +1,7 @@
 # Runbook — Onboarding y rollback del segundo tenant
 
 **Estado:** ready  
-**Baseline registrado:** `9bbb790` (`origin/main` al iniciar P08-T04)
+**Changeset registrado:** `dd810e0..11b3de5` (padre real del commit de onboarding tras el rebase de P08-T04)
 
 Este procedimiento incorpora un tenant sintético B sin cambiar Core. Los valores de secreto no se versionan: sólo referencias `sm://`.
 
@@ -9,12 +9,12 @@ Este procedimiento incorpora un tenant sintético B sin cambiar Core. Los valore
 
 - Package declarativo bajo `tenants/fixtures/tenant-b/` (config, corpus, tools y MCP distintos de A).
 - Principal `platform_admin` por `--principal-id` y `--role`. No hay autenticación federada.
-- PostgreSQL local (misma URL que `tests/e2e/test_second_tenant.py`).
+- PostgreSQL local; las suites leen la misma URL vía `IA_MCP_TEST_DATABASE_URL` (`tests/fixtures/database.py`).
 - `DATABASE_URL` exportada; el CLI construye `TenantOnboardingService` con ese engine.
 - Corpus canario B en `tenants/fixtures/tenant-b/knowledge/hours-b.txt` (`canary-tenant-b`).
 
 ```text
-export DATABASE_URL=postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03
+export DATABASE_URL=postgresql+psycopg://<usuario>@<host>:5432/<base>
 ```
 
 ## Activación
@@ -44,7 +44,7 @@ python -m ia_mcp.onboarding activate tenant-b \
 - Runs, jobs y config de A no cambian.
 
 ```text
-python scripts/check_tenant_specific_core.py --base 9bbb790
+python scripts/check_tenant_specific_core.py --base dd810e0 --head 11b3de5
 ```
 
 El script falla si Core introduce un `if tenant_slug == "..."` / nombre de institución, o si el changeset toca Core fuera de adapters.

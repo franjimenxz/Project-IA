@@ -48,6 +48,7 @@ from ia_mcp.scheduling.models import JOB_TYPE, ScheduledJob
 from ia_mcp.scheduling.service import SqlAlchemyJobStore, scheduled_job_table
 from ia_mcp.shared.errors import DomainError
 from ia_mcp.tenancy.models import TenantContext, TenantIdentity
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
 from tests.unit.onboarding.helpers import write_package
 
@@ -55,8 +56,16 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_B = ROOT / "tenants" / "fixtures" / "tenant-b"
 CANARY_B_FILE = FIXTURE_B / "knowledge" / "hours-b.txt"
 CANARY_A = b"canary-tenant-a clinic hours eight to sixteen"
-REGISTERED_BASE = "9bbb790"
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
+# AC-P08-010 is a claim about one changeset: the commit that onboarded tenant-b
+# and the commit it was built on. Pinning a base and diffing it against a moving
+# working tree only held while the delegation branch was open -- every later
+# Core change, legitimate or not, turned the gate red and it stopped
+# discriminating anything. A fixed pair of commits is a historical fact that
+# never expires. `9bbb790` was the pre-rebase branch base; the range it opens
+# also contains the P07-T03/T04 commits, which changed Core for unrelated
+# reasons, so the parent of the onboarding commit is the real boundary.
+TENANT_B_BASE = "dd810e0"
+TENANT_B_COMMIT = "11b3de5"
 
 PLATFORM = Principal(
     principal_id=UUID("11111111-1111-1111-1111-111111111111"),
@@ -380,8 +389,22 @@ def test_secret_reference_is_validated_without_printing_value() -> None:
     assert "sk-live" not in dumped
 
 
-def test_core_diff_fails_slug_branches_and_passes_this_changeset() -> None:
-    from scripts.check_tenant_specific_core import review_changeset
+def _commit_is_reachable(revision: str) -> bool:
+    completed = subprocess.run(
+        ["git", "cat-file", "-e", f"{revision}^{{commit}}"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed.returncode == 0
+
+
+def test_core_guard_rejects_slug_branches_and_passes_tenant_b_changeset() -> None:
+    from scripts.check_tenant_specific_core import (
+        collect_range_files,
+        review_changeset,
+    )
 
     findings = review_changeset(
         {
@@ -391,12 +414,24 @@ def test_core_diff_fails_slug_branches_and_passes_this_changeset() -> None:
         }
     )
     assert findings
+    assert _commit_is_reachable(TENANT_B_BASE) and _commit_is_reachable(
+        TENANT_B_COMMIT
+    ), "the onboarding changeset needs full git history (checkout fetch-depth: 0)"
+    changeset = collect_range_files(TENANT_B_BASE, TENANT_B_COMMIT, ROOT)
+    # Guard the guard: an empty or mis-resolved range would pass vacuously.
+    assert "tenants/fixtures/tenant-b/knowledge/hours-b.txt" in changeset
+    assert "tests/e2e/test_second_tenant.py" in changeset
+    assert review_changeset(changeset) == ()
+    # The CLI run also rescans today's Core tree, so the live half of AC-P08-010
+    # -- no tenant slug or name branch in Core right now -- stays enforced.
     completed = subprocess.run(
         [
             sys.executable,
             "scripts/check_tenant_specific_core.py",
             "--base",
-            REGISTERED_BASE,
+            TENANT_B_BASE,
+            "--head",
+            TENANT_B_COMMIT,
         ],
         cwd=ROOT,
         check=False,

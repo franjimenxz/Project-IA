@@ -34,10 +34,10 @@ from ia_mcp.scheduling.models import JOB_TYPE, ScheduledJob
 from ia_mcp.scheduling.service import SqlAlchemyJobStore, scheduled_job_table
 from ia_mcp.shared.errors import DomainError
 from ia_mcp.tenancy.models import TenantContext, TenantIdentity
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.onboarding.helpers import write_package
 
 ROOT = Path(__file__).resolve().parents[2]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 PLATFORM = Principal(
     principal_id=UUID("11111111-1111-1111-1111-111111111111"),

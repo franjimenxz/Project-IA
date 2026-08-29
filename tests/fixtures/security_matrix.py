@@ -35,9 +35,9 @@ from ia_mcp.configuration.models import (
 from ia_mcp.contracts.appointments import AppointmentSlot
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
 from ia_mcp.tenancy.models import TenantContext, TenantIdentity
+from tests.fixtures.database import DATABASE_URL
 
 ROOT = Path(__file__).resolve().parents[2]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")

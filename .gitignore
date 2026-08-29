@@ -8,6 +8,7 @@ __pycache__/
 htmlcov/
 build/
 dist/
+*.egg-info/
 .env
 .env.*
 !.env.example
@@ -16,4 +17,5 @@ dist/
 secrets/
 artifacts/
 .worktrees/
+.claude/worktrees/
 .superpowers/

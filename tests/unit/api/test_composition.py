@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -30,6 +31,7 @@ from ia_mcp.contracts.errors import ToolErrorCode
 from ia_mcp.mcp.client import SseMcpClient
 from ia_mcp.mcp.executor import McpTarget, ToolCall
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
+from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.models import TenantContext
 from ia_mcp.tenancy.service import TenantService
@@ -60,6 +62,8 @@ RUNTIME_STATE = (
     "agent_harness",
     "channel_integration_ids",
     "tool_executor",
+    "onboarding_service",
+    "tenant_packages_dir",
 )
 
 
@@ -164,6 +168,42 @@ def test_development_with_database_url_attaches_runtime(
     assert isinstance(app.state.agent_harness, AgentHarness)
     assert isinstance(app.state.channel_integration_ids, dict)
     assert isinstance(app.state.tool_executor, TenantToolExecutors)
+    assert isinstance(app.state.onboarding_service, TenantOnboardingService)
+
+
+def test_tenant_packages_dir_is_published_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", UNREACHABLE_DATABASE_URL)
+    monkeypatch.setenv("IA_MCP_TENANT_PACKAGES_DIR", str(tmp_path))
+    app = create_app(environment="development")
+    assert app.state.tenant_packages_dir == tmp_path
+
+
+def test_runtime_without_packages_dir_publishes_no_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unset means the HTTP boundary has no root, never an arbitrary path."""
+    monkeypatch.delenv("IA_MCP_TENANT_PACKAGES_DIR", raising=False)
+    runtime = build_runtime(
+        environment="development",
+        environ={"DATABASE_URL": UNREACHABLE_DATABASE_URL},
+    )
+    assert runtime is not None
+    assert runtime.tenant_packages_dir is None
+    assert isinstance(runtime.onboarding_service, TenantOnboardingService)
+
+
+def test_blank_packages_dir_is_not_a_root() -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            "IA_MCP_TENANT_PACKAGES_DIR": "   ",
+        },
+    )
+    assert runtime is not None
+    assert runtime.tenant_packages_dir is None
 
 
 def test_production_mounts_no_simulated_route_and_no_fakes(
@@ -171,8 +211,11 @@ def test_production_mounts_no_simulated_route_and_no_fakes(
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", UNREACHABLE_DATABASE_URL)
     app = create_app(environment="production")
-    paths = {getattr(route, "path", "") for route in app.routes}
+    # Included routers are not flattened into `app.routes` on this FastAPI
+    # version, so reading them there would pass even if the route were mounted.
+    paths = set(app.openapi()["paths"])
     assert "/v1/simulated/messages" not in paths
+    assert TestClient(app).post("/v1/simulated/messages", json={}).status_code == 404
     for name in RUNTIME_STATE:
         assert getattr(app.state, name, None) is None
 

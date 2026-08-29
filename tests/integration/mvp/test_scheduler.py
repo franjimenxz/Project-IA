@@ -22,6 +22,7 @@ from ia_mcp.scheduling.service import (
 )
 from ia_mcp.scheduling.worker import JobWorker
 from ia_mcp.tenancy.models import TenantContext
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.scheduling.fakes import (
     AdjustableClock,
     FakeAppointmentLookup,
@@ -30,7 +31,6 @@ from tests.unit.scheduling.fakes import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")

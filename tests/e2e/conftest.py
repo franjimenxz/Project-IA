@@ -38,11 +38,11 @@ from ia_mcp.knowledge.service import KnowledgeService
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.models import ChannelIntegration, TenantContext, TenantIdentity
 from ia_mcp.tenancy.service import TenantService
+from tests.fixtures.database import DATABASE_URL
 from tests.integration.api.test_simulated_messages import signed_simulated_headers
 from tests.unit.knowledge.fakes import FakeChunker, FakeEmbedding, FakeParser
 
 ROOT = Path(__file__).resolve().parents[2]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")

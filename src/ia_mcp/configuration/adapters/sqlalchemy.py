@@ -222,18 +222,42 @@ class SqlAlchemyConfigRepository:
         self, session: AsyncSession, admin: TenantAdminContext
     ) -> None:
         now = _now()
-        await session.execute(
-            pg_insert(tenant_table)
-            .values(
-                id=admin.identity.tenant_id,
-                slug=admin.identity.tenant_slug,
-                status="active",
-                active_config_version=None,
-                created_at=now,
-                updated_at=now,
+        identity = admin.identity
+        inserted = (
+            await session.execute(
+                pg_insert(tenant_table)
+                .values(
+                    id=identity.tenant_id,
+                    slug=identity.tenant_slug,
+                    status="active",
+                    active_config_version=None,
+                    created_at=now,
+                    updated_at=now,
+                )
+                .on_conflict_do_nothing()
+                .returning(tenant_table.c.id)
             )
-            .on_conflict_do_nothing(index_elements=["id"])
-        )
+        ).scalar_one_or_none()
+        if inserted is not None:
+            return
+        # `tenant` is unique on `slug` as well as on `id`. Arbitrating on a
+        # single index left the other one free to raise, so a concurrent insert
+        # of this same tenant surfaced as a `slug` violation instead of being
+        # ignored. Staying silent on either index makes that race benign; the
+        # read below keeps it apart from a slug another tenant owns, which is a
+        # conflict the caller has to see rather than a race to absorb.
+        owner = (
+            await session.execute(
+                select(tenant_table.c.id).where(
+                    tenant_table.c.slug == identity.tenant_slug
+                )
+            )
+        ).scalar_one_or_none()
+        if owner is not None and owner != identity.tenant_id:
+            raise ConfigurationError(
+                "slug_taken",
+                "Tenant slug is already registered.",
+            )
 
     async def _load(
         self, session: AsyncSession, tenant_id: UUID, version: int

@@ -49,10 +49,10 @@ from ia_mcp.scheduling.service import SqlAlchemyJobStore, scheduled_job_table
 from ia_mcp.shared.errors import DomainError
 from ia_mcp.tenancy.models import TenantIdentity
 from ia_mcp.tenancy.service import TenantResolutionError, TenantService
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.onboarding.helpers import write_package
 
 ROOT = Path(__file__).resolve().parents[3]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 PLATFORM_PRINCIPAL = Principal(
     principal_id=UUID("11111111-1111-1111-1111-111111111111"),
@@ -568,6 +568,7 @@ async def test_api_provision_creates_disabled_tenant(
     app = FastAPI()
     app.include_router(create_onboarding_router())
     app.state.onboarding_service = service
+    app.state.tenant_packages_dir = tmp_path
     app.state.principal = PLATFORM_PRINCIPAL
     client = TestClient(app)
     created = client.post(
