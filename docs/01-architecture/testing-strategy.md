@@ -126,13 +126,20 @@ Pruebas incluyen concurrencia entre tenants, cola de jobs, corpus creciente, ups
 
 ## CI
 
-| Evento | Suites |
-|---|---|
-| Cada commit | format check, Ruff, types, unit |
-| Pull request | unit, contract, integration, security rápida, docs/links |
-| Merge main | E2E local, aislamiento completo, resilience seleccionada |
-| Programada | evals completas, performance, dependency scan |
-| Release | todas + sandbox real cuando aplique |
+| Evento | Suites | Estado |
+|---|---|---|
+| Cada commit | format check, Ruff, types, unit | cubierto por el gate de pull request |
+| Pull request | Ruff, tipos, docs/links, unit, contract, integration, security, E2E y aislamiento completo | implementado (`quality.yml`) |
+| Merge main | E2E local, aislamiento completo, resilience seleccionada | **pendiente**: no hay workflow disparado por `push` a `main` |
+| Programada | evals completas, performance, resilience marcada | implementado (`quality-evidence.yml`, semanal) |
+| Release | todas + sandbox real cuando aplique | pendiente hasta `EXT-002` |
+
+El gate de pull request se adelantó respecto del diseño: corre las suites que
+la tabla original reservaba para el merge, porque hasta que existieron
+`tests/fixtures/database.py` y el job `database-quality` esas suites no corrían
+en ningún evento. La fila de merge sigue listada porque un merge puede romper
+lo que cada PR verificó por separado; queda como hueco conocido, no como
+requisito satisfecho.
 
 ## Flakiness
 
