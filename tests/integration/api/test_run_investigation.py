@@ -25,6 +25,7 @@ from ia_mcp.observability.run_models import (
 from ia_mcp.observability.run_query import RunNotFound
 from ia_mcp.onboarding.commands import Principal
 from ia_mcp.tenancy.models import TenantContext
+from tests.fixtures.admin_auth import admin_authenticator, bearer
 from tests.integration.observability.test_run_query import (
     CHUNK_TEXT,
     DATABASE_URL,
@@ -39,6 +40,7 @@ from tests.integration.observability.test_run_query import (
     seed_investigation_fixture,
 )
 
+TOKEN = "svctest-run-investigation-token"
 MISSING_RUN_ID = UUID("99999999-9999-4999-8999-999999999999")
 XSS_SKILL = '<script>alert("xss")</script>'
 XSS_ERROR = '<img src=x onerror=alert("err")>'
@@ -218,12 +220,18 @@ def make_admin_client(
     principal: Principal | None = None,
     query: Any = None,
 ) -> TestClient:
+    """A client that presents `TOKEN`, authenticated as `principal`.
+
+    Identity travels in the request, so an anonymous client is one that
+    presents no header against a process that declared no principal.
+    """
     app = create_app()
     if principal is not None:
-        app.state.principal = principal
+        app.state.admin_authenticator = admin_authenticator({TOKEN: principal})
     if query is not None:
         app.state.run_investigation_query = query
-    return TestClient(app)
+    headers = bearer(TOKEN) if principal is not None else {}
+    return TestClient(app, headers=headers)
 
 
 def _error_shape(response: Any) -> tuple[int, str, str]:

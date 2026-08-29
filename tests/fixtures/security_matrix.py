@@ -318,6 +318,20 @@ SECURITY_MATRIX: tuple[MatrixRow, ...] = (
         module="tests.security.test_redaction",
         test="test_tool_audit_summary_omits_secret_values_and_endpoint",
     ),
+    MatrixRow(
+        leg="secret",
+        threat="Secret leakage",
+        boundary="admin service token",
+        module="tests.security.test_admin_auth",
+        test="test_no_response_or_log_carries_the_token_or_the_secret",
+    ),
+    MatrixRow(
+        leg="state",
+        threat="IDOR",
+        boundary="admin run investigation",
+        module="tests.security.test_admin_auth",
+        test="test_a_token_from_another_tenant_never_reads_a_foreign_run",
+    ),
 )
 
 

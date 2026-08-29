@@ -6,6 +6,11 @@ it is resolved inside the root the deployment configured
 `app.state.tenant_packages_dir`) and refused when it lands outside. The rule
 lives here and not in `load_tenant_package`, which the CLI calls with the
 operator's own local paths.
+
+Identity is not this module's business either: `get_principal` is the one
+administrative boundary (`ia_mcp.api.auth.admin`, ADR-007), shared with the run
+investigation router, so both planes authenticate the same way and no endpoint
+can grow its own weaker check.
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from ia_mcp.api.auth.admin import get_principal
 from ia_mcp.onboarding.commands import (
     OnboardingError,
     Principal,
@@ -70,7 +76,7 @@ def create_onboarding_router() -> APIRouter:
     async def provision_tenant(
         request: Request,
         payload: ProvisionRequest,
-        principal: Annotated[Principal, Depends(_get_principal)],
+        principal: Annotated[Principal, Depends(get_principal)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> dict[str, str]:
         if PLATFORM_ADMIN not in principal.roles:
@@ -92,7 +98,7 @@ def create_onboarding_router() -> APIRouter:
     @router.get("/v1/admin/tenants/{slug}")
     async def get_tenant(
         slug: str,
-        principal: Annotated[Principal, Depends(_get_principal)],
+        principal: Annotated[Principal, Depends(get_principal)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> dict[str, str]:
         tenant = await service.get_by_slug(slug)
@@ -114,7 +120,7 @@ def create_onboarding_router() -> APIRouter:
     async def disable_tenant(
         slug: str,
         payload: DisableRequest,
-        principal: Annotated[Principal, Depends(_get_principal)],
+        principal: Annotated[Principal, Depends(get_principal)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> dict[str, str]:
         tenant = await service.get_by_slug(slug)
@@ -143,7 +149,7 @@ def create_onboarding_router() -> APIRouter:
         slug: str,
         request: Request,
         payload: PreflightRequest,
-        principal: Annotated[Principal, Depends(_get_principal)],
+        principal: Annotated[Principal, Depends(get_principal)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> dict[str, str | bool]:
         tenant = await service.get_by_slug(slug)
@@ -182,7 +188,7 @@ def create_onboarding_router() -> APIRouter:
     async def activate_tenant(
         slug: str,
         payload: ActivateRequest,
-        principal: Annotated[Principal, Depends(_get_principal)],
+        principal: Annotated[Principal, Depends(get_principal)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> dict[str, str]:
         tenant = await service.get_by_slug(slug)
@@ -285,16 +291,6 @@ def _get_service(request: Request) -> TenantOnboardingService:
             detail="An internal error occurred",
         )
     return service
-
-
-def _get_principal(request: Request) -> Principal:
-    principal = getattr(request.app.state, "principal", None)
-    if not isinstance(principal, Principal):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Administrator identity is required.",
-        )
-    return principal
 
 
 def _status_for(exc: OnboardingError) -> int:

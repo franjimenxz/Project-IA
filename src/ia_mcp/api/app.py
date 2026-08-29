@@ -2,7 +2,12 @@ import os
 
 from fastapi import FastAPI
 
-from ia_mcp.api.composition import attach_runtime, build_runtime, runtime_lifespan
+from ia_mcp.api.composition import (
+    admin_authenticator_from,
+    attach_runtime,
+    build_runtime,
+    runtime_lifespan,
+)
 from ia_mcp.api.routes.admin_runs import create_admin_runs_router
 from ia_mcp.channels.outbox import ChannelOutbox
 from ia_mcp.observability.context import CorrelationMiddleware
@@ -23,6 +28,9 @@ def create_app(*, environment: str | None = None) -> FastAPI:
     app = FastAPI() if runtime is None else FastAPI(lifespan=runtime_lifespan(runtime))
     app.add_middleware(CorrelationMiddleware)
     app.state.outbox = ChannelOutbox()
+    # Published in every environment: an unconfigured roster leaves this unset,
+    # and the administrative boundary then refuses every caller.
+    app.state.admin_authenticator = admin_authenticator_from(os.environ)
     if runtime is not None:
         attach_runtime(app, runtime)
 

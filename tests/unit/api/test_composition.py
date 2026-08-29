@@ -18,8 +18,10 @@ from fastapi.testclient import TestClient
 
 from ia_mcp.agent_runtime.harness import AgentHarness
 from ia_mcp.api.app import create_app
+from ia_mcp.api.auth.service_token import ADMIN_PRINCIPALS, ServiceTokenAuthenticator
 from ia_mcp.api.composition import (
     TenantToolExecutors,
+    admin_authenticator_from,
     allowed_hosts_for,
     build_runtime,
     mcp_endpoints_from,
@@ -31,6 +33,7 @@ from ia_mcp.contracts.errors import ToolErrorCode
 from ia_mcp.mcp.client import SseMcpClient
 from ia_mcp.mcp.executor import McpTarget, ToolCall
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
+from ia_mcp.onboarding.preflight import SecretResolvabilityCheck
 from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.models import TenantContext
@@ -50,6 +53,9 @@ SERVER_ID = "mcp-appointments"
 TENANT_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 RUN_ID = uuid4()
 GENERIC_TOOL = "crear_turno"
+TOKEN_REFERENCE = "sm://admin/composition"
+TOKEN_VARIABLE = "IA_MCP_SECRET_ADMIN_COMPOSITION"
+ADMIN_TOKEN = "svctest-composition-token"
 SEARCH_ARGS: dict[str, Any] = {
     "specialty": "cardiologia",
     "date_from": "2026-09-01",
@@ -329,6 +335,73 @@ def test_generic_tool_is_forbidden_without_transport() -> None:
     assert result.ok is False
     assert result.error is not None
     assert result.error.code == ToolErrorCode.FORBIDDEN
+
+
+def test_no_declared_roster_publishes_no_authenticator() -> None:
+    """An unconfigured process must refuse callers, never trust one."""
+    assert admin_authenticator_from({}) is None
+    assert admin_authenticator_from({ADMIN_PRINCIPALS: "  "}) is None
+
+
+def test_declared_roster_authenticates_its_token_from_the_environment() -> None:
+    authenticator = admin_authenticator_from(
+        {
+            ADMIN_PRINCIPALS: (
+                f"principal={TENANT_ID};roles=operator;secret={TOKEN_REFERENCE};"
+                f"tenant_id={TENANT_ID};tenant_slug=tenant-a"
+            ),
+            TOKEN_VARIABLE: ADMIN_TOKEN,
+        }
+    )
+    assert authenticator is not None
+    principal = _run(authenticator.authenticate(f"Bearer {ADMIN_TOKEN}"))
+    assert principal is not None
+    assert principal.roles == frozenset({"operator"})
+    assert principal.tenant_slug == "tenant-a"
+    assert _run(authenticator.authenticate(f"Bearer {ADMIN_TOKEN}x")) is None
+
+
+def test_a_declared_principal_without_its_secret_authenticates_nobody() -> None:
+    authenticator = admin_authenticator_from(
+        {ADMIN_PRINCIPALS: f"principal={TENANT_ID};roles=platform_admin;secret={TOKEN_REFERENCE}"}
+    )
+    assert authenticator is not None
+    assert _run(authenticator.authenticate(f"Bearer {ADMIN_TOKEN}")) is None
+
+
+def test_create_app_publishes_the_authenticator_in_every_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(ADMIN_PRINCIPALS, raising=False)
+    assert create_app(environment="production").state.admin_authenticator is None
+    monkeypatch.setenv(
+        ADMIN_PRINCIPALS,
+        f"principal={TENANT_ID};roles=platform_admin;secret={TOKEN_REFERENCE}",
+    )
+    monkeypatch.setenv(TOKEN_VARIABLE, ADMIN_TOKEN)
+    for environment in ("production", "development", "test"):
+        published = create_app(environment=environment).state.admin_authenticator
+        assert isinstance(published, ServiceTokenAuthenticator), environment
+
+
+def test_runtime_wires_the_environment_resolver_into_the_secret_check() -> None:
+    """The preflight secret check must report what this process can reach."""
+    runtime = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            TOKEN_VARIABLE: ADMIN_TOKEN,
+        },
+    )
+    assert runtime is not None
+    checks = {
+        check.name: check for check in runtime.onboarding_service.preflight_checks
+    }
+    secrets = checks["secrets_resolvable"]
+    assert isinstance(secrets, SecretResolvabilityCheck)
+    tenant = _tenant()
+    assert _run(secrets.secrets.resolvable(tenant, TOKEN_REFERENCE)) is True
+    assert _run(secrets.secrets.resolvable(tenant, "sm://tenant-a/mcp/absent")) is False
 
 
 def test_endpoints_are_read_from_the_environment_not_hardcoded() -> None:

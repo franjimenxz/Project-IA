@@ -31,6 +31,7 @@ from ia_mcp.configuration.adapters.sqlalchemy import (
     tenant_table,
 )
 from ia_mcp.configuration.models import TenantConfigDraft
+from ia_mcp.configuration.secrets import SecretResolutionError, SecretResolver
 from ia_mcp.knowledge.adapters.sqlalchemy import SqlAlchemyKnowledgeRepository
 from ia_mcp.observability.redaction import redact
 from ia_mcp.observability.run_query import RunInvestigationQuery, RunNotFound
@@ -262,7 +263,9 @@ class SecretResolvabilityCheck:
 
     def __init__(self, engine: AsyncEngine, secrets: SecretReferencePort) -> None:
         self._sessions = async_sessionmaker(engine, expire_on_commit=False)
-        self._secrets = secrets
+        # Published, not private: a composition root's wiring is only verifiable
+        # if a test can ask which port this check ended up holding.
+        self.secrets = secrets
 
     async def run(self, tenant: TenantContext) -> CheckOutcome:
         references = await _secret_references(self._sessions, tenant)
@@ -273,7 +276,7 @@ class SecretResolvabilityCheck:
                 return _failed(
                     self.name, "secret_literal", "Secret values are forbidden."
                 )
-            if not await self._secrets.resolvable(tenant, reference):
+            if not await self.secrets.resolvable(tenant, reference):
                 return _failed(
                     self.name,
                     "secret_unresolved",
@@ -450,6 +453,33 @@ class RollbackInputsCheck:
                 self.name, "rollback_inputs_missing", "Rollback inputs are missing."
             )
         return _passed(self.name)
+
+
+class ResolvableSecretReferences:
+    """`SecretReferencePort` backed by the deployment's `SecretResolver`.
+
+    Replaces `_FailClosedSecrets` once a deployment can resolve references, so
+    `secrets_resolvable` reports what the process can actually reach instead of
+    a constant refusal. The resolved value is discarded: the check answers
+    whether the credential exists, and never carries it into a `CheckOutcome`,
+    a report row or a log line.
+
+    The tenant is not used to authorize the lookup, and must not be read as if
+    it were: ownership was already decided by the tenant-scoped query that
+    produced the reference (`_secret_references`). A future secret manager that
+    binds a reference to a tenant should enforce it here.
+    """
+
+    def __init__(self, secrets: SecretResolver) -> None:
+        self._secrets = secrets
+
+    async def resolvable(self, tenant: TenantContext, reference: str) -> bool:
+        del tenant
+        try:
+            await self._secrets.resolve(reference)
+        except SecretResolutionError:
+            return False
+        return True
 
 
 class _FailClosedSecrets:

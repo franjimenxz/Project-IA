@@ -44,11 +44,12 @@ Cada límite valida autenticidad, autorización, esquema, tamaño, timeout y san
 
 ### Administración
 
-- identidad federada o tokens firmados;
+- autenticación por request; hoy, token de servicio por principal validado contra una referencia `sm://` ([ADR-007](adr/ADR-007-admin-service-tokens-and-secret-resolution.md)), reemplazable por identidad federada sin cambiar los routers;
 - roles `platform_admin`, `tenant_admin`, `operator`, `auditor`;
 - autorización por acción y tenant;
 - operaciones cross-tenant exclusivas de `platform_admin` y puertos separados;
-- cambios sensibles con auditoría antes/después y motivo.
+- cambios sensibles con auditoría antes/después y motivo;
+- sin configuración de identidad el plano rechaza: 401 sin identidad o con credencial inválida (indistinguibles), 403 con rol insuficiente.
 
 ### Servicios internos
 
@@ -149,6 +150,8 @@ Se guardan hashes o identificadores opacos cuando se necesita correlación.
 ## Secretos
 
 La configuración almacena `credentials_reference`. El adapter de secretos requiere tenant, integration id y purpose; valida ownership y devuelve el valor sólo al transport que lo necesita. El valor no aparece en excepciones ni objetos serializables.
+
+Estado implementado ([ADR-007](adr/ADR-007-admin-service-tokens-and-secret-resolution.md)): el puerto `SecretResolver` resuelve una referencia `sm://` a un `SecretStr` o levanta `SecretResolutionError` con la referencia y sin el valor. El adapter disponible lee el entorno del proceso (`IA_MCP_SECRET_*`) y no valida ownership: el tenant lo establece la consulta tenant-scoped que produjo la referencia. La validación de ownership dentro del adapter queda pendiente del proveedor real.
 
 ## Incidentes
 
