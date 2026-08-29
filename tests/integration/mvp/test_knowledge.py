@@ -17,6 +17,7 @@ from ia_mcp.knowledge.adapters.sqlalchemy import SqlAlchemyKnowledgeRepository
 from ia_mcp.knowledge.models import DocumentSource, KnowledgeQuery
 from ia_mcp.knowledge.service import KnowledgeService
 from ia_mcp.tenancy.models import TenantContext
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.knowledge.fakes import (
     DownEmbedding,
     FakeChunker,
@@ -25,7 +26,6 @@ from tests.unit.knowledge.fakes import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")

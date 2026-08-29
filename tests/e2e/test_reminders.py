@@ -29,6 +29,7 @@ from ia_mcp.scheduling.worker import JobWorker
 from ia_mcp.tenancy.models import TenantContext
 from ia_mcp.workflows.appointments.confirm import ConfirmAppointmentDefinition
 from ia_mcp.workflows.engine import WorkflowEngine
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.scheduling.fakes import (
     AdjustableClock,
     FakeAppointmentLookup,
@@ -38,7 +39,6 @@ from tests.unit.scheduling.fakes import (
 from tests.unit.workflows.fakes import InMemoryWorkflowRepository
 
 ROOT = Path(__file__).resolve().parents[2]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")

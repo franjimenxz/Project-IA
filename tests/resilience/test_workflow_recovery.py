@@ -17,6 +17,7 @@ from ia_mcp.workflows.definition import WorkflowDefinition
 from ia_mcp.workflows.engine import WorkflowEngine
 from ia_mcp.workflows.models import AdvanceCommand, StartWorkflow
 from ia_mcp.workflows.ports import WorkflowError
+from tests.fixtures.database import DATABASE_URL
 from tests.fixtures.faults import (
     InjectedFault,
     instrument_workflow_repository,
@@ -25,7 +26,6 @@ from tests.fixtures.faults import (
 from tests.unit.workflows.fakes import InMemoryWorkflowRepository
 
 ROOT = Path(__file__).resolve().parents[2]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")

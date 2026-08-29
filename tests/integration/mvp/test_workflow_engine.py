@@ -30,9 +30,9 @@ from ia_mcp.workflows.models import (
     WorkflowTransition,
 )
 from ia_mcp.workflows.ports import WorkflowError
+from tests.fixtures.database import DATABASE_URL
 
 ROOT = Path(__file__).resolve().parents[3]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")

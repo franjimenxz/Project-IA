@@ -1,4 +1,12 @@
-"""Fail the gate when Core gains tenant-name or slug branches."""
+"""Fail the gate when Core gains tenant-name or slug branches.
+
+Two changesets can be reviewed. Without `--head` the working tree is compared
+against `--base`, which is what an open branch needs. With `--head` the pair of
+commits `--base`..`--head` is reviewed instead, so a claim about a changeset
+that already merged -- "onboarding this tenant needed no Core change" -- stays
+verifiable no matter how far the working tree has moved since. Either way the
+current Core tree is rescanned for tenant slug or name branches.
+"""
 
 from __future__ import annotations
 
@@ -123,8 +131,29 @@ def collect_changed_files(base: str, root: Path) -> dict[str, str]:
     return files
 
 
-def review_repository(base: str, root: Path) -> tuple[Finding, ...]:
-    findings = list(review_changeset(collect_changed_files(base, root)))
+def collect_range_files(base: str, head: str, root: Path) -> dict[str, str]:
+    """Return the files `base`..`head` touched, read at `head`.
+
+    Contents come from the commit, not from disk, so the verdict on a merged
+    changeset does not drift when the same files change later.
+    """
+    files: dict[str, str] = {}
+    for name in _git(["diff", "--name-only", base, head], root):
+        if not name:
+            continue
+        files[name] = _blob(head, name, root) if name.endswith(".py") else ""
+    return files
+
+
+def review_repository(
+    base: str, root: Path, head: str | None = None
+) -> tuple[Finding, ...]:
+    changed = (
+        collect_changed_files(base, root)
+        if head is None
+        else collect_range_files(base, head, root)
+    )
+    findings = list(review_changeset(changed))
     seen = {(item.path, item.code, item.message) for item in findings}
     for item in scan_core_tree(root):
         key = (item.path, item.code, item.message)
@@ -140,6 +169,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--base", required=True, help="Registered baseline git hash")
     parser.add_argument(
+        "--head",
+        default=None,
+        help="Review the commits base..head instead of the working tree",
+    )
+    parser.add_argument(
         "--root",
         type=Path,
         default=Path.cwd(),
@@ -147,7 +181,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(list(argv) if argv is not None else None)
     root = args.root.resolve()
-    findings = review_repository(str(args.base), root)
+    head = None if args.head is None else str(args.head)
+    findings = review_repository(str(args.base), root, head=head)
     for finding in findings:
         print(finding)
     return 1 if findings else 0
@@ -171,6 +206,19 @@ def _source_findings(path: str, source: str) -> tuple[Finding, ...]:
             )
         )
     return tuple(findings)
+
+
+def _blob(revision: str, path: str, root: Path) -> str:
+    completed = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    # A path deleted by the changeset has no blob at `head`; only its presence
+    # matters for the Core verdict.
+    return completed.stdout if completed.returncode == 0 else ""
 
 
 def _git(arguments: Sequence[str], root: Path) -> tuple[str, ...]:

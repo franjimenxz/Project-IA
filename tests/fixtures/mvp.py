@@ -41,6 +41,7 @@ from ia_mcp.workflows.appointments.reschedule import RescheduleAppointmentDefini
 from ia_mcp.workflows.engine import WorkflowEngine
 from ia_mcp.workflows.models import WorkflowResult
 from ia_mcp.workflows.ports import WorkflowDefinition
+from tests.fixtures.database import DATABASE_URL
 from tests.unit.scheduling.fakes import (
     AdjustableClock,
     FakeChannelAdapter,
@@ -48,7 +49,6 @@ from tests.unit.scheduling.fakes import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-DATABASE_URL = "postgresql+psycopg://francojimenez@127.0.0.1:5432/ia_mcp_p02_t03"
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
