@@ -250,6 +250,13 @@ def build_runtime(
     endpoints = mcp_endpoints_from(environ)
     hosts = allowed_hosts_for(endpoints)
     transport = SseMcpClient(allowlist=HostAllowlist(hosts)) if hosts else None
+    tool_executors = TenantToolExecutors(
+        integrations=SqlAlchemyMcpIntegrations(engine, endpoints=endpoints),
+        capability=FakeAppointmentCapability(),
+        skills=skills,
+        allowed_hosts=hosts,
+        transport=transport,
+    )
     harness = AgentHarness(
         conversations=SqlAlchemyConversationRepository(engine),
         runs=SqlAlchemyAgentRunRepository(engine),
@@ -258,6 +265,9 @@ def build_runtime(
         compiler=ContextCompiler(configs=configs, skills=skills, tenant_tools={}),
         knowledge=EmptyKnowledgeSearch(),
         llm=FakeLLM(LLMDecision(kind="insufficient", text="", source_ids=())),
+        executors=tool_executors,
+        max_tool_iterations=4,
+        turn_deadline_seconds=30.0,
     )
     return RuntimeGraph(
         engine=engine,
@@ -266,13 +276,7 @@ def build_runtime(
         config_service=ConfigurationService(configs),
         agent_harness=harness,
         channel_integration_ids={},
-        tool_executor=TenantToolExecutors(
-            integrations=SqlAlchemyMcpIntegrations(engine, endpoints=endpoints),
-            capability=FakeAppointmentCapability(),
-            skills=skills,
-            allowed_hosts=hosts,
-            transport=transport,
-        ),
+        tool_executor=tool_executors,
         onboarding_service=TenantOnboardingService(
             engine,
             checks=default_preflight_checks(
