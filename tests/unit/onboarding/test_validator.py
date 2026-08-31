@@ -1,9 +1,25 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from ia_mcp.configuration.models import AgentConfig
+from ia_mcp.onboarding.loader import load_yaml
+from ia_mcp.onboarding.models import PackageConfig
 from ia_mcp.onboarding.validator import validate_package
 from tests.unit.onboarding.helpers import write_package
+
+SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "src"
+    / "ia_mcp"
+    / "onboarding"
+    / "schemas"
+    / "tenant-package.schema.json"
+)
+TENANT_B_INSTRUCTIONS = (
+    "No invente horarios ni especialidades que no figuren en el conocimiento recuperado."
+)
 
 FIXTURE_TENANT_B = (
     Path(__file__).resolve().parents[3] / "tenants" / "fixtures" / "tenant-b"
@@ -175,3 +191,69 @@ def test_fixture_tenant_b_package_is_valid() -> None:
     report = validate_package(FIXTURE_TENANT_B)
     assert report.valid is True
     assert report.errors == ()
+
+
+def test_package_without_agent_instructions_is_valid(tmp_path: Path) -> None:
+    package = write_package(tmp_path)
+    report = validate_package(package)
+    assert report.valid is True
+    assert report.errors == ()
+
+
+def test_package_with_agent_instructions_is_valid(tmp_path: Path) -> None:
+    package = write_package(
+        tmp_path,
+        config={
+            "agent": {
+                "tone": "formal",
+                "instructions": "Be precise about hours.",
+            }
+        },
+    )
+    report = validate_package(package)
+    assert report.valid is True
+    assert report.errors == ()
+
+
+def test_package_rejects_agent_instructions_over_max_length(tmp_path: Path) -> None:
+    package = write_package(
+        tmp_path,
+        config={"agent": {"tone": "formal", "instructions": "x" * 2001}},
+    )
+    report = validate_package(package)
+    assert report.valid is False
+    assert any(
+        issue.code == "string_too_long"
+        or "2000" in issue.message
+        or "too long" in issue.message.lower()
+        for issue in report.errors
+    )
+
+
+def test_package_config_agent_is_agent_config_not_a_parallel_type() -> None:
+    assert PackageConfig.model_fields["agent"].annotation is AgentConfig
+    import ia_mcp.onboarding.models as onboarding_models
+
+    assert not hasattr(onboarding_models, "PackageAgentConfig")
+
+
+def test_schema_allows_optional_agent_instructions() -> None:
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    agent = schema["$defs"]["config"]["properties"]["agent"]
+    assert agent["additionalProperties"] is False
+    assert agent["required"] == ["tone"]
+    instructions = agent["properties"]["instructions"]
+    assert instructions["maxLength"] == 2000
+    assert "string" in instructions["type"]
+    assert "null" in instructions["type"]
+
+
+def test_fixture_tenant_b_declares_policy_instructions_without_secrets() -> None:
+    config = load_yaml((FIXTURE_TENANT_B / "config.yaml").read_text(encoding="utf-8"))
+    assert config["agent"]["instructions"] == TENANT_B_INSTRUCTIONS
+    dumped = json.dumps(config).lower()
+    assert "sk-" not in dumped
+    assert "password" not in dumped
+    assert "api_key" not in dumped
+    report = validate_package(FIXTURE_TENANT_B)
+    assert report.valid is True
