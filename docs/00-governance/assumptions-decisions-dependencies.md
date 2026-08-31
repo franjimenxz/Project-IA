@@ -39,6 +39,7 @@
 | D-006 | Loop conversacional de tools de lectura; mutaciones siguen por workflow | ADR-006 |
 | D-007 | Perfil de agente del tenant (`tone` + `instructions` opcionales) llega a cada `LLMRequest` sin concatenarse con Core | ADR-008 |
 | D-008 | Páginas HTML de laboratorio (alta/lista/config/chat) y `lab_enable` sólo en development/test | ADR-009 |
+| D-009 | Runtime LLM = Gemini 3.5 Flash (`generativelanguage.googleapis.com`); clave `sm://platform/llm/gemini` | ADR-010 |
 
 ## Dependencias externas
 
@@ -50,7 +51,7 @@ Estas decisiones tienen un momento de resolución definido y no bloquean la docu
 
 | Tema | Momento | Criterio |
 |---|---|---|
-| Proveedor LLM inicial | Bootstrap de Slice 4.1 | Tool calling, observabilidad, región, costos y privacidad |
+| Proveedor LLM inicial | Resuelto: Gemini (D-009 / ADR-010). No reabrir | Tool calling, observabilidad, región, costos y privacidad |
 | Modelo de embeddings | Spike RAG de Slice 4.1 | Calidad en español, latencia, dimensión y costo |
 | Librería de jobs | Diseño Slice 4.5 | Durabilidad, retries, scheduling y operación |
 | Proveedor de secretos | Preparación de entorno real | Cloud elegido, rotación, auditoría y acceso local |

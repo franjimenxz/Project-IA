@@ -19,15 +19,16 @@
 
 | Ruta | Responsabilidad | Owner inicial |
 |---|---|---|
-| `src/ia_mcp/api/` | adapters HTTP/FastAPI, auth de entrada y composition root | P02-T01 / P10-T01 / P13-T01 (templates lab) |
+| `src/ia_mcp/api/` | adapters HTTP/FastAPI, auth de entrada y composition root | P02-T01 / P10-T01 / P13-T01 (templates lab) / P14-T04 (wiring Gemini + knowledge) |
 | `src/ia_mcp/channels/` | envelopes, adapters y delivery | P02-T05 |
 | `src/ia_mcp/tenancy/` | TenantContext y resolución | P02-T02 |
 | `src/ia_mcp/configuration/` | config versionada | P02-T03 |
 | `src/ia_mcp/conversation/` | Conversation, Message y SessionState | P04-T01 |
-| `src/ia_mcp/agent_runtime/` | Harness, runs, LLM port, context | P04-T02/P04-T04 |
-| `src/ia_mcp/skills/` | registry y skills MVP | P04-T02 |
+| `src/ia_mcp/agent_runtime/` | Harness, runs, LLM port, context | P04-T02/P04-T04 / P14-T03 (compiler `enabled_tools`) |
+| `src/ia_mcp/skills/` | registry y skills MVP | P04-T02 / P14-T03 (FAQ read tools) |
 | `src/ia_mcp/contracts/` | modelos canónicos públicos | P03-T01 |
-| `src/ia_mcp/knowledge/` | ingestión, documentos y retrieval | P04-T03 |
+| `src/ia_mcp/knowledge/` | ingestión, documentos y retrieval | P04-T03 / P14-T02 (`lab_search.py`) |
+| `src/ia_mcp/llm/` | adaptador Gemini de runtime | P14-T01 |
 | `src/ia_mcp/workflows/` | engine y definitions de negocio | P04-T06 |
 | `src/ia_mcp/mcp/` | registry, resolver, discovery, client, executor y capabilities | P03-T03/P03-T04/P03-T05, P09-T02–T04 |
 | `src/ia_mcp/integrations/` | adapters institucionales | P05-T02 |
