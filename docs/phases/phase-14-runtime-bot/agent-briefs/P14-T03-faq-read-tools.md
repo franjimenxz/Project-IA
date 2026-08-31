@@ -1,6 +1,6 @@
 # P14-T03 — FAQ anuncia herramientas de lectura
 
-**Estado:** ready · **Wave:** W13 · **Depends on:** Fase 12 accepted
+**Estado:** accepted · **Wave:** W13 · **Depends on:** Fase 12 accepted
 
 `FAQSkill.allowed_tools` deja de ignorar `config` y anuncia la intersección de `enabled_tools` con `{appointments.search, appointments.get}`. `ContextCompiler` toma el allowlist tenant de `config.enabled_tools` y acepta un catálogo servidor de proceso (`frozenset[str]`).
 

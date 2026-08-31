@@ -11,7 +11,7 @@ P14-T03 FAQ read tools     ──┘
 P14-T04 Runtime wiring     (blocked hasta que T01–T03 estén accepted)
 ```
 
-P13-T01 (páginas HTML) no comparte archivos con T01–T03. Puede seguir en paralelo. T04 toca `composition.py`; no se lanza hasta aceptar T01–T03 ni mientras P13-T01 tenga ese archivo reservado.
+P13-T01 accepted. T04 toca `composition.py`; no se lanza hasta aceptar T01.
 
 ## T01 — Gemini adapter
 

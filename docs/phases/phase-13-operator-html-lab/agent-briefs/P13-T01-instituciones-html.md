@@ -1,6 +1,6 @@
 # P13-T01 — Páginas HTML de instituciones y chat de prueba
 
-**Estado:** ready · **Wave:** W12 · **Depends on:** Fase 12 accepted
+**Estado:** accepted · **Wave:** W12 · **Depends on:** Fase 12 accepted
 
 Implementar las páginas HTML de laboratorio: alta/edición/lista de instituciones y chat tipo WhatsApp que llama al harness. Una sola tarea.
 
