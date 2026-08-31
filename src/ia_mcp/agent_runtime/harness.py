@@ -146,6 +146,8 @@ class AgentHarness:
                     history=compiled.history,
                     allowed_source_ids=allowed,
                     tool_names=tool_names,
+                    tone=config.agent.tone,
+                    tenant_instructions=config.agent.instructions or None,
                 )
             )
             trajectory.append("generate")
