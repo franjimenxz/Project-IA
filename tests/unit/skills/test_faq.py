@@ -5,7 +5,10 @@ import pytest
 from ia_mcp.agent_runtime.models import LLMDecision
 from ia_mcp.configuration.models import AgentConfig, TenantConfig
 from ia_mcp.knowledge.models import KnowledgeHit
+from ia_mcp.mcp.registry import ToolName
+from ia_mcp.skills.base import SkillTurn
 from ia_mcp.skills.faq import AnswerPolicy, FAQSkill
+from ia_mcp.tenancy.models import TenantContext
 
 TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 DOC_A = UUID("aaaaaaaa-0000-4000-8000-000000000001")
@@ -39,11 +42,22 @@ def test_faq_exposes_no_tools() -> None:
     assert skill.required_fields(config()) == ()
 
 
+def test_faq_announces_only_read_tools_from_enabled_tools() -> None:
+    skill = FAQSkill()
+    cfg = TenantConfig(
+        tenant_id=TENANT_A,
+        version=1,
+        agent=AgentConfig(tone="cordial"),
+        enabled_skills=frozenset({"faq"}),
+        enabled_tools=frozenset({"appointments.search", "appointments.create"}),
+    )
+    allowed = skill.allowed_tools(cfg)
+    assert allowed == frozenset({ToolName("appointments.search")})
+    assert ToolName("appointments.create") not in allowed
+
+
 @pytest.mark.anyio
 async def test_faq_route_stays_on_faq_skill() -> None:
-    from ia_mcp.skills.base import SkillTurn
-    from ia_mcp.tenancy.models import TenantContext
-
     tenant = TenantContext(
         tenant_id=TENANT_A,
         tenant_slug="tenant-a",

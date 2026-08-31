@@ -324,6 +324,63 @@ async def test_compile_does_not_concatenate_tenant_text_into_core() -> None:
 
 
 @pytest.mark.anyio
+async def test_faq_compile_uses_enabled_tools_and_process_server_catalog() -> None:
+    compiler = ContextCompiler(
+        configs=FakeConfigRepository(
+            {
+                TENANT_A: config_for(
+                    TENANT_A,
+                    skills=frozenset({"faq"}),
+                    enabled_tools=frozenset({"appointments.search"}),
+                )
+            }
+        ),
+        skills=SkillRegistry(),
+        tenant_tools={TENANT_A: frozenset()},
+        server_tools=frozenset({"appointments.search"}),
+    )
+    context = await compiler.compile(tenant_context(), request(skill="faq"))
+    assert [schema.name for schema in context.tool_schemas] == ["appointments.search"]
+
+
+@pytest.mark.anyio
+async def test_faq_compile_does_not_mix_enabled_tools_across_tenants() -> None:
+    compiler = ContextCompiler(
+        configs=FakeConfigRepository(
+            {
+                TENANT_A: config_for(
+                    TENANT_A,
+                    skills=frozenset({"faq"}),
+                    enabled_tools=frozenset({"appointments.search"}),
+                ),
+                TENANT_B: config_for(
+                    TENANT_B,
+                    skills=frozenset({"faq"}),
+                    enabled_tools=frozenset({"appointments.get"}),
+                ),
+            }
+        ),
+        skills=SkillRegistry(),
+        tenant_tools={
+            TENANT_A: frozenset({"appointments.get"}),
+            TENANT_B: frozenset({"appointments.search"}),
+        },
+        server_tools=frozenset({"appointments.search", "appointments.get"}),
+    )
+    context_a = await compiler.compile(tenant_context(), request(skill="faq"))
+    context_b = await compiler.compile(
+        tenant_context(tenant_id=TENANT_B, slug="tenant-b"),
+        request(skill="faq"),
+    )
+    names_a = [schema.name for schema in context_a.tool_schemas]
+    names_b = [schema.name for schema in context_b.tool_schemas]
+    assert names_a == ["appointments.search"]
+    assert names_b == ["appointments.get"]
+    assert "appointments.get" not in context_a.model_dump_json()
+    assert "appointments.search" not in context_b.model_dump_json()
+
+
+@pytest.mark.anyio
 async def test_knowledge_hit_does_not_become_agent_policy(
     compiler: ContextCompiler, tenant_a: TenantContext
 ) -> None:
