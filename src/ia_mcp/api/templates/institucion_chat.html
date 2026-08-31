@@ -59,10 +59,11 @@
           var token = sessionStorage.getItem(KEY);
           var headers = {};
           if (token) { headers.Authorization = "Bearer " + token; }
+          headers["Content-Type"] = "application/x-www-form-urlencoded";
           fetch(form.getAttribute("action") || location.pathname, {
             method: "POST",
             headers: headers,
-            body: new FormData(form)
+            body: new URLSearchParams(new FormData(form))
           }).then(function (response) { return response.text(); }).then(function (html) {
             document.open();
             document.write(html);

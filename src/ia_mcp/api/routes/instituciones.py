@@ -20,7 +20,12 @@ from fastapi.responses import HTMLResponse
 from pydantic import ValidationError
 
 from ia_mcp.api.auth.admin import get_principal
-from ia_mcp.configuration.models import TenantAdminContext, TenantConfigDraft
+from ia_mcp.configuration.models import (
+    AgentConfig,
+    McpConfig,
+    TenantAdminContext,
+    TenantConfigDraft,
+)
 from ia_mcp.configuration.ports import ConfigurationError
 from ia_mcp.configuration.service import ConfigurationService
 from ia_mcp.conversation.models import InboundMessage
@@ -272,8 +277,6 @@ async def _run_chat_turn(
 
 
 def _draft_from_form(form: InstitucionForm) -> TenantConfigDraft:
-    from ia_mcp.configuration.models import AgentConfig, McpConfig
-
     return TenantConfigDraft(
         schema_version=1,
         agent=AgentConfig(tone=form.tone, instructions=form.instructions),

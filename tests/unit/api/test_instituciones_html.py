@@ -216,6 +216,8 @@ def test_form_only_exposes_current_package_fields(tmp_path: Path) -> None:
     assert "cuit" not in html
     assert "api_key" not in html
     assert "whatsapp" not in html.lower() or "aspecto" in html.lower()
+    assert "URLSearchParams" in html
+    assert "application/x-www-form-urlencoded" in html
 
 
 def test_post_alta_writes_package_provisions_and_lab_enables(tmp_path: Path) -> None:
@@ -276,6 +278,7 @@ def test_chat_get_renders_whatsapp_shell(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "Clinica Norte" in response.text or SLUG in response.text
     assert "chat" in response.text.lower() or "whatsapp" in response.text.lower()
+    assert "URLSearchParams" in response.text
     assert TOKEN not in response.text
 
 
