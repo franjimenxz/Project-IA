@@ -46,7 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from ia_mcp.agent_runtime.context_compiler import ContextCompiler
 from ia_mcp.agent_runtime.harness import AgentHarness
 from ia_mcp.agent_runtime.models import LLMDecision
-from ia_mcp.agent_runtime.ports import FakeLLM
+from ia_mcp.agent_runtime.ports import FakeLLM, KnowledgeSearch, LLMPort
 from ia_mcp.agent_runtime.run_repository import SqlAlchemyAgentRunRepository
 from ia_mcp.api.auth.service_token import (
     ServiceTokenAuthenticator,
@@ -268,10 +268,12 @@ def build_runtime(
     gemini_api_key = environ.get(
         environment_variable_for(GEMINI_SECRET_REFERENCE), ""
     ).strip()
+    llm: LLMPort
     if gemini_api_key:
         llm = GeminiLLM(transport=UrllibGeminiTransport(), api_key=gemini_api_key)
     else:
         llm = FakeLLM(LLMDecision(kind="insufficient", text="", source_ids=()))
+    knowledge: KnowledgeSearch
     if packages_dir is not None:
         knowledge = LabKnowledgeSearch(packages_dir=packages_dir)
     else:
