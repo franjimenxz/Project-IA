@@ -1,6 +1,6 @@
 # Fase 13 — Páginas HTML de laboratorio
 
-**Estado:** ready  
+**Estado:** accepted  
 **Gate de entrada:** G6 satisfecho; Fase 12 aceptada en tablero  
 **Salida de fase:** AC-P13-001–AC-P13-008 aceptados; sin gate global nuevo
 

@@ -23,12 +23,12 @@ Gemini lee el `LLMRequest` (Core + perfil + evidencia + tools). El knowledge de 
 
 | ID | Resultado | Paralelismo |
 |---|---|---|
-| [P14-T01](agent-briefs/P14-T01-gemini-adapter.md) | `GeminiLLM` | `ready`, paralelo |
-| [P14-T02](agent-briefs/P14-T02-lab-knowledge.md) | Búsqueda de knowledge del package | `ready`, paralelo |
-| [P14-T03](agent-briefs/P14-T03-faq-read-tools.md) | FAQ lectura + compiler usa `enabled_tools` | `ready`, paralelo |
-| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `blocked` hasta T01–T03 `accepted` |
+| [P14-T01](agent-briefs/P14-T01-gemini-adapter.md) | `GeminiLLM` | `in_progress` |
+| [P14-T02](agent-briefs/P14-T02-lab-knowledge.md) | Búsqueda de knowledge del package | `accepted` |
+| [P14-T03](agent-briefs/P14-T03-faq-read-tools.md) | FAQ lectura + compiler usa `enabled_tools` | `accepted` |
+| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `blocked` hasta T01 `accepted` |
 
-P13-T01 (páginas HTML) no comparte archivos con T01–T03. Puede seguir en paralelo. T04 toca `composition.py`; no se lanza hasta aceptar T01–T03, y espera que P13-T01 haya soltado ese archivo.
+P13-T01 accepted (PR #91); `composition.py` ya no está reservado. T04 toca `composition.py`; no se lanza hasta aceptar T01.
 
 ## Fuera de alcance
 

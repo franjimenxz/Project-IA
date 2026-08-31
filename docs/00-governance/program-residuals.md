@@ -7,13 +7,11 @@
 
 | Ítem | Estado | Acción |
 |---|---|---|
-| P13-T01 páginas HTML de laboratorio | `in_progress` | Ya hay un agente. No relanzar |
-| P14-T01 adaptador Gemini | `in_progress` | [P14-T01](https://cursor.com/agents/bc-221973e1-33b4-5365-8c93-ef1417b2245d) |
+| P13-T01 páginas HTML de laboratorio | `accepted` | PR #91 (`a92d9af`) |
+| P14-T01 adaptador Gemini | `in_progress` | [P14-T01](https://cursor.com/agents/bc-221973e1-33b4-5365-8c93-ef1417b2245d). No relanzar |
 | P14-T02 knowledge de laboratorio | `accepted` | PR #89 (`83a3f22`) |
-| P14-T03 FAQ lectura + compiler | `in_progress` | [P14-T03](https://cursor.com/agents/bc-b67b97a4-40c0-5bb3-a6e8-b930c13f70ff) |
-| P14-T04 wiring de composition | `blocked` | Esperar T01–T03 `accepted` |
-
-T01–T03 no comparten archivos entre sí ni con P13-T01. T04 comparte `composition.py` con P13-T01: no lanzar T04 mientras P13-T01 esté `in_progress`.
+| P14-T03 FAQ lectura + compiler | `accepted` | PR #92 (`47081d9`) |
+| P14-T04 wiring de composition | `blocked` | Esperar T01 `accepted`. T02, T03 y P13 ya soltaron sus archivos |
 
 ## Fuera de esta wave (no delegar)
 
@@ -30,4 +28,4 @@ T01–T03 no comparten archivos entre sí ni con P13-T01. T04 comparte `composit
 
 ## Demo usable
 
-Hace falta P13-T01 (pantalla) **y** P14-T01–T04 (bot) **y** que el operador exporte `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
+Hace falta P14-T01 y P14-T04 **y** que el operador exporte `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
