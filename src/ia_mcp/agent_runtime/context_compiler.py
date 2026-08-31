@@ -46,7 +46,10 @@ def _evidence(hit: KnowledgeHit) -> str:
 
 
 def _policies(skill: SkillName, config: TenantConfig) -> dict[str, object]:
-    policies: dict[str, object] = {"agent": {"tone": config.agent.tone}}
+    agent: dict[str, object] = {"tone": config.agent.tone}
+    if config.agent.instructions:
+        agent["instructions"] = config.agent.instructions
+    policies: dict[str, object] = {"agent": agent}
     if skill == "appointments":
         policies["appointments"] = {"schema": "policy"}
     if skill == "human_handoff":
