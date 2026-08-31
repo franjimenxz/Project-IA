@@ -1,6 +1,6 @@
 # P15-T03 — Runtime adaptado al MCP enchufado
 
-**Estado:** in_progress · **Wave:** W14 · **Depends on:** P15-T02 accepted
+**Estado:** accepted · **Wave:** W14 · **Depends on:** P15-T02 accepted
 
 El turno de laboratorio anuncia e invoca las tools que el tenant habilitó (catálogo descubierto). Con endpoint allowlisted, el executor usa SSE también para nombres canónicos. Sin endpoint, el fake y la regla de lectura de ADR-006 se mantienen.
 

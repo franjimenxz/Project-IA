@@ -14,8 +14,9 @@
 | P14-T04 wiring de composition | `accepted` | PR #97 (`1473e5f`) |
 | P15-T01 docs Fase 15 / ADR-011 | `accepted` | PR #100 |
 | P15-T02 form + mapa MCP lab | `accepted` | PR #102 (`87a21b9`) |
+| P15-T03 runtime catálogo enchufado | `accepted` | PR #105 (`58dfcb5`) |
 
-Fase 13 y Fase 14 T01–T04 accepted. Fase 15: T01–T02 accepted. T03 `in_progress` (runtime + catálogo enchufado). Residual T02: `SseLabMcpDiscoverer` es no-op; el POST no lista tools hasta que T03 publique `app.state.lab_mcp_discoverer`.
+Fase 13, 14 y 15 T01–T03 accepted. Residual T03: MCP con auth no inventada falla cerrado hasta P05; mutaciones de lab no pasan por workflow (ADR-011).
 
 ## Fuera de esta wave (no delegar)
 
@@ -25,7 +26,7 @@ Fase 13 y Fase 14 T01–T04 accepted. Fase 15: T01–T02 accepted. T03 `in_progr
 | WhatsApp Cloud | EXT-004 | no inventar proveedor |
 | Plataforma de handoff real | EXT-005 | no inventar API |
 | Embeddings, PDF, OCR | EXT-008; el lab usa `knowledge/*.txt` | no es Gemini |
-| Mutaciones en el turno (`create` / `cancel` / `reschedule` / `confirm`) | ADR-006 §4; siguen por workflow | no abrir en P14 |
+| Mutaciones productivas en el turno | ADR-006 §4 / ADR-003; en lab anunciadas van por SSE (ADR-011) | no abrir workflow en P15 |
 | Secret manager de producto | ADR-007 ya mapea `sm://` → `IA_MCP_SECRET_*` | env del operador |
 | SLOs, legal, CI obligatorio en push a `main` | residuales P06/P07 | no esta wave |
 | Condiciones por slug de institución en Core | CON / ADR-002 | prohibido |
@@ -34,4 +35,4 @@ Fase 13 y Fase 14 T01–T04 accepted. Fase 15: T01–T02 accepted. T03 `in_progr
 
 El wiring de P14-T04 está en `main`. El operador debe exportar `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
 
-En development/test, las páginas HTML `/admin/instituciones` usan el `platform_admin` declarado en `IA_MCP_ADMIN_PRINCIPALS` cuando el browser no manda Bearer y el `IA_MCP_SECRET_*` de esa entrada resuelve. El token no se incrusta en el HTML. `/v1/admin/*` sigue exigiendo `Authorization`. El form ya persiste `mcp_endpoint` en `lab_mcp_endpoints.json` (T02). El chat aún no invoca el catálogo descubierto hasta T03.
+En development/test, las páginas HTML `/admin/instituciones` usan el `platform_admin` declarado en `IA_MCP_ADMIN_PRINCIPALS` cuando el browser no manda Bearer y el `IA_MCP_SECRET_*` de esa entrada resuelve. El token no se incrusta en el HTML. `/v1/admin/*` sigue exigiendo `Authorization`. Fase 15 está en `main`: el form persiste `mcp_endpoint`, descubre `tools/list` y el chat (canal `simulated`) invoca ese catálogo por SSE. Si el MCP exige auth, falla cerrado hasta P05. Nadie inventa Bearer.
