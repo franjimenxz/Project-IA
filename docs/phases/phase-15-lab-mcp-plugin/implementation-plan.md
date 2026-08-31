@@ -9,7 +9,7 @@ P15-T01 Architecture docs     (coordinador)
 P15-T02 Lab form + endpoint + chat WSP     accepted
                 │
                 ▼
-P15-T03 Runtime adapt                      ready
+P15-T03 Runtime adapt                      in_progress
 ```
 
 T02 y T03 no comparten archivos. T03 consume `lab_mcp.load_lab_mcp_endpoints` creado por T02.
