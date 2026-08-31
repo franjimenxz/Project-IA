@@ -15,6 +15,8 @@ class LLMRequest:
     history: tuple[str, ...]
     allowed_source_ids: tuple[str, ...]
     tool_names: tuple[str, ...] = ()
+    tone: str = ""
+    tenant_instructions: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

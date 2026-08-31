@@ -21,6 +21,7 @@ class TenantAdminContext:
 class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tone: str
+    instructions: str | None = Field(default=None, max_length=2000)
 
 
 class AppointmentPolicy(BaseModel):
