@@ -1,6 +1,6 @@
 # Fase 14 — Cerrar el bot de runtime
 
-**Estado:** ready  
+**Estado:** accepted  
 **Gate de entrada:** G6 satisfecho; Fase 12 accepted; vendor Gemini decidido (ADR-010)  
 **Salida de fase:** AC-P14-001–AC-P14-010 aceptados; sin gate global nuevo
 
@@ -26,9 +26,9 @@ Gemini lee el `LLMRequest` (Core + perfil + evidencia + tools). El knowledge de 
 | [P14-T01](agent-briefs/P14-T01-gemini-adapter.md) | `GeminiLLM` | `accepted` |
 | [P14-T02](agent-briefs/P14-T02-lab-knowledge.md) | Búsqueda de knowledge del package | `accepted` |
 | [P14-T03](agent-briefs/P14-T03-faq-read-tools.md) | FAQ lectura + compiler usa `enabled_tools` | `accepted` |
-| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `in_progress` |
+| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `accepted` |
 
-P13-T01 y T01–T03 accepted. T04 toca `composition.py`.
+Fase 14 T01–T04 accepted.
 
 ## Fuera de alcance
 
