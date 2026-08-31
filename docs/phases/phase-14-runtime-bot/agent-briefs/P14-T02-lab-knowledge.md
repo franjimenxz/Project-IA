@@ -1,6 +1,6 @@
 # P14-T02 — Knowledge de laboratorio
 
-**Estado:** ready · **Wave:** W13 · **Depends on:** Fase 12 accepted
+**Estado:** accepted · **Wave:** W13 · **Depends on:** Fase 12 accepted
 
 Crear `LabKnowledgeSearch` que lee `{packages_dir}/{tenant.tenant_slug}/knowledge/*.txt` en proceso. Sin embeddings. Sin tocar `composition.py`.
 
