@@ -2,7 +2,7 @@
 
 **Estado:** ready  
 **Gate de entrada:** G6 satisfecho; P10-T01 aceptada; Fase 11 aceptada en tablero  
-**Salida de fase:** AC-P12-001–AC-P12-00N aceptados (N lo fija T01); sin gate global nuevo
+**Salida de fase:** AC-P12-001–AC-P12-008 aceptados; sin gate global nuevo
 
 ## Problema
 
@@ -38,7 +38,7 @@ Si una institución requiere un `if tenant.slug` para que su tono o instruccione
 | ID | Resultado |
 |---|---|
 | [P12-T01](agent-briefs/P12-T01-architecture-docs.md) | ADR-008 y documentación de fase |
-| P12-T02 | Contrato y cableado del perfil (brief lo escribe T01) |
+| [P12-T02](agent-briefs/P12-T02-profile-contract.md) | Contrato y cableado del perfil |
 
 ## Dependencias abiertas
 
@@ -51,4 +51,6 @@ Si una institución requiere un `if tenant.slug` para que su tono o instruccione
 
 - [ADR-002](../../01-architecture/adr/ADR-002-tenant-context-and-isolation.md)
 - [ADR-006](../../01-architecture/adr/ADR-006-conversational-tool-loop.md)
-- TDD de fase y criterios: los crea P12-T01
+- [ADR-008](../../01-architecture/adr/ADR-008-tenant-agent-profile.md)
+- [TDD de fase](TDD.md)
+- [Criterios](acceptance-criteria.md)

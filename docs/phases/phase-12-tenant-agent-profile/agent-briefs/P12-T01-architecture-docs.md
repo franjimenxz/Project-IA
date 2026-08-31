@@ -1,6 +1,6 @@
 # P12-T01 — ADR-008 y documentación de fase
 
-**Estado:** ready · **Wave:** W11 · **Depends on:** Fase 11 accepted en tablero; P10-T01 accepted
+**Estado:** accepted · **Wave:** W11 · **Depends on:** Fase 11 accepted en tablero; P10-T01 accepted
 
 Documentar que el perfil de agente del tenant (tono + instrucciones opcionales) es configuración versionada y llega a cada `LLMRequest` del turno, sin reemplazar Core ni abrir un system prompt libre. Tarea sin código de producción.
 
@@ -93,7 +93,7 @@ ruff check scripts tests/docs
 
 Cada afirmación de estado actual del ADR cita archivo y línea verificables en el commit base de esta rama. El brief de T02 debe tener las secciones exigidas por `check_docs.py --briefs`: Lectura obligatoria, Archivos, Interfaces/TDD, Verificación, Commit.
 
-Criterio mínimo: AC-P12-001 (ADR-008 + fase documentada). El resto de AC-P12 los define T01 y los cubre T02.
+T01 cubre AC-P12-001. T01 define AC-P12-001–AC-P12-008. T02 cubre AC-P12-002–AC-P12-008.
 
 ## Exclusiones
 

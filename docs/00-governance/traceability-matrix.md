@@ -7,8 +7,8 @@
 
 | Requisitos | Diseño principal | Criterios | Pruebas | Fase |
 |---|---|---|---|---|
-| RF-001–RF-003 | Tenant/configuration en System TDD | AC-P02-002–007, AC-P02-011–012, AC-P04-001–003 | Unit + integración + aislamiento | 2, 4.1 |
-| RF-004–RF-008 | Agent Harness y Context Compiler | AC-P04-004–008 | Unit + eval + autorización | 4.1, 4.2 |
+| RF-001–RF-003 | Tenant/configuration en System TDD | AC-P02-002–007, AC-P02-011–012, AC-P04-001–003, AC-P12-002, AC-P12-006 | Unit + integración + aislamiento | 2, 4.1, 12 |
+| RF-004–RF-008 | Agent Harness y Context Compiler | AC-P04-004–008, AC-P12-003–005, AC-P12-007–008 | Unit + eval + autorización | 4.1, 4.2, 12 |
 | RF-009–RF-013, RF-043 | Knowledge/RAG TDD | AC-P04-009–014 | Integración + eval + fuga | 4.1 |
 | RF-014–RF-018 | Appointment workflow TDD | AC-P04-020–027 | Unit + contrato + E2E | 4.2 |
 | RF-019–RF-023 | Lifecycle/workflow TDD | AC-P04-030–038 | E2E + resiliencia | 4.3 |
