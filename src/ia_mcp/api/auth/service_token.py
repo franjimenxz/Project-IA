@@ -67,6 +67,8 @@ class AdminAuthenticator(Protocol):
 
     async def authenticate(self, credentials: str | None) -> Principal | None: ...
 
+    async def fallback_platform_admin(self) -> Principal | None: ...
+
 
 @dataclass(frozen=True, slots=True)
 class PrincipalBinding:
@@ -97,6 +99,27 @@ class ServiceTokenAuthenticator:
             # would make the work depend on which token was presented.
             if expected is not None and compare_digest(digest, expected):
                 matched = binding.principal if matched is None else matched
+        return matched
+
+    async def fallback_platform_admin(self) -> Principal | None:
+        """Roster `platform_admin` for lab HTML when the browser sent no Bearer.
+
+        The identity comes from `IA_MCP_ADMIN_PRINCIPALS`. The token value is
+        never returned: a binding is used only if its secret resolves, so a
+        roster entry without the matching `IA_MCP_SECRET_*` does not open the
+        HTML plane. Tenant-bound principals are skipped.
+        """
+        matched: Principal | None = None
+        for binding in self._bindings:
+            if "platform_admin" not in binding.principal.roles:
+                continue
+            if binding.principal.tenant_id is not None:
+                continue
+            expected = await self._expected_digest(binding)
+            if expected is None:
+                continue
+            if matched is None:
+                matched = binding.principal
         return matched
 
     async def _expected_digest(self, binding: PrincipalBinding) -> bytes | None:

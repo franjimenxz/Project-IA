@@ -1,6 +1,8 @@
 """Lab HTML and JSON routes for institutions (ADR-009).
 
-Mounted only in development and test. Auth is ADR-007 (`get_principal`).
+Mounted only in development and test. JSON auth is ADR-007 (`get_principal`).
+HTML pages without `Authorization` act as the roster `platform_admin` whose
+`IA_MCP_SECRET_*` resolves; the token is never written into the page.
 Tenant-scoped work always receives a `TenantContext` of the chosen slug.
 """
 
@@ -19,7 +21,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from pydantic import ValidationError
 
-from ia_mcp.api.auth.admin import get_principal
+from ia_mcp.api.auth.admin import AUTHORIZATION_HEADER, get_principal
+from ia_mcp.api.auth.service_token import AdminAuthenticator
 from ia_mcp.configuration.models import (
     AgentConfig,
     McpConfig,
@@ -54,6 +57,7 @@ from ia_mcp.shared.errors import TenantIsolationViolation
 _LIST_TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "instituciones.html"
 _CHAT_TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "institucion_chat.html"
 _UNAUTHORIZED = "Administrator is not allowed to perform this action."
+_UNAUTHENTICATED = "Administrator identity is required."
 _HISTORY_PAIRS = 20
 
 
@@ -110,7 +114,7 @@ def create_instituciones_router() -> APIRouter:
     @router.get("/admin/instituciones", response_model=None)
     async def get_instituciones_html(
         request: Request,
-        principal: Annotated[Principal, Depends(require_platform_admin)],
+        principal: Annotated[Principal, Depends(html_platform_admin)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> HTMLResponse:
         items = await service.list_tenants(principal)
@@ -119,7 +123,7 @@ def create_instituciones_router() -> APIRouter:
     @router.post("/admin/instituciones", response_model=None)
     async def post_instituciones_html(
         request: Request,
-        principal: Annotated[Principal, Depends(require_platform_admin)],
+        principal: Annotated[Principal, Depends(html_platform_admin)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> HTMLResponse:
         message = ""
@@ -141,7 +145,7 @@ def create_instituciones_router() -> APIRouter:
     async def get_institucion_chat(
         slug: str,
         request: Request,
-        principal: Annotated[Principal, Depends(get_principal)],
+        principal: Annotated[Principal, Depends(html_lab_principal)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> HTMLResponse:
         await _chat_admin(principal, service, slug)
@@ -158,7 +162,7 @@ def create_instituciones_router() -> APIRouter:
     async def post_institucion_chat(
         slug: str,
         request: Request,
-        principal: Annotated[Principal, Depends(get_principal)],
+        principal: Annotated[Principal, Depends(html_lab_principal)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
     ) -> HTMLResponse:
         await _chat_admin(principal, service, slug)
@@ -189,6 +193,47 @@ def create_instituciones_router() -> APIRouter:
 
 async def require_platform_admin(request: Request) -> Principal:
     principal = await get_principal(request)
+    if PLATFORM_ADMIN not in principal.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_UNAUTHORIZED,
+        )
+    return principal
+
+
+async def html_lab_principal(request: Request) -> Principal:
+    """Authenticate HTML lab pages; missing Bearer uses the roster operator.
+
+    JSON admin routes keep `get_principal`. A presented but invalid Bearer
+    still answers 401 so a typo is not silently upgraded to platform_admin.
+    The token value is never copied into the response.
+    """
+    authenticator = getattr(request.app.state, "admin_authenticator", None)
+    if not isinstance(authenticator, AdminAuthenticator):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_UNAUTHENTICATED,
+        )
+    header = request.headers.get(AUTHORIZATION_HEADER)
+    if header and header.strip():
+        principal = await authenticator.authenticate(header)
+        if principal is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=_UNAUTHENTICATED,
+            )
+        return principal
+    principal = await authenticator.fallback_platform_admin()
+    if principal is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_UNAUTHENTICATED,
+        )
+    return principal
+
+
+async def html_platform_admin(request: Request) -> Principal:
+    principal = await html_lab_principal(request)
     if PLATFORM_ADMIN not in principal.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
