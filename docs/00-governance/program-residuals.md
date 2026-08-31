@@ -16,7 +16,7 @@
 | P15-T02 form + mapa MCP lab | `accepted` | PR #102 (`87a21b9`) |
 | P15-T03 runtime catálogo enchufado | `accepted` | PR #105 (`58dfcb5`) |
 
-Fase 13, 14 y 15 T01–T03 accepted. Residual T03: MCP con auth no inventada falla cerrado hasta P05; mutaciones de lab no pasan por workflow (ADR-011).
+Fase 13, 14 y 15 T01–T03 accepted. Hotfix PR #107 (`30f1785`): el primer alta ya no pierde `enabled_tools` al convertir package → draft. Residual T03: MCP con auth no inventada falla cerrado hasta P05; mutaciones de lab no pasan por workflow (ADR-011). Tenants creados antes del hotfix tienen `enabled_tools` vacío en Postgres hasta re-guardar el formulario.
 
 ## Fuera de esta wave (no delegar)
 
