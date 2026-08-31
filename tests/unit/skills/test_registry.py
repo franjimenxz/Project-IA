@@ -37,11 +37,11 @@ def test_disabled_skill_is_not_instantiated() -> None:
         registry.resolve("appointments", _config("faq"))
 
 
-def test_faq_exposes_no_tools() -> None:
+def test_faq_exposes_enabled_tools_including_discovered_names() -> None:
     config = _config("faq", enabled_tools=frozenset({"crear_turno"}))
     skill = SkillRegistry().resolve("faq", config)
     assert skill.name == "faq"
-    assert skill.allowed_tools(config) == frozenset()
+    assert skill.allowed_tools(config) == frozenset({ToolName("crear_turno")})
 
 
 def test_appointments_uses_tenant_allowlist_including_discovered_names() -> None:

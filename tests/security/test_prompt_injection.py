@@ -28,6 +28,7 @@ from tests.integration.api.test_simulated_messages import (
     signed_simulated_headers,
     valid_body,
 )
+from tests.unit.mcp.test_executor import TransportSpy
 
 SEARCH_ARGS: dict[str, object] = {
     "specialty": "cardiologia",
@@ -288,6 +289,7 @@ async def test_endpoint_outside_host_allowlist_is_rejected_before_capability() -
     assert closed.ok is False
     assert capability.calls == []
 
+    transport = TransportSpy()
     permitted = ToolExecutor(
         server=ALL_TOOLS,
         tenant=ALL_TOOLS,
@@ -295,12 +297,14 @@ async def test_endpoint_outside_host_allowlist_is_rejected_before_capability() -
         capability=capability,
         resolver=StaticResolver(endpoint=ALLOWED_MCP_ENDPOINT),
         allowed_hosts=ALLOWED_MCP_HOSTS,
+        transport=transport,
     )
     allowed = await permitted.execute(
         TENANT_A_CTX, uuid4(), ToolCall(name="appointments.search", arguments=SEARCH_ARGS)
     )
     assert allowed.ok is True
-    assert capability.calls == [(TENANT_A, "search")]
+    assert capability.calls == []
+    transport.call_tool.assert_awaited()
 
 
 @pytest.mark.security

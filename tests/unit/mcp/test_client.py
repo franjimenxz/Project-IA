@@ -10,6 +10,7 @@ import asyncio
 import inspect
 import json
 from collections.abc import Coroutine, Iterable
+from pathlib import Path
 from typing import Any, get_type_hints
 from uuid import uuid4
 
@@ -100,6 +101,25 @@ def test_list_tools_intersects_allowed_tools(target: McpTarget) -> None:
     catalog = _run(_client().list_tools(TENANT_A, restricted))
     assert catalog.names() == frozenset({"crear_turno"})
     assert all(tool.name == "crear_turno" for tool in catalog.tools)
+
+
+def test_list_tools_intersect_allowed_false_keeps_all_names(target: McpTarget) -> None:
+    restricted = McpTarget(
+        server_id=target.server_id,
+        endpoint=target.endpoint,
+        auth_reference=target.auth_reference,
+        allowed_tools=frozenset(),
+    )
+    catalog = _run(
+        _client().list_tools(TENANT_A, restricted, intersect_allowed=False)
+    )
+    assert catalog.names() == TOOL_NAMES
+
+
+def test_client_does_not_invent_authorization_headers() -> None:
+    source = Path("src/ia_mcp/mcp/client.py").read_text(encoding="utf-8")
+    assert "Authorization" not in source
+    assert "Bearer " not in source
 
 
 def test_call_tool_happy_path_returns_tool_result(target: McpTarget) -> None:

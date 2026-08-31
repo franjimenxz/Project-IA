@@ -5,17 +5,30 @@ from uuid import UUID
 
 import pytest
 
-from ia_mcp.agent_runtime.models import ToolCallProposal
-from ia_mcp.configuration.models import TenantConfig
+from ia_mcp.agent_runtime.context_compiler import ContextCompiler
+from ia_mcp.agent_runtime.harness import AgentHarness, invocable_on_turn
+from ia_mcp.agent_runtime.models import LLMDecision, ToolCallProposal
+from ia_mcp.configuration.models import AgentConfig, TenantConfig
 from ia_mcp.contracts.common import ToolResult
 from ia_mcp.mcp.executor import McpTarget, ToolCall
+from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.models import TenantContext
-from tests.unit.agent.test_harness import TENANT_A, inbound, tenant_a
+from tests.unit.agent.test_harness import (
+    TENANT_A,
+    FakeConfigRepository,
+    FakeConversationRepository,
+    FakeKnowledge,
+    FakeRunRepository,
+    hit,
+    inbound,
+    tenant_a,
+)
 from tests.unit.agent.test_harness_loop import (
     ANSWER,
     GET_PROPOSAL,
     SEARCH_PROPOSAL,
     RecordingExecutor,
+    RecordingFactory,
     ScriptedLLM,
     make_loop_harness,
     tenant_b,
@@ -29,6 +42,25 @@ MUTATING_CANONICAL = (
     "appointments.confirm",
 )
 NON_CANONICAL = "crear_turno"
+
+
+def _faq_config(*tools: str) -> TenantConfig:
+    return TenantConfig(
+        tenant_id=TENANT_A,
+        version=1,
+        agent=AgentConfig(tone="cordial"),
+        enabled_skills=frozenset({"faq"}),
+        enabled_tools=frozenset(tools),
+    )
+
+
+def test_invocable_on_turn_honors_declared_names() -> None:
+    declared = frozenset({"appointments.create", NON_CANONICAL})
+    assert invocable_on_turn("appointments.create", declared_for_turn=declared)
+    assert invocable_on_turn(NON_CANONICAL, declared_for_turn=declared)
+    assert invocable_on_turn("appointments.create") is False
+    assert invocable_on_turn("appointments.search") is True
+    assert invocable_on_turn(NON_CANONICAL) is False
 
 
 class AnyFactory:
@@ -222,3 +254,83 @@ async def test_tenant_b_turn_uses_tenant_b_executor_not_tenant_a() -> None:
     assert executor_b.tenants[0].tenant_id == tenant_b().tenant_id
     assert result.tenant_id == tenant_b().tenant_id
     assert all(request.tenant_id == tenant_b().tenant_id for request in llm.requests)
+
+
+def _announced_harness(
+    *,
+    llm: ScriptedLLM,
+    executor: object,
+    tools: frozenset[str],
+    knowledge: FakeKnowledge | None = None,
+) -> AgentHarness:
+    configs = FakeConfigRepository({TENANT_A: _faq_config(*tools)})
+    compiler = ContextCompiler(
+        configs=configs,
+        skills=SkillRegistry(),
+        tenant_tools={},
+        server_tools=tools,
+    )
+    return AgentHarness(
+        conversations=FakeConversationRepository(),
+        runs=FakeRunRepository(),
+        configs=configs,
+        skills=SkillRegistry(),
+        compiler=compiler,
+        knowledge=knowledge or FakeKnowledge(hits=(hit(),)),
+        llm=llm,
+        executors=AnyFactory(executor),
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("name", ("appointments.create", NON_CANONICAL))
+async def test_announced_mutation_reaches_executor(name: str) -> None:
+    executor = RecordingExecutor()
+    llm = ScriptedLLM(ToolCallProposal(name=name, arguments={"slot": "manana"}), ANSWER)
+    harness = _announced_harness(llm=llm, executor=executor, tools=frozenset({name}))
+
+    result = await harness.handle_message(tenant_a(), inbound("book"))
+
+    assert [call.name for call in executor.calls] == [name]
+    assert result.tool_calls[0].name == name
+    assert result.tool_calls[0].ok is True
+    assert llm.requests[0].tool_names == (name,)
+
+
+@pytest.mark.anyio
+async def test_empty_knowledge_with_enabled_tools_reaches_llm() -> None:
+    llm = ScriptedLLM(ANSWER)
+    configs = FakeConfigRepository({TENANT_A: _faq_config("appointments.search")})
+    harness, _knowledge, _llm, _runs = make_loop_harness(
+        llm=llm,
+        knowledge=FakeKnowledge(hits=()),
+        configs=configs,
+    )
+
+    result = await harness.handle_message(tenant_a(), inbound("hours"))
+
+    assert llm.requests
+    assert "generate" in result.trajectory
+
+
+@pytest.mark.anyio
+async def test_answer_after_successful_tool_does_not_require_cites() -> None:
+    executor = RecordingExecutor()
+    llm = ScriptedLLM(
+        SEARCH_PROPOSAL,
+        LLMDecision(kind="answer", text="Hay turnos el martes.", source_ids=()),
+    )
+    configs = FakeConfigRepository({TENANT_A: _faq_config("appointments.search")})
+    harness, _knowledge, _llm, _runs = make_loop_harness(
+        llm=llm,
+        executors=RecordingFactory(executor),
+        knowledge=FakeKnowledge(hits=()),
+        configs=configs,
+    )
+
+    result = await harness.handle_message(tenant_a(), inbound("book"))
+
+    assert executor.calls
+    assert result.kind == "answer"
+    assert result.text == "Hay turnos el martes."
+    assert result.source_ids == ()

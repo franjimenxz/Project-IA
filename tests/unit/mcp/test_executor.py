@@ -107,7 +107,7 @@ class ResolverSpy:
         self,
         *,
         allowed_tools: frozenset[str] = CATALOG,
-        endpoint: str = "https://internal.example/secret-mcp",
+        endpoint: str = "",
     ) -> None:
         self.resolve = AsyncMock(
             return_value=McpTarget(
@@ -382,12 +382,52 @@ def test_authorized_non_canonical_tool_calls_generic_client_not_capability(
         assert fragment not in blob
 
 
-def test_canonical_appointments_search_uses_capability_when_wired(
+@pytest.mark.parametrize(
+    ("name", "arguments"),
+    (
+        ("appointments.search", SEARCH_ARGS),
+        (CREAR_TURNO, CREAR_TURNO_ARGS),
+    ),
+)
+def test_allowlisted_endpoint_dispatches_any_name_to_transport(
+    capability_spy: CapabilitySpy,
+    audit_spy: Mock,
+    name: str,
+    arguments: dict[str, Any],
+) -> None:
+    transport = TransportSpy()
+    resolver = ResolverSpy(
+        allowed_tools=CATALOG | {CREAR_TURNO},
+        endpoint=ALLOWED_MCP_ENDPOINT,
+    )
+    executor = _make_executor(
+        capability_spy,
+        resolver,
+        audit_spy,
+        transport=transport,
+        allowed_hosts=(ALLOWED_MCP_HOST,),
+        **_generic_allowlists(),
+    )
+
+    result = _run(executor.execute(TENANT_A_CTX, RUN_ID, tool_call(name, arguments)))
+
+    assert result.ok is True
+    assert result.value == {"status": "ok"}
+    capability_spy.assert_not_called()
+    transport.call_tool.assert_awaited_once()
+    args = transport.call_tool.call_args
+    assert args.args[0] is TENANT_A_CTX
+    assert args.args[1].endpoint == ALLOWED_MCP_ENDPOINT
+    assert args.args[2] == name
+    assert dict(args.args[3]) == arguments
+
+
+def test_canonical_search_uses_capability_without_endpoint(
     capability_spy: CapabilitySpy,
     audit_spy: Mock,
 ) -> None:
     transport = TransportSpy()
-    resolver = ResolverSpy(endpoint=ALLOWED_MCP_ENDPOINT)
+    resolver = ResolverSpy(endpoint="")
     executor = _make_executor(
         capability_spy,
         resolver,
@@ -408,6 +448,85 @@ def test_canonical_appointments_search_uses_capability_when_wired(
     capability_spy.search.assert_called_once()
     assert capability_spy.search.call_args.args[0] is TENANT_A_CTX
     transport.assert_not_called()
+
+
+def test_endpoint_without_allowlist_does_not_fall_to_capability(
+    capability_spy: CapabilitySpy,
+    audit_spy: Mock,
+) -> None:
+    resolver = ResolverSpy(endpoint=ALLOWED_MCP_ENDPOINT)
+    executor = _make_executor(capability_spy, resolver, audit_spy)
+
+    result = _run(
+        executor.execute(
+            TENANT_A_CTX,
+            RUN_ID,
+            tool_call("appointments.search", SEARCH_ARGS),
+        )
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == ToolErrorCode.FORBIDDEN
+    capability_spy.assert_not_called()
+
+
+def test_tenant_a_does_not_see_tenant_b_tools_or_endpoint(
+    capability_spy: CapabilitySpy,
+    audit_spy: Mock,
+) -> None:
+    transport = TransportSpy()
+    resolver_a = ResolverSpy(
+        allowed_tools=frozenset({"appointments.search"}),
+        endpoint="https://mcp-a.example/sse",
+    )
+    resolver_b = ResolverSpy(
+        allowed_tools=frozenset({CREAR_TURNO}),
+        endpoint="https://mcp-b.example/sse",
+    )
+    exec_a = _make_executor(
+        capability_spy,
+        resolver_a,
+        audit_spy,
+        tenant_tools=frozenset({"appointments.search"}),
+        server_tools=frozenset({"appointments.search", CREAR_TURNO}),
+        skill_tools=frozenset({"appointments.search", CREAR_TURNO}),
+        transport=transport,
+        allowed_hosts=("mcp-a.example", "mcp-b.example"),
+    )
+    exec_b = _make_executor(
+        capability_spy,
+        resolver_b,
+        audit_spy,
+        tenant_tools=frozenset({CREAR_TURNO}),
+        server_tools=frozenset({"appointments.search", CREAR_TURNO}),
+        skill_tools=frozenset({"appointments.search", CREAR_TURNO}),
+        transport=transport,
+        allowed_hosts=("mcp-a.example", "mcp-b.example"),
+    )
+
+    denied = _run(
+        exec_a.execute(TENANT_A_CTX, RUN_ID, tool_call(CREAR_TURNO, CREAR_TURNO_ARGS))
+    )
+    searched = _run(
+        exec_a.execute(
+            TENANT_A_CTX, RUN_ID, tool_call("appointments.search", SEARCH_ARGS)
+        )
+    )
+    created = _run(
+        exec_b.execute(TENANT_B_CTX, RUN_ID, tool_call(CREAR_TURNO, CREAR_TURNO_ARGS))
+    )
+
+    assert denied.ok is False
+    assert denied.error is not None
+    assert denied.error.code == ToolErrorCode.FORBIDDEN
+    assert searched.ok is True
+    assert created.ok is True
+    endpoints = [call.args[1].endpoint for call in transport.call_tool.await_args_list]
+    assert endpoints == ["https://mcp-a.example/sse", "https://mcp-b.example/sse"]
+    names = [call.args[2] for call in transport.call_tool.await_args_list]
+    assert names == ["appointments.search", CREAR_TURNO]
+    capability_spy.assert_not_called()
 
 
 def test_host_not_allowlisted_is_forbidden_without_calling_client(

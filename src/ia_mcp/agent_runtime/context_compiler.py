@@ -65,11 +65,13 @@ class ContextCompiler:
         skills: SkillRegistry,
         tenant_tools: Mapping[UUID, frozenset[str]],
         server_tools: Mapping[UUID, frozenset[str]] | frozenset[str] | None = None,
+        mirror_tenant_tools: bool = False,
     ) -> None:
         self._configs = configs
         self._skills = skills
         self._tenant_tools = tenant_tools
         self._server_tools = server_tools
+        self._mirror_tenant_tools = mirror_tenant_tools
 
     def _server_catalog(self, tenant_id: UUID) -> frozenset[str]:
         catalog = self._server_tools
@@ -86,9 +88,12 @@ class ContextCompiler:
         if config is None:
             raise ConfigurationError("not_found", "Active configuration is not available.")
         skill = self._skills.resolve(request.skill, config)
+        catalog = self._server_catalog(tenant.tenant_id)
+        if self._mirror_tenant_tools:
+            catalog = catalog | frozenset(config.enabled_tools)
         authorized = sorted(
             tool_registry.available(
-                server=self._server_catalog(tenant.tenant_id),
+                server=catalog,
                 tenant=config.enabled_tools,
                 skill=skill.allowed_tools(config),
             )

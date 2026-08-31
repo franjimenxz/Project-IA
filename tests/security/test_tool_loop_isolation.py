@@ -252,7 +252,8 @@ async def test_enlarging_tenant_a_allowlist_does_not_change_tenant_b_surface() -
     after_a = await harness_a.handle_message(tenant_a(), inbound("hours"))
     assert after_a.tool_calls[0].ok is True
     assert after_a.tool_calls[0].name == B_ONLY_DISCOVERED
-    factory.capabilities[TENANT_A].get.assert_awaited()
+    factory.transports[TENANT_A].call_tool.assert_awaited()
+    factory.capabilities[TENANT_A].get.assert_not_called()
     assert factory.catalogs[TENANT_B] == SEARCH_ONLY
 
 

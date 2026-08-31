@@ -42,18 +42,25 @@ def test_faq_exposes_no_tools() -> None:
     assert skill.required_fields(config()) == ()
 
 
-def test_faq_announces_only_read_tools_from_enabled_tools() -> None:
+def test_faq_allowed_tools_mirrors_enabled_tools_including_mutations() -> None:
     skill = FAQSkill()
     cfg = TenantConfig(
         tenant_id=TENANT_A,
         version=1,
         agent=AgentConfig(tone="cordial"),
         enabled_skills=frozenset({"faq"}),
-        enabled_tools=frozenset({"appointments.search", "appointments.create"}),
+        enabled_tools=frozenset(
+            {"appointments.search", "appointments.create", "crear_turno"}
+        ),
     )
     allowed = skill.allowed_tools(cfg)
-    assert allowed == frozenset({ToolName("appointments.search")})
-    assert ToolName("appointments.create") not in allowed
+    assert allowed == frozenset(
+        {
+            ToolName("appointments.search"),
+            ToolName("appointments.create"),
+            ToolName("crear_turno"),
+        }
+    )
 
 
 @pytest.mark.anyio
