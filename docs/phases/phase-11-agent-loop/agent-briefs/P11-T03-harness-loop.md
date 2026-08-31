@@ -1,6 +1,6 @@
 # P11-T03 — Loop acotado en el harness
 
-**Estado:** draft · **Wave:** W10 · **Depends on:** P11-T02 aceptada
+**Estado:** ready · **Wave:** W10 · **Depends on:** P11-T02 aceptada
 
 Ejecutar en `AgentHarness` un loop acotado que consuma el `ToolExecutor` cableado en Fase 10, con superficie invocable fail-closed, límites duros y errores tipados.
 

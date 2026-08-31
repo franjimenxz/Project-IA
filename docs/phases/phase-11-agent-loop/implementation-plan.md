@@ -28,9 +28,9 @@
 
 **Brief:** [`agent-briefs/P11-T02-decision-contract.md`](agent-briefs/P11-T02-decision-contract.md)
 
-- [ ] Rojo: `LLMPort` no puede expresar una tool call y `LLMRequest` no puede transportar resultados previos.
-- [ ] Verde: `ToolCallProposal`, `LLMTurnDecision`, `ToolObservation`, `LLMRequest.tool_results`, `AgentTurnResult.tool_calls` y ajuste de `observe_turn`.
-- [ ] Commit `feat: add tool call decision and observation contracts`.
+- [x] Rojo: `LLMPort` no puede expresar una tool call y `LLMRequest` no puede transportar resultados previos.
+- [x] Verde: `ToolCallProposal`, `LLMTurnDecision`, `ToolObservation`, `LLMRequest.tool_results`, `AgentTurnResult.tool_calls` y ajuste de `observe_turn`.
+- [x] Commit `feat: add tool call decision and observation contracts`.
 
 ## Task 3: Loop acotado en el harness
 
