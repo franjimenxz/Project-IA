@@ -1,6 +1,6 @@
 # P14-T01 — Adaptador Gemini
 
-**Estado:** ready · **Wave:** W13 · **Depends on:** Fase 12 accepted; ADR-010 accepted
+**Estado:** accepted · **Wave:** W13 · **Depends on:** Fase 12 accepted; ADR-010 accepted
 
 Crear `GeminiLLM` que implementa `LLMPort` contra Gemini 3.5 Flash vía transport inyectable. Sin red real en tests. Sin tocar `composition.py`.
 

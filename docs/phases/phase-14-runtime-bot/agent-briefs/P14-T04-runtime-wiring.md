@@ -1,8 +1,8 @@
 # P14-T04 — Wiring del runtime
 
-**Estado:** blocked · **Wave:** W13 · **Depends on:** P14-T01 `accepted` (T02, T03 y P13-T01 ya accepted; `composition.py` libre)
+**Estado:** ready · **Wave:** W13 · **Depends on:** P14-T01, P14-T02 y P14-T03 `accepted`
 
-`build_runtime` instancia `GeminiLLM` si el secreto existe, `LabKnowledgeSearch` si hay packages dir, y pasa el catálogo MCP de lectura como `server_tools`. Fail-closed a `FakeLLM` / `EmptyKnowledgeSearch` si faltan. **No lanzar esta tarea hasta que T01 esté `accepted`.**
+`build_runtime` instancia `GeminiLLM` si el secreto existe, `LabKnowledgeSearch` si hay packages dir, y pasa el catálogo MCP de lectura como `server_tools`. Fail-closed a `FakeLLM` / `EmptyKnowledgeSearch` si faltan.
 
 Commit: `feat: wire Gemini and lab knowledge into development runtime (P14-T04)`
 
