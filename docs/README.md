@@ -27,6 +27,7 @@ Este directorio es la fuente de verdad para diseñar, implementar, verificar y o
 5. [`00-governance/traceability-matrix.md`](00-governance/traceability-matrix.md)
 6. `phases/<fase>/implementation-plan.md`
 7. `phases/<fase>/agent-briefs/*.md`
+8. [`00-governance/program-residuals.md`](00-governance/program-residuals.md)
 
 ### Para verificar y operar
 
@@ -59,4 +60,4 @@ Una contradicción se resuelve en el nivel superior; nunca mediante una desviaci
 
 ## Estado del programa
 
-La documentación define trece fases. La API médica, el proveedor real de WhatsApp y la plataforma real de handoff son dependencias externas; el MVP trabaja con puertos y mocks hasta que sus gates estén satisfechos. Fase 9 habilita discovery MCP (ADR-005). Fase 11 cablea el loop de tools de lectura. Fase 12 hace que el perfil de agente del tenant (`tone` e `instructions`) llegue al `LLMRequest`. Fase 13 agrega páginas HTML de laboratorio para instituciones (el bot débil se mejora después).
+La documentación define catorce fases. La API médica, el proveedor real de WhatsApp y la plataforma real de handoff son dependencias externas; el MVP trabaja con puertos y mocks hasta que sus gates estén satisfechos. Fase 9 habilita discovery MCP (ADR-005). Fase 11 cablea el loop de tools de lectura. Fase 12 hace que el perfil de agente del tenant (`tone` e `instructions`) llegue al `LLMRequest`. Fase 13 agrega páginas HTML de laboratorio para instituciones. Fase 14 cierra el bot débil de development (Gemini, knowledge de package, FAQ de lectura). Residuales del programa: [`00-governance/program-residuals.md`](00-governance/program-residuals.md).
