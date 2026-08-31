@@ -532,6 +532,67 @@ def test_runtime_lab_endpoints_alone_wire_transport(tmp_path: Path) -> None:
     assert runtime.tool_executor.allowed_hosts == ("http://192.168.1.247",)
 
 
+def test_runtime_reloads_lab_endpoint_written_after_startup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lan = "http://192.168.1.247:8001/sse"
+    environ = {
+        "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+        "IA_MCP_TENANT_PACKAGES_DIR": str(tmp_path),
+    }
+    runtime = build_runtime(environment="development", environ=environ)
+    assert runtime is not None
+    assert runtime.tool_executor.transport is None
+    assert "http://192.168.1.247" not in runtime.tool_executor.allowed_hosts
+
+    write_lab_mcp_endpoint(tmp_path, SERVER_ID, lan)
+    runtime.tool_executor._integrations = StubIntegrations(
+        frozenset({"appointments.search"}), endpoint=""
+    )
+
+    class RecordingClient:
+        def __init__(
+            self, *, allowlist: object, timeout_seconds: float = 10.0
+        ) -> None:
+            self.allowlist = allowlist
+            del timeout_seconds
+            self.calls: list[tuple[str, str]] = []
+
+        async def call_tool(
+            self,
+            tenant: TenantContext,
+            target: McpTarget,
+            name: str,
+            arguments: dict[str, Any],
+        ) -> ToolResult[Any]:
+            del tenant, arguments
+            self.calls.append((name, target.endpoint))
+            return ToolResult[Any](ok=True, value={"via": "transport"})
+
+    monkeypatch.setattr("ia_mcp.api.composition.SseMcpClient", RecordingClient)
+    tenant = _tenant()
+
+    async def _scenario() -> tuple[ToolResult[Any], McpTarget]:
+        executor = await runtime.tool_executor.for_tenant(
+            tenant, _config("appointments.search"), "appointments"
+        )
+        target = await executor._resolver.resolve(tenant, "appointments")
+        result = await executor.execute(
+            tenant,
+            RUN_ID,
+            ToolCall(name="appointments.search", arguments=SEARCH_ARGS),
+        )
+        return result, target
+
+    result, target = _run(_scenario())
+    assert target.endpoint == lan
+    assert "http://192.168.1.247" in runtime.tool_executor.allowed_hosts
+    assert result.ok is True
+    assert result.value == {"via": "transport"}
+    assert isinstance(runtime.tool_executor.transport, RecordingClient)
+    assert runtime.tool_executor.transport.calls == [("appointments.search", lan)]
+
+
 def test_runtime_discoverer_lists_without_intersect_or_auth(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

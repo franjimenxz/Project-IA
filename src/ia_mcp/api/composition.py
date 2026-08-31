@@ -125,13 +125,59 @@ class EmptyKnowledgeSearch:
         return ()
 
 
+def live_mcp_endpoints(
+    packages_dir: Path | None, environ: Mapping[str, str]
+) -> dict[str, str]:
+    """Merge lab JSON with `IA_MCP_MCP_ENDPOINTS`. Env wins on the same key."""
+    lab = load_lab_mcp_endpoints(packages_dir) if packages_dir is not None else {}
+    return {**lab, **mcp_endpoints_from(environ)}
+
+
+class LiveMcpEndpointResolver:
+    """Overlays the current lab/env endpoint map onto a resolved target.
+
+    `SqlAlchemyMcpIntegrations` snapshots endpoints at construction. The HTML
+    form writes `lab_mcp_endpoints.json` in this same process, so each resolve
+    reloads the merge and applies it. Auth is never invented.
+    """
+
+    def __init__(
+        self,
+        inner: TenantMcpIntegrations,
+        *,
+        packages_dir: Path | None,
+        environ: Mapping[str, str],
+    ) -> None:
+        self._inner = inner
+        self._packages_dir = packages_dir
+        self._environ = environ
+
+    async def declared_tools(self, tenant: TenantContext) -> frozenset[str]:
+        return await self._inner.declared_tools(tenant)
+
+    async def resolve(self, tenant: TenantContext, capability: str) -> McpTarget:
+        target = await self._inner.resolve(tenant, capability)
+        endpoint = live_mcp_endpoints(self._packages_dir, self._environ).get(
+            target.server_id
+        )
+        if endpoint is None or endpoint == target.endpoint:
+            return target
+        return McpTarget(
+            server_id=target.server_id,
+            allowed_tools=target.allowed_tools,
+            endpoint=endpoint,
+            auth_reference=target.auth_reference,
+        )
+
+
 class TenantToolExecutors:
     """Builds a `ToolExecutor` for one tenant.
 
     The three allowlists an executor intersects are tenant data (the server
     catalog the tenant declared, its enabled tools and the active skill), so the
     composition root exposes this factory instead of one shared executor that
-    could not be tenant-scoped.
+    could not be tenant-scoped. Development reloads the lab/env endpoint map on
+    each `for_tenant` so a form save in this process is visible on the next turn.
     """
 
     def __init__(
@@ -142,6 +188,8 @@ class TenantToolExecutors:
         skills: SkillRegistry,
         allowed_hosts: Iterable[str] = (),
         transport: McpTransportClient | None = None,
+        packages_dir: Path | None = None,
+        environ: Mapping[str, str] | None = None,
     ) -> None:
         hosts = tuple(allowed_hosts)
         if transport is not None and not hosts:
@@ -157,18 +205,39 @@ class TenantToolExecutors:
         self._integrations = integrations
         self._capability = capability
         self._skills = skills
+        self._packages_dir = packages_dir
+        self._environ = environ
         self.allowed_hosts = hosts
         self.transport = transport
+
+    def _reload_live_endpoints(self) -> dict[str, str] | None:
+        if self._packages_dir is None and self._environ is None:
+            return None
+        endpoints = live_mcp_endpoints(self._packages_dir, self._environ or {})
+        hosts = allowed_hosts_for(endpoints)
+        self.allowed_hosts = hosts
+        self.transport = (
+            SseMcpClient(allowlist=HostAllowlist(hosts)) if hosts else None
+        )
+        return endpoints
 
     async def for_tenant(
         self, tenant: TenantContext, config: TenantConfig, skill: str
     ) -> ToolExecutor:
+        live = self._reload_live_endpoints()
+        resolver: TenantMcpIntegrations = self._integrations
+        if live is not None:
+            resolver = LiveMcpEndpointResolver(
+                self._integrations,
+                packages_dir=self._packages_dir,
+                environ=self._environ or {},
+            )
         return ToolExecutor(
-            server=await self._integrations.declared_tools(tenant),
+            server=await resolver.declared_tools(tenant),
             tenant=config.enabled_tools,
             skill=self._skills.resolve(skill, config).allowed_tools(config),
             capability=self._capability,
-            resolver=self._integrations,
+            resolver=resolver,
             allowed_hosts=self.allowed_hosts or None,
             transport=self.transport,
         )
@@ -264,10 +333,7 @@ def build_runtime(
     skills = SkillRegistry()
     channels = SqlAlchemyChannelIntegrationRepository(engine)
     packages_dir = tenant_packages_dir_from(environ)
-    lab_endpoints = (
-        load_lab_mcp_endpoints(packages_dir) if packages_dir is not None else {}
-    )
-    endpoints = {**lab_endpoints, **mcp_endpoints_from(environ)}
+    endpoints = live_mcp_endpoints(packages_dir, environ)
     hosts = allowed_hosts_for(endpoints)
     transport = SseMcpClient(allowlist=HostAllowlist(hosts)) if hosts else None
     tool_executors = TenantToolExecutors(
@@ -276,6 +342,8 @@ def build_runtime(
         skills=skills,
         allowed_hosts=hosts,
         transport=transport,
+        packages_dir=packages_dir,
+        environ=environ,
     )
     gemini_api_key = environ.get(
         environment_variable_for(GEMINI_SECRET_REFERENCE), ""
