@@ -1,6 +1,6 @@
 # P11-T01 — ADR-006 y documentación de fase
 
-**Estado:** in_review · **Wave:** W10 · **Depends on:** P10-T01 aceptada
+**Estado:** accepted · **Wave:** W10 · **Depends on:** P10-T01 aceptada
 
 Documentar el hueco entre el turno conversacional y la maquinaria MCP, y decidir su cierre: contrato de decisión, loop acotado, superficie invocable, errores, aislamiento y observabilidad. Tarea sin código de producción.
 

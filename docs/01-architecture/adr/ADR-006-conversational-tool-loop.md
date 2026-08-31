@@ -1,6 +1,6 @@
 # ADR-006 — Loop de tool calls en el turno conversacional
 
-**Estado:** proposed  
+**Estado:** accepted  
 **Fecha:** 2026-08-29  
 **Supersedes:** ninguno  
 **Amends:** ninguno

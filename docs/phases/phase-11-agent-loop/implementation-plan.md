@@ -20,9 +20,9 @@
 
 **Brief:** [`agent-briefs/P11-T01-architecture-docs.md`](agent-briefs/P11-T01-architecture-docs.md)
 
-- [ ] Rojo: el hueco no está escrito en ningún ADR ni fase; revisión documental falla por falta de fuente normativa.
-- [ ] Verde: ADR-006, fase 11 con TDD, criterios, plan y test plan.
-- [ ] Commit `docs: define conversational tool loop and its boundary`.
+- [x] Rojo: el hueco no está escrito en ningún ADR ni fase; revisión documental falla por falta de fuente normativa.
+- [x] Verde: ADR-006, fase 11 con TDD, criterios, plan y test plan.
+- [x] Commit `docs: define conversational tool loop and its boundary`.
 
 ## Task 2: Contrato de decisión y realimentación
 

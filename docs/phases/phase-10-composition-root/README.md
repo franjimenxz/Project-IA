@@ -1,6 +1,6 @@
 # Fase 10 — Composition root
 
-**Estado:** ready  
+**Estado:** accepted  
 **Objetivo:** que un proceso real (`create_app`) deje listos los mismos collaborators que hoy sólo inyectan los tests.
 
 ## Problema
