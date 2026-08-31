@@ -1,6 +1,6 @@
 # P15-T02 — Form de laboratorio, endpoint MCP y chat simulado
 
-**Estado:** ready · **Wave:** W14 · **Depends on:** P15-T01 accepted
+**Estado:** accepted · **Wave:** W14 · **Depends on:** P15-T01 accepted
 
 Crear el mapa de endpoints de lab, el campo `mcp_endpoint` y presentar el chat como simulación de WhatsApp. Discovery al guardar con un puerto inyectable. Sin tocar el loop ni el executor.
 

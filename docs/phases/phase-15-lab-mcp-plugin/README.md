@@ -17,8 +17,8 @@ En development/test: pegar la URL SSE del MCP, descubrir `tools/list`, persistir
 | ID | Resultado | Paralelismo |
 |---|---|---|
 | [P15-T01](agent-briefs/P15-T01-architecture-docs.md) | ADR-011, TDD, AC, briefs | coordinador (esta entrega) |
-| [P15-T02](agent-briefs/P15-T02-lab-form-endpoint.md) | Form, `lab_mcp.py`, discovery al guardar, chat como WSP simulado | `ready` tras T01 |
-| [P15-T03](agent-briefs/P15-T03-runtime-adapt.md) | FAQ, harness, executor, compiler, composition, cliente `tools/list` | `blocked` hasta T02 accepted |
+| [P15-T02](agent-briefs/P15-T02-lab-form-endpoint.md) | Form, `lab_mcp.py`, discovery al guardar, chat como WSP simulado | `accepted` |
+| [P15-T03](agent-briefs/P15-T03-runtime-adapt.md) | FAQ, harness, executor, compiler, composition, cliente `tools/list` | `ready` |
 
 ## Fuera de alcance
 

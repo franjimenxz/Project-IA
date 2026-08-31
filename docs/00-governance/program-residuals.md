@@ -12,8 +12,10 @@
 | P14-T02 knowledge de laboratorio | `accepted` | PR #89 (`83a3f22`) |
 | P14-T03 FAQ lectura + compiler | `accepted` | PR #92 (`47081d9`) |
 | P14-T04 wiring de composition | `accepted` | PR #97 (`1473e5f`) |
+| P15-T01 docs Fase 15 / ADR-011 | `accepted` | PR #100 |
+| P15-T02 form + mapa MCP lab | `accepted` | PR #102 (`87a21b9`) |
 
-Fase 13 y Fase 14 T01–T04 accepted. Fase 15 documentada (ADR-011): T02 `ready` (form + endpoint); T03 `blocked` hasta T02.
+Fase 13 y Fase 14 T01–T04 accepted. Fase 15: T01–T02 accepted. T03 `ready` (runtime + catálogo enchufado). Residual T02: `SseLabMcpDiscoverer` es no-op; el POST no lista tools hasta que T03 publique `app.state.lab_mcp_discoverer`.
 
 ## Fuera de esta wave (no delegar)
 
@@ -32,4 +34,4 @@ Fase 13 y Fase 14 T01–T04 accepted. Fase 15 documentada (ADR-011): T02 `ready`
 
 El wiring de P14-T04 está en `main`. El operador debe exportar `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
 
-En development/test, las páginas HTML `/admin/instituciones` usan el `platform_admin` declarado en `IA_MCP_ADMIN_PRINCIPALS` cuando el browser no manda Bearer y el `IA_MCP_SECRET_*` de esa entrada resuelve. El token no se incrusta en el HTML. `/v1/admin/*` sigue exigiendo `Authorization`. El enchufe MCP por URL y el catálogo en el chat son Fase 15 (T02/T03).
+En development/test, las páginas HTML `/admin/instituciones` usan el `platform_admin` declarado en `IA_MCP_ADMIN_PRINCIPALS` cuando el browser no manda Bearer y el `IA_MCP_SECRET_*` de esa entrada resuelve. El token no se incrusta en el HTML. `/v1/admin/*` sigue exigiendo `Authorization`. El form ya persiste `mcp_endpoint` en `lab_mcp_endpoints.json` (T02). El chat aún no invoca el catálogo descubierto hasta T03.
