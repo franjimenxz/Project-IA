@@ -11,7 +11,7 @@ P14-T03 FAQ read tools     ──┘
 P14-T04 Runtime wiring     (blocked hasta que T01–T03 estén accepted)
 ```
 
-P13-T01 accepted. T04 toca `composition.py`; no se lanza hasta aceptar T01.
+P13-T01 y T01–T03 accepted. T04 toca `composition.py` y está `ready`.
 
 ## T01 — Gemini adapter
 

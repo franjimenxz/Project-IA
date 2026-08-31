@@ -23,12 +23,12 @@ Gemini lee el `LLMRequest` (Core + perfil + evidencia + tools). El knowledge de 
 
 | ID | Resultado | Paralelismo |
 |---|---|---|
-| [P14-T01](agent-briefs/P14-T01-gemini-adapter.md) | `GeminiLLM` | `in_progress` |
+| [P14-T01](agent-briefs/P14-T01-gemini-adapter.md) | `GeminiLLM` | `accepted` |
 | [P14-T02](agent-briefs/P14-T02-lab-knowledge.md) | Búsqueda de knowledge del package | `accepted` |
 | [P14-T03](agent-briefs/P14-T03-faq-read-tools.md) | FAQ lectura + compiler usa `enabled_tools` | `accepted` |
-| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `blocked` hasta T01 `accepted` |
+| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `ready` |
 
-P13-T01 accepted (PR #91); `composition.py` ya no está reservado. T04 toca `composition.py`; no se lanza hasta aceptar T01.
+P13-T01 y T01–T03 accepted. T04 toca `composition.py`.
 
 ## Fuera de alcance
 
