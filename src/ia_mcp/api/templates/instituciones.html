@@ -38,23 +38,27 @@
       <label>display_name <input name="display_name" type="text" required></label>
       <label>tone <input name="tone" type="text" required></label>
       <label>instructions <textarea name="instructions" maxlength="2000"></textarea></label>
-      <fieldset>
-        <legend>enabled_skills</legend>
-        <label><input type="checkbox" name="enabled_skills" value="faq"> faq</label>
-        <label><input type="checkbox" name="enabled_skills" value="appointments"> appointments</label>
-        <label><input type="checkbox" name="enabled_skills" value="human_handoff"> human_handoff</label>
-      </fieldset>
-      <fieldset>
-        <legend>enabled_tools</legend>
-        $tool_checks
-      </fieldset>
-      <label>mcp_server_id <input name="mcp_server_id" type="text" required></label>
-      <fieldset>
-        <legend>mcp_capabilities</legend>
-        $capability_checks
-      </fieldset>
-      <label>mcp_credentials_reference <input name="mcp_credentials_reference" type="text" required placeholder="sm://slug/mcp/appointments"></label>
+      <label>mcp_endpoint <input name="mcp_endpoint" type="text" placeholder="http://192.168.1.247:8001/sse" autocomplete="off"></label>
       <label>knowledge_text <textarea name="knowledge_text"></textarea></label>
+      <details>
+        <summary>Avanzado</summary>
+        <fieldset>
+          <legend>enabled_skills</legend>
+          <label><input type="checkbox" name="enabled_skills" value="faq"> faq</label>
+          <label><input type="checkbox" name="enabled_skills" value="appointments"> appointments</label>
+          <label><input type="checkbox" name="enabled_skills" value="human_handoff"> human_handoff</label>
+        </fieldset>
+        <fieldset>
+          <legend>enabled_tools</legend>
+          $tool_checks
+        </fieldset>
+        <label>mcp_server_id <input name="mcp_server_id" type="text"></label>
+        <fieldset>
+          <legend>mcp_capabilities</legend>
+          $capability_checks
+        </fieldset>
+        <label>mcp_credentials_reference <input name="mcp_credentials_reference" type="text" value="sm://slug/mcp/appointments"></label>
+      </details>
       <button type="submit">Guardar</button>
     </form>
   </section>

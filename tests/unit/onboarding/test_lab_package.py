@@ -1,6 +1,7 @@
-"""Lab package writer (AC-P13-002, AC-P13-008).
+"""Lab package writer (AC-P13-002, AC-P13-008, AC-P15-001, AC-P15-002, AC-P15-004).
 
 No PostgreSQL: this suite only writes files and runs `validate_package`.
+The MCP URL is not a package field.
 """
 
 from __future__ import annotations
@@ -111,11 +112,21 @@ def test_write_lab_package_rejects_non_uri_reference_for_validate_package(
         )
 
 
-def test_enabled_tools_must_be_known_and_declared_capabilities() -> None:
+def test_enabled_tools_accepts_discovered_names_inside_capabilities() -> None:
+    form = _form(
+        enabled_skills=frozenset({"faq"}),
+        enabled_tools=frozenset({"crear_turno"}),
+        mcp_capabilities=frozenset({"crear_turno"}),
+    )
+    assert form.enabled_tools == frozenset({"crear_turno"})
+    assert form.mcp_capabilities == frozenset({"crear_turno"})
+
+
+def test_enabled_tools_must_be_declared_capabilities() -> None:
     with pytest.raises(ValidationError):
         _form(
-            enabled_tools=frozenset({"appointments.search", "invented.tool"}),
-            mcp_capabilities=frozenset({"appointments.search", "invented.tool"}),
+            enabled_tools=frozenset({"crear_turno"}),
+            mcp_capabilities=frozenset({"appointments.search"}),
         )
     with pytest.raises(ValidationError):
         _form(
@@ -124,6 +135,55 @@ def test_enabled_tools_must_be_known_and_declared_capabilities() -> None:
         )
     allowed = set(KNOWN_TOOLS)
     assert "appointments.search" in allowed
+
+
+def test_form_accepts_mcp_endpoint_and_still_forbids_api_key() -> None:
+    form = _form(mcp_endpoint="http://192.168.1.247:8001/sse")
+    assert form.mcp_endpoint == "http://192.168.1.247:8001/sse"
+    assert _form().mcp_endpoint is None
+    with pytest.raises(ValidationError) as refused:
+        InstitucionForm.model_validate(
+            {
+                "slug": "clinica-norte",
+                "display_name": "Clinica Norte",
+                "tone": "formal",
+                "mcp_server_id": "fake",
+                "mcp_credentials_reference": "sm://clinica-norte/mcp/appointments",
+                "mcp_endpoint": "http://192.168.1.247:8001/sse",
+                "api_key": TOKEN_CANARY,
+            }
+        )
+    assert refused.value.errors()[0]["type"] == "extra_forbidden"
+    assert refused.value.errors()[0]["loc"] == ("api_key",)
+
+
+def test_write_lab_package_does_not_persist_mcp_endpoint(tmp_path: Path) -> None:
+    package = write_lab_package(
+        tmp_path,
+        _form(mcp_endpoint="http://192.168.1.247:8001/sse"),
+    )
+    blob = ""
+    for path in package.rglob("*"):
+        if path.is_file():
+            blob += path.read_text(encoding="utf-8")
+    assert "192.168.1.247" not in blob
+    assert "mcp_endpoint" not in blob
+    assert not (tmp_path / "lab_mcp_endpoints.json").exists()
+    assert validate_package(package).valid is True
+
+
+def test_blank_server_id_and_placeholder_credentials_use_slug() -> None:
+    form = InstitucionForm.model_validate(
+        {
+            "slug": "clinica-norte",
+            "display_name": "Clinica Norte",
+            "tone": "formal",
+            "mcp_server_id": "",
+            "mcp_credentials_reference": "sm://slug/mcp/appointments",
+        }
+    )
+    assert form.mcp_server_id == "clinica-norte"
+    assert form.mcp_credentials_reference == "sm://clinica-norte/mcp/appointments"
 
 
 def test_written_package_does_not_contain_secret_literals(tmp_path: Path) -> None:
