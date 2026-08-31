@@ -219,3 +219,26 @@ def test_authenticator_satisfies_the_published_protocol() -> None:
     authenticator, _ = _authenticator()
     assert isinstance(authenticator, AdminAuthenticator)
     assert not isinstance(object(), AdminAuthenticator)
+
+
+def test_fallback_platform_admin_uses_the_resolvable_roster_entry() -> None:
+    """Lab HTML may act as this principal when the browser sent no Bearer."""
+    authenticator, secrets = _authenticator()
+    principal = _run(authenticator.fallback_platform_admin())
+    assert principal is not None
+    assert principal.principal_id == PLATFORM_ID
+    assert "platform_admin" in principal.roles
+    assert principal.tenant_id is None
+    assert PLATFORM_TOKEN not in repr(principal)
+    assert PLATFORM_REFERENCE in secrets.asked
+
+
+def test_fallback_platform_admin_is_none_when_the_secret_does_not_resolve() -> None:
+    secrets = _MappingSecrets({OPERATOR_REFERENCE: OPERATOR_TOKEN})
+    authenticator, _ = _authenticator(secrets=secrets)
+    assert _run(authenticator.fallback_platform_admin()) is None
+
+
+def test_fallback_platform_admin_skips_tenant_bound_and_non_platform_roles() -> None:
+    authenticator, _ = _authenticator(OPERATOR_ENTRY)
+    assert _run(authenticator.fallback_platform_admin()) is None

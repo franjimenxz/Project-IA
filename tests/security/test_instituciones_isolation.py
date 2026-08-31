@@ -182,12 +182,26 @@ def test_chat_of_a_does_not_include_canary_of_b() -> None:
 @pytest.mark.security
 def test_missing_authorization_is_the_same_401_as_other_admin() -> None:
     client = _client()
-    anonymous_list = client.get("/admin/instituciones")
-    anonymous_chat = client.get(f"/admin/instituciones/{SLUG_A}/chat")
     anonymous_json = client.get("/v1/admin/tenants")
-    for response in (anonymous_list, anonymous_chat, anonymous_json):
-        assert response.status_code == 401
-        assert response.json()["detail"] == UNAUTHENTICATED
+    anonymous_lab_enable = client.post(f"/v1/admin/tenants/{SLUG_A}/lab-enable")
+    assert anonymous_json.status_code == 401
+    assert anonymous_lab_enable.status_code == 401
+    assert anonymous_json.json()["detail"] == UNAUTHENTICATED
+    assert anonymous_lab_enable.json()["detail"] == UNAUTHENTICATED
+
+
+@pytest.mark.security
+def test_html_without_bearer_does_not_embed_the_roster_token() -> None:
+    client = _client()
+    listed = client.get("/admin/instituciones")
+    chat = client.get(f"/admin/instituciones/{SLUG_A}/chat")
+    assert listed.status_code == 200
+    assert chat.status_code == 200
+    assert SLUG_A in listed.text
+    assert PLATFORM_TOKEN not in listed.text
+    assert TENANT_A_TOKEN not in listed.text
+    assert PLATFORM_TOKEN not in chat.text
+    assert TENANT_A_TOKEN not in chat.text
 
 
 @pytest.mark.security

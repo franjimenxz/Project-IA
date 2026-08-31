@@ -8,5 +8,5 @@
 | AC-P13-004 | `GET /admin/instituciones` lista slugs visibles; el form solo admite campos del contrato actual |
 | AC-P13-005 | POST de alta/edición escribe package, provisiona o publica, y llama `lab_enable` |
 | AC-P13-006 | `GET`/`POST /admin/instituciones/{slug}/chat` llama al harness con el `TenantContext` de ese slug; no usa la firma del canal simulado |
-| AC-P13-007 | El chat y la lista de A no revelan tenant B; 401 sin token; 404 para slug ajeno a un `tenant_admin` |
+| AC-P13-007 | El chat y la lista de A no revelan tenant B; JSON y Bearer inválido: 401; HTML sin header usa el `platform_admin` del roster si su `IA_MCP_SECRET_*` resuelve (el token no se pinta); 404 para slug ajeno a un `tenant_admin` |
 | AC-P13-008 | Cero secretos en HTML, fixtures o logs; cero `if tenant.slug` en Core; `FakeLLM` y activate productivo intactos |

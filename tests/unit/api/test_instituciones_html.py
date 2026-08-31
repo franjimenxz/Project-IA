@@ -168,7 +168,26 @@ def _client(
         app.state.tenant_packages_dir = packages_dir
     if principal is not None:
         app.state.admin_authenticator = admin_authenticator({TOKEN: principal})
-    return TestClient(app, headers=bearer(TOKEN)), onboarding, config_service, agent
+    headers = bearer(TOKEN) if principal is not None else {}
+    return TestClient(app, headers=headers), onboarding, config_service, agent
+
+
+def _anonymous_client(
+    packages_dir: Path,
+    service: StubOnboardingService | None = None,
+    configs: StubConfigService | None = None,
+    harness: StubHarness | None = None,
+) -> tuple[TestClient, StubOnboardingService, StubConfigService, StubHarness]:
+    app = create_app(environment="test")
+    onboarding = service or StubOnboardingService()
+    config_service = configs or StubConfigService()
+    agent = harness or StubHarness()
+    app.state.onboarding_service = onboarding
+    app.state.config_service = config_service
+    app.state.agent_harness = agent
+    app.state.tenant_packages_dir = packages_dir
+    app.state.admin_authenticator = admin_authenticator({TOKEN: PLATFORM})
+    return TestClient(app), onboarding, config_service, agent
 
 
 def test_instituciones_routes_are_absent_in_production() -> None:
@@ -309,6 +328,76 @@ def test_chat_post_calls_harness_with_slug_tenant_context(tmp_path: Path) -> Non
     assert service.channel_lookups[0].tenant_slug == SLUG
     assert "X-Simulated-Signature" not in response.request.headers
     assert TOKEN not in response.text
+
+
+def test_html_without_bearer_uses_roster_platform_admin(tmp_path: Path) -> None:
+    """Browser lab pages read the process roster; the token stays out of HTML."""
+    service = StubOnboardingService()
+    configs = StubConfigService()
+    harness = StubHarness()
+    bare, _, _, _ = _anonymous_client(tmp_path, service, configs, harness)
+    listed = bare.get("/admin/instituciones")
+    assert listed.status_code == 200
+    assert SLUG in listed.text
+    assert TOKEN not in listed.text
+    chat = bare.get(f"/admin/instituciones/{SLUG}/chat")
+    assert chat.status_code == 200
+    assert TOKEN not in chat.text
+    created = bare.post(
+        "/admin/instituciones",
+        data={
+            "slug": "sede-lab",
+            "display_name": "Sede Lab",
+            "tone": "claro",
+            "enabled_skills": ["faq"],
+            "mcp_server_id": "fake-lab",
+            "mcp_capabilities": [],
+            "mcp_credentials_reference": "sm://sede-lab/mcp/appointments",
+        },
+    )
+    assert created.status_code == 200
+    assert service.lab_enabled[-1] == "sede-lab"
+    assert TOKEN not in created.text
+    spoken = bare.post(
+        f"/admin/instituciones/{SLUG}/chat",
+        data={"text": "horario", "history": "[]"},
+    )
+    assert spoken.status_code == 200
+    assert harness.messages
+    assert TOKEN not in spoken.text
+
+
+def test_html_json_and_bad_bearer_still_require_a_presented_token(
+    tmp_path: Path,
+) -> None:
+    bare, _, _, _ = _anonymous_client(tmp_path)
+    listed_json = bare.get("/v1/admin/tenants")
+    created_json = bare.post(
+        "/v1/admin/instituciones",
+        json={
+            "slug": "sede-json",
+            "display_name": "Sede JSON",
+            "tone": "formal",
+            "mcp_server_id": "fake-json",
+            "mcp_credentials_reference": "sm://sede-json/mcp/appointments",
+        },
+    )
+    rejected = bare.get(
+        "/admin/instituciones",
+        headers={"Authorization": "Bearer not-the-roster-token"},
+    )
+    assert listed_json.status_code == 401
+    assert created_json.status_code == 401
+    assert rejected.status_code == 401
+    assert TOKEN not in rejected.text
+
+
+def test_html_without_roster_secret_stays_unauthorized(tmp_path: Path) -> None:
+    client, _, _, _ = _client(packages_dir=tmp_path, principal=None)
+    listed = client.get("/admin/instituciones")
+    chat = client.get(f"/admin/instituciones/{SLUG}/chat")
+    assert listed.status_code == 401
+    assert chat.status_code == 401
 
 
 def test_chat_does_not_require_simulated_channel_signature(tmp_path: Path) -> None:

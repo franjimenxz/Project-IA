@@ -31,3 +31,5 @@ Fase 13 y Fase 14 T01–T04 accepted. No hay más tareas P14 para delegar.
 ## Demo usable
 
 El wiring de P14-T04 está en `main`. El operador debe exportar `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
+
+En development/test, las páginas HTML `/admin/instituciones` usan el `platform_admin` declarado en `IA_MCP_ADMIN_PRINCIPALS` cuando el browser no manda Bearer y el `IA_MCP_SECRET_*` de esa entrada resuelve. El token no se incrusta en el HTML. `/v1/admin/*` sigue exigiendo `Authorization`.
