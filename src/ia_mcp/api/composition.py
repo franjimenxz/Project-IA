@@ -52,12 +52,17 @@ from ia_mcp.api.auth.service_token import (
     ServiceTokenAuthenticator,
     admin_bindings_from,
 )
-from ia_mcp.configuration.adapters.environment_secrets import EnvironmentSecretResolver
+from ia_mcp.configuration.adapters.environment_secrets import (
+    EnvironmentSecretResolver,
+    environment_variable_for,
+)
 from ia_mcp.configuration.adapters.sqlalchemy import SqlAlchemyConfigRepository
 from ia_mcp.configuration.models import TenantConfig
 from ia_mcp.configuration.service import ConfigurationService
 from ia_mcp.conversation.adapters.sqlalchemy import SqlAlchemyConversationRepository
+from ia_mcp.knowledge.lab_search import LabKnowledgeSearch
 from ia_mcp.knowledge.models import KnowledgeHit, KnowledgeQuery
+from ia_mcp.llm.gemini import GeminiLLM, UrllibGeminiTransport
 from ia_mcp.mcp.capabilities.appointments import AppointmentCapability
 from ia_mcp.mcp.client import SseMcpClient
 from ia_mcp.mcp.executor import (
@@ -84,6 +89,8 @@ DEVELOPMENT = "development"
 DATABASE_URL = "DATABASE_URL"
 MCP_ENDPOINTS = "IA_MCP_MCP_ENDPOINTS"
 TENANT_PACKAGES_DIR = "IA_MCP_TENANT_PACKAGES_DIR"
+GEMINI_SECRET_REFERENCE = "sm://platform/llm/gemini"
+READ_SERVER_TOOLS = frozenset({"appointments.search", "appointments.get"})
 
 
 class TenantMcpIntegrations(Protocol):
@@ -257,19 +264,35 @@ def build_runtime(
         allowed_hosts=hosts,
         transport=transport,
     )
+    packages_dir = tenant_packages_dir_from(environ)
+    gemini_api_key = environ.get(
+        environment_variable_for(GEMINI_SECRET_REFERENCE), ""
+    ).strip()
+    if gemini_api_key:
+        llm = GeminiLLM(transport=UrllibGeminiTransport(), api_key=gemini_api_key)
+    else:
+        llm = FakeLLM(LLMDecision(kind="insufficient", text="", source_ids=()))
+    if packages_dir is not None:
+        knowledge = LabKnowledgeSearch(packages_dir=packages_dir)
+    else:
+        knowledge = EmptyKnowledgeSearch()
     harness = AgentHarness(
         conversations=SqlAlchemyConversationRepository(engine),
         runs=SqlAlchemyAgentRunRepository(engine),
         configs=configs,
         skills=skills,
-        compiler=ContextCompiler(configs=configs, skills=skills, tenant_tools={}),
-        knowledge=EmptyKnowledgeSearch(),
-        llm=FakeLLM(LLMDecision(kind="insufficient", text="", source_ids=())),
+        compiler=ContextCompiler(
+            configs=configs,
+            skills=skills,
+            tenant_tools={},
+            server_tools=READ_SERVER_TOOLS,
+        ),
+        knowledge=knowledge,
+        llm=llm,
         executors=tool_executors,
         max_tool_iterations=4,
         turn_deadline_seconds=30.0,
     )
-    packages_dir = tenant_packages_dir_from(environ)
     return RuntimeGraph(
         engine=engine,
         channels=channels,

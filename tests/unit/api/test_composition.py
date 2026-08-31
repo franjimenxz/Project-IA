@@ -17,9 +17,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ia_mcp.agent_runtime.harness import AgentHarness
+from ia_mcp.agent_runtime.ports import FakeLLM
 from ia_mcp.api.app import create_app
 from ia_mcp.api.auth.service_token import ADMIN_PRINCIPALS, ServiceTokenAuthenticator
 from ia_mcp.api.composition import (
+    EmptyKnowledgeSearch,
     TenantToolExecutors,
     admin_authenticator_from,
     allowed_hosts_for,
@@ -30,6 +32,8 @@ from ia_mcp.configuration.models import AgentConfig, TenantConfig
 from ia_mcp.configuration.service import ConfigurationService
 from ia_mcp.contracts.common import ToolResult
 from ia_mcp.contracts.errors import ToolErrorCode
+from ia_mcp.knowledge.lab_search import LabKnowledgeSearch
+from ia_mcp.llm.gemini import GeminiLLM, UrllibGeminiTransport
 from ia_mcp.mcp.client import SseMcpClient
 from ia_mcp.mcp.executor import McpTarget, ToolCall
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
@@ -38,6 +42,7 @@ from ia_mcp.onboarding.service import TenantOnboardingService
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.models import TenantContext
 from ia_mcp.tenancy.service import TenantService
+from scripts.check_tenant_specific_core import find_slug_branches
 from tests.integration.api.test_simulated_messages import (
     FROZEN_NOW,
     FakeChannelRepository,
@@ -47,6 +52,10 @@ from tests.integration.api.test_simulated_messages import (
 
 # Port 1 is never a PostgreSQL listener; the graph must not connect while building.
 UNREACHABLE_DATABASE_URL = "postgresql+psycopg://ia_mcp@127.0.0.1:1/ia_mcp_composition"
+GEMINI_SECRET_VARIABLE = "IA_MCP_SECRET_PLATFORM_LLM_GEMINI"
+GEMINI_TEST_KEY = "test-not-a-secret"
+COMPOSITION_PATH = Path("src/ia_mcp/api/composition.py")
+READ_SERVER_TOOLS = frozenset({"appointments.search", "appointments.get"})
 MCP_HOST = "mcp.example"
 MCP_ENDPOINT = f"https://{MCP_HOST}/sse"
 SERVER_ID = "mcp-appointments"
@@ -411,3 +420,101 @@ def test_endpoints_are_read_from_the_environment_not_hardcoded() -> None:
     assert endpoints == {SERVER_ID: MCP_ENDPOINT, "lan": "http://lan.example"}
     assert allowed_hosts_for(endpoints) == (MCP_HOST, "http://lan.example")
     assert mcp_endpoints_from({}) == {}
+
+
+def test_runtime_wires_gemini_when_platform_secret_is_set() -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            GEMINI_SECRET_VARIABLE: GEMINI_TEST_KEY,
+        },
+    )
+    assert runtime is not None
+    assert isinstance(runtime.agent_harness._llm, GeminiLLM)
+    assert isinstance(runtime.agent_harness._llm._transport, UrllibGeminiTransport)
+
+
+def test_runtime_keeps_fake_llm_when_gemini_secret_is_absent() -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={"DATABASE_URL": UNREACHABLE_DATABASE_URL},
+    )
+    assert runtime is not None
+    assert isinstance(runtime.agent_harness._llm, FakeLLM)
+
+
+def test_runtime_keeps_fake_llm_when_gemini_secret_is_blank() -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            GEMINI_SECRET_VARIABLE: "   ",
+        },
+    )
+    assert runtime is not None
+    assert isinstance(runtime.agent_harness._llm, FakeLLM)
+
+
+def test_runtime_wires_lab_knowledge_when_packages_dir_is_set(tmp_path: Path) -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            "IA_MCP_TENANT_PACKAGES_DIR": str(tmp_path),
+        },
+    )
+    assert runtime is not None
+    assert isinstance(runtime.agent_harness._knowledge, LabKnowledgeSearch)
+
+
+def test_runtime_keeps_empty_knowledge_when_packages_dir_is_absent() -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={"DATABASE_URL": UNREACHABLE_DATABASE_URL},
+    )
+    assert runtime is not None
+    assert isinstance(runtime.agent_harness._knowledge, EmptyKnowledgeSearch)
+
+
+def test_runtime_compiler_uses_process_read_server_tools() -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={"DATABASE_URL": UNREACHABLE_DATABASE_URL},
+    )
+    assert runtime is not None
+    compiler = runtime.agent_harness._compiler
+    assert compiler._server_tools == READ_SERVER_TOOLS
+    assert compiler._tenant_tools == {}
+
+
+def test_runtime_wiring_does_not_branch_on_tenant_identity() -> None:
+    """The same process collaborators serve every tenant; no slug fork in Core."""
+    source = COMPOSITION_PATH.read_text(encoding="utf-8")
+    assert find_slug_branches(source) == ()
+    assert "if tenant_id" not in source
+    assert "match tenant_id" not in source
+    runtime_a = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            GEMINI_SECRET_VARIABLE: GEMINI_TEST_KEY,
+            "IA_MCP_TENANT_PACKAGES_DIR": "/tmp/packages-a",
+        },
+    )
+    runtime_b = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            GEMINI_SECRET_VARIABLE: GEMINI_TEST_KEY,
+            "IA_MCP_TENANT_PACKAGES_DIR": "/tmp/packages-b",
+        },
+    )
+    assert runtime_a is not None
+    assert runtime_b is not None
+    assert isinstance(runtime_a.agent_harness._llm, GeminiLLM)
+    assert isinstance(runtime_b.agent_harness._llm, GeminiLLM)
+    assert isinstance(runtime_a.agent_harness._knowledge, LabKnowledgeSearch)
+    assert isinstance(runtime_b.agent_harness._knowledge, LabKnowledgeSearch)
+    assert runtime_a.agent_harness._compiler._server_tools == READ_SERVER_TOOLS
+    assert runtime_b.agent_harness._compiler._server_tools == READ_SERVER_TOOLS
