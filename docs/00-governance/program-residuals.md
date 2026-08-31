@@ -11,7 +11,7 @@
 | P14-T01 adaptador Gemini | `accepted` | PR #93 (`c9c23b5`) |
 | P14-T02 knowledge de laboratorio | `accepted` | PR #89 (`83a3f22`) |
 | P14-T03 FAQ lectura + compiler | `accepted` | PR #92 (`47081d9`) |
-| P14-T04 wiring de composition | `ready` | Un agente. Solo `composition.py` y `test_composition.py` |
+| P14-T04 wiring de composition | `in_progress` | [P14-T04](https://cursor.com/agents/bc-95e29507-abcc-511d-8ab6-fae5df73995f). No relanzar |
 
 ## Fuera de esta wave (no delegar)
 
