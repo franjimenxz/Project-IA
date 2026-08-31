@@ -8,9 +8,9 @@
 | Ítem | Estado | Acción |
 |---|---|---|
 | P13-T01 páginas HTML de laboratorio | `in_progress` | Ya hay un agente. No relanzar |
-| P14-T01 adaptador Gemini | `ready` | Un agente, una rama |
-| P14-T02 knowledge de laboratorio | `ready` | Un agente, una rama |
-| P14-T03 FAQ lectura + compiler | `ready` | Un agente, una rama |
+| P14-T01 adaptador Gemini | `in_progress` | [P14-T01](https://cursor.com/agents/bc-221973e1-33b4-5365-8c93-ef1417b2245d) |
+| P14-T02 knowledge de laboratorio | `ready` | Cupo de VMs lleno (P13+T01+T03); se implementa en rama propia |
+| P14-T03 FAQ lectura + compiler | `in_progress` | [P14-T03](https://cursor.com/agents/bc-b67b97a4-40c0-5bb3-a6e8-b930c13f70ff) |
 | P14-T04 wiring de composition | `blocked` | Esperar T01–T03 `accepted` |
 
 T01–T03 no comparten archivos entre sí ni con P13-T01. T04 comparte `composition.py` con P13-T01: no lanzar T04 mientras P13-T01 esté `in_progress`.
