@@ -363,7 +363,11 @@ def observe_turn(
         ),
         retrieval_source_ids=frozenset(result.source_ids),
         skill=skill,
-        tool_calls=tuple(ObservedToolCall(name=name) for name in result.tool_names),
+        tool_calls=(
+            tuple(ObservedToolCall(name=call.name) for call in result.tool_calls)
+            if result.tool_calls
+            else tuple(ObservedToolCall(name=name) for name in result.tool_names)
+        ),
         workflow_state=None,
         workflow_transitions=(),
         handoff=result.kind == "handoff",

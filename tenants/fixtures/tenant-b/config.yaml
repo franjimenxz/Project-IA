@@ -2,6 +2,7 @@ schema_version: 1
 version: 1
 agent:
   tone: formal
+  instructions: "No invente horarios ni especialidades que no figuren en el conocimiento recuperado."
 enabled_skills:
   - faq
   - appointments

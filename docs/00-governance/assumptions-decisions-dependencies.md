@@ -37,6 +37,7 @@
 | D-004 | PostgreSQL autoritativo, Redis coordinador y pgvector reemplazable | ADR-004 |
 | D-005 | MCP discovery (`tools/list`) e invocación genérica con intersección tenant/skill/servidor | ADR-005 |
 | D-006 | Loop conversacional de tools de lectura; mutaciones siguen por workflow | ADR-006 |
+| D-007 | Perfil de agente del tenant (`tone` + `instructions` opcionales) llega a cada `LLMRequest` sin concatenarse con Core | ADR-008 |
 
 ## Dependencias externas
 
