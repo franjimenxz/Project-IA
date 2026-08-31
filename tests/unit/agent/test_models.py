@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import fields
-from typing import get_args
 from uuid import UUID
 
 import pytest
@@ -45,7 +44,8 @@ def test_llm_request_accepts_tone_and_tenant_instructions() -> None:
 
 
 def test_answer_kind_members_are_unchanged() -> None:
-    assert get_args(AnswerKind) == ("answer", "clarify", "insufficient", "handoff")
+    members = getattr(AnswerKind, "__value__", AnswerKind).__args__
+    assert members == ("answer", "clarify", "insufficient", "handoff")
 
 
 @pytest.mark.anyio
