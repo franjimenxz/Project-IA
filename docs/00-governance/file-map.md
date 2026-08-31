@@ -19,7 +19,7 @@
 
 | Ruta | Responsabilidad | Owner inicial |
 |---|---|---|
-| `src/ia_mcp/api/` | adapters HTTP/FastAPI, auth de entrada y composition root | P02-T01 / P10-T01 |
+| `src/ia_mcp/api/` | adapters HTTP/FastAPI, auth de entrada y composition root | P02-T01 / P10-T01 / P13-T01 (templates lab) |
 | `src/ia_mcp/channels/` | envelopes, adapters y delivery | P02-T05 |
 | `src/ia_mcp/tenancy/` | TenantContext y resolución | P02-T02 |
 | `src/ia_mcp/configuration/` | config versionada | P02-T03 |

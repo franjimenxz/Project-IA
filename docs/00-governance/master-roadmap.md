@@ -29,6 +29,7 @@ flowchart LR
     P9 --> P10[Fase 10\nComposition root]
     P10 --> P11[Fase 11\nLoop de tool calls]
     P11 --> P12[Fase 12\nPerfil de agente]
+    P12 --> P13[Fase 13\nHTML laboratorio]
 ```
 
 ## Estrategia de entrega
@@ -54,6 +55,7 @@ La arquitectura y los contratos se estabilizan primero. A continuación se imple
 | W9 | Fase 10 composition root | Fase 9 aceptada (P09-T04) | Un proceso real deja listos los collaborators que hoy sólo inyectan los tests |
 | W10 | Fase 11 loop de tool calls en el turno | P10-T01 aceptada; ADR-006 aceptado | El modelo ejecuta una tool de lectura ya autorizada y su resultado vuelve en la iteración siguiente |
 | W11 | Fase 12 perfil de agente por tenant | Fase 11 accepted en tablero | El tono e instrucciones del tenant llegan a cada `LLMRequest` del turno |
+| W12 | Fase 13 páginas HTML de laboratorio | Fase 12 accepted | Alta, lista, config y chat de prueba por institución en development/test |
 
 ## Gates globales
 

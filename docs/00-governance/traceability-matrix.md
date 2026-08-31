@@ -16,7 +16,7 @@
 | RF-028–RF-030 | Handoff TDD | AC-P04-040–046 | E2E + eval | 4.4 |
 | RF-031–RF-033 | Scheduling TDD | AC-P04-050–058 | Reloj falso + idempotencia | 4.5 |
 | RF-034–RF-036, RF-044 | Observability/Security TDD | AC-P07-001–010 | Reconstrucción + sanitización | 4–7 |
-| RF-037–RF-039, RF-045 | Security/Onboarding TDD | AC-P08-001–010 | Seguridad + segundo tenant | 2, 8 |
+| RF-037–RF-039, RF-045 | Security/Onboarding TDD | AC-P08-001–010, AC-P13-002–008 | Seguridad + segundo tenant + HTML lab | 2, 8, 13 |
 | RF-040 | Testing strategy | AC-P06-001–009 | Pipeline de evals | 6 |
 | RF-041–RF-042 | Channel Gateway TDD | AC-P04-015–019 | Contract + integración | 4.1, posterior |
 
