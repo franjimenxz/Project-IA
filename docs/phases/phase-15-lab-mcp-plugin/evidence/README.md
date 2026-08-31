@@ -4,4 +4,4 @@
 |---|---|
 | P15-T01 | accepted (paquete documental) |
 | P15-T02 | accepted (`87a21b9`, PR #102) |
-| P15-T03 | pendiente |
+| P15-T03 | accepted (`58dfcb5`, PR #105) |
