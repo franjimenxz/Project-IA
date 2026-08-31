@@ -9,9 +9,11 @@ Development reads three variables:
 - `DATABASE_URL`, already used by `ia_mcp.onboarding.cli`.
 - `IA_MCP_MCP_ENDPOINTS`, an optional `server_id=endpoint` list (comma
   separated) that maps the MCP servers tenants declared to the addresses this
-  deployment may reach. It is the only source of MCP hosts, and the host
-  allowlist is derived from it, so no host is hardcoded in Core. Without it
-  there is no generic MCP transport at all.
+  deployment may reach. Development also merges
+  `{IA_MCP_TENANT_PACKAGES_DIR}/lab_mcp_endpoints.json`; env wins on the same
+  `server_id`. The host allowlist is derived from that merged map, so no host
+  is hardcoded in Core. Without any endpoint there is no generic MCP
+  transport.
 - `IA_MCP_TENANT_PACKAGES_DIR`, an optional absolute directory the onboarding
   HTTP boundary may read tenant packages from. It is the only root that
   boundary accepts, so without it every request naming a `package_path` is
@@ -72,6 +74,7 @@ from ia_mcp.mcp.executor import (
     ToolExecutor,
 )
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
+from ia_mcp.onboarding.lab_mcp import allowlist_entry_for, load_lab_mcp_endpoints
 from ia_mcp.onboarding.preflight import (
     ResolvableSecretReferences,
     default_preflight_checks,
@@ -91,6 +94,12 @@ MCP_ENDPOINTS = "IA_MCP_MCP_ENDPOINTS"
 TENANT_PACKAGES_DIR = "IA_MCP_TENANT_PACKAGES_DIR"
 GEMINI_SECRET_REFERENCE = "sm://platform/llm/gemini"
 READ_SERVER_TOOLS = frozenset({"appointments.search", "appointments.get"})
+_LAB_DISCOVERY_TENANT = TenantContext(
+    tenant_id=UUID(int=0),
+    tenant_slug="lab-mcp-discovery",
+    config_version=1,
+    correlation_id=UUID(int=0),
+)
 
 
 class TenantMcpIntegrations(Protocol):
@@ -254,7 +263,11 @@ def build_runtime(
     configs = SqlAlchemyConfigRepository(engine)
     skills = SkillRegistry()
     channels = SqlAlchemyChannelIntegrationRepository(engine)
-    endpoints = mcp_endpoints_from(environ)
+    packages_dir = tenant_packages_dir_from(environ)
+    lab_endpoints = (
+        load_lab_mcp_endpoints(packages_dir) if packages_dir is not None else {}
+    )
+    endpoints = {**lab_endpoints, **mcp_endpoints_from(environ)}
     hosts = allowed_hosts_for(endpoints)
     transport = SseMcpClient(allowlist=HostAllowlist(hosts)) if hosts else None
     tool_executors = TenantToolExecutors(
@@ -264,7 +277,6 @@ def build_runtime(
         allowed_hosts=hosts,
         transport=transport,
     )
-    packages_dir = tenant_packages_dir_from(environ)
     gemini_api_key = environ.get(
         environment_variable_for(GEMINI_SECRET_REFERENCE), ""
     ).strip()
@@ -288,6 +300,7 @@ def build_runtime(
             skills=skills,
             tenant_tools={},
             server_tools=READ_SERVER_TOOLS,
+            mirror_tenant_tools=True,
         ),
         knowledge=knowledge,
         llm=llm,
@@ -315,6 +328,29 @@ def build_runtime(
     )
 
 
+class RuntimeLabMcpDiscoverer:
+    """Lists tool names from an operator-provided lab MCP URL.
+
+    Validates and allowlists the URL, then calls `tools/list` without
+    intersecting a predeclared allowlist and without inventing auth.
+    Client and network failures propagate (TimeoutError, OSError, DomainError).
+    """
+
+    async def list_names(self, endpoint: str) -> tuple[str, ...]:
+        entry = allowlist_entry_for(endpoint)
+        client = SseMcpClient(allowlist=HostAllowlist((entry,)))
+        target = McpTarget(
+            server_id="lab",
+            allowed_tools=frozenset(),
+            endpoint=endpoint.strip(),
+            auth_reference="",
+        )
+        catalog = await client.list_tools(
+            _LAB_DISCOVERY_TENANT, target, intersect_allowed=False
+        )
+        return tuple(tool.name for tool in catalog.tools)
+
+
 def attach_runtime(app: FastAPI, runtime: RuntimeGraph) -> None:
     """Publish the graph under the names the routers already read."""
     app.state.tenant_service = runtime.tenant_service
@@ -324,6 +360,7 @@ def attach_runtime(app: FastAPI, runtime: RuntimeGraph) -> None:
     app.state.tool_executor = runtime.tool_executor
     app.state.onboarding_service = runtime.onboarding_service
     app.state.tenant_packages_dir = runtime.tenant_packages_dir
+    app.state.lab_mcp_discoverer = RuntimeLabMcpDiscoverer()
 
 
 def runtime_lifespan(

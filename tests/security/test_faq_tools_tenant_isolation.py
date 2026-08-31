@@ -95,12 +95,16 @@ def test_faq_allowlist_does_not_mix_enabled_tools_across_configs() -> None:
     )
     allowed_a = skill.allowed_tools(config_a)
     allowed_b = skill.allowed_tools(config_b)
-    assert allowed_a == frozenset({ToolName("appointments.search")})
-    assert allowed_b == frozenset({ToolName("appointments.get")})
-    assert ToolName("appointments.create") not in allowed_a
-    assert ToolName("appointments.cancel") not in allowed_b
+    assert allowed_a == frozenset(
+        {ToolName("appointments.search"), ToolName("appointments.create")}
+    )
+    assert allowed_b == frozenset(
+        {ToolName("appointments.get"), ToolName("appointments.cancel")}
+    )
     assert ToolName("appointments.get") not in allowed_a
+    assert ToolName("appointments.cancel") not in allowed_a
     assert ToolName("appointments.search") not in allowed_b
+    assert ToolName("appointments.create") not in allowed_b
 
 
 def test_faq_and_compiler_have_no_slug_branches() -> None:

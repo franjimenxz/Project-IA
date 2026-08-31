@@ -222,14 +222,12 @@ class ToolExecutor:
                 target = await self._resolver.resolve(tenant, capability_name)
                 span.set_attribute("mcp_server_id", target.server_id)
             tool_denied = call.name not in target.allowed_tools
-            if self._transport is not None:
+            if target.endpoint:
                 host_denied = (
                     self._hosts is None or not self._hosts.permits(target.endpoint)
                 )
             else:
-                host_denied = (
-                    self._hosts is not None and not self._hosts.permits(target.endpoint)
-                )
+                host_denied = False
             denied = tool_denied or host_denied
             if denied:
                 self._audit(
@@ -269,6 +267,19 @@ class ToolExecutor:
         call: ToolCall,
         target: McpTarget | None,
     ) -> ToolResult[Any]:
+        if target is not None and target.endpoint:
+            if (
+                self._transport is None
+                or self._hosts is None
+                or not self._hosts.permits(target.endpoint)
+            ):
+                return ToolResult[Any](ok=False, error=_FORBIDDEN)
+            return await self._transport.call_tool(
+                tenant,
+                target,
+                call.name,
+                dict(call.arguments),
+            )
         if call.name in KNOWN_TOOLS:
             return await self._dispatch_capability(tenant, call)
         if self._transport is not None and target is not None:

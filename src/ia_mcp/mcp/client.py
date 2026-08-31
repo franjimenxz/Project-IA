@@ -36,9 +36,15 @@ class SseMcpClient:
         self._lock = threading.Lock()
 
     async def list_tools(
-        self, tenant: TenantContext, target: McpTarget
+        self,
+        tenant: TenantContext,
+        target: McpTarget,
+        *,
+        intersect_allowed: bool = True,
     ) -> DiscoveredToolCatalog:
-        return await asyncio.to_thread(self._list_tools_sync, tenant, target)
+        return await asyncio.to_thread(
+            self._list_tools_sync, tenant, target, intersect_allowed
+        )
 
     async def call_tool(
         self,
@@ -52,7 +58,10 @@ class SseMcpClient:
         )
 
     def _list_tools_sync(
-        self, tenant: TenantContext, target: McpTarget
+        self,
+        tenant: TenantContext,
+        target: McpTarget,
+        intersect_allowed: bool = True,
     ) -> DiscoveredToolCatalog:
         try:
             self._require_permitted(_sse_url(target.endpoint), target)
@@ -86,7 +95,7 @@ class SseMcpClient:
             if not isinstance(schema, Mapping):
                 schema = {}
             name = str(item["name"])
-            if name not in target.allowed_tools:
+            if intersect_allowed and name not in target.allowed_tools:
                 continue
             tools.append(
                 DiscoveredTool(

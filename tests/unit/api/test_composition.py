@@ -14,6 +14,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from ia_mcp.agent_runtime.harness import AgentHarness
@@ -22,9 +23,11 @@ from ia_mcp.api.app import create_app
 from ia_mcp.api.auth.service_token import ADMIN_PRINCIPALS, ServiceTokenAuthenticator
 from ia_mcp.api.composition import (
     EmptyKnowledgeSearch,
+    RuntimeLabMcpDiscoverer,
     TenantToolExecutors,
     admin_authenticator_from,
     allowed_hosts_for,
+    attach_runtime,
     build_runtime,
     mcp_endpoints_from,
 )
@@ -35,10 +38,13 @@ from ia_mcp.contracts.errors import ToolErrorCode
 from ia_mcp.knowledge.lab_search import LabKnowledgeSearch
 from ia_mcp.llm.gemini import GeminiLLM, UrllibGeminiTransport
 from ia_mcp.mcp.client import SseMcpClient
+from ia_mcp.mcp.discovery import DiscoveredTool, DiscoveredToolCatalog
 from ia_mcp.mcp.executor import McpTarget, ToolCall
 from ia_mcp.mcp.fakes.appointments import FakeAppointmentCapability
+from ia_mcp.onboarding.lab_mcp import write_lab_mcp_endpoint
 from ia_mcp.onboarding.preflight import SecretResolvabilityCheck
 from ia_mcp.onboarding.service import TenantOnboardingService
+from ia_mcp.shared.errors import DomainError
 from ia_mcp.skills.registry import SkillRegistry
 from ia_mcp.tenancy.models import TenantContext
 from ia_mcp.tenancy.service import TenantService
@@ -108,8 +114,9 @@ def _config(*enabled_tools: str) -> TenantConfig:
 class StubIntegrations:
     """MCP server the tenant declared, with the tools it declared for it."""
 
-    def __init__(self, tools: frozenset[str]) -> None:
+    def __init__(self, tools: frozenset[str], *, endpoint: str = "") -> None:
         self._tools = tools
+        self._endpoint = endpoint
         self.tenants: list[TenantContext] = []
 
     async def declared_tools(self, tenant: TenantContext) -> frozenset[str]:
@@ -121,7 +128,7 @@ class StubIntegrations:
         return McpTarget(
             server_id=SERVER_ID,
             allowed_tools=self._tools,
-            endpoint=MCP_ENDPOINT,
+            endpoint=self._endpoint,
             auth_reference="",
         )
 
@@ -149,7 +156,9 @@ def _executors(
     allowed_hosts: tuple[str, ...] = (),
 ) -> TenantToolExecutors:
     return TenantToolExecutors(
-        integrations=StubIntegrations(declared),
+        integrations=StubIntegrations(
+            declared, endpoint=MCP_ENDPOINT if transport is not None else ""
+        ),
         capability=FakeAppointmentCapability(),
         skills=SkillRegistry(),
         allowed_hosts=allowed_hosts,
@@ -184,6 +193,7 @@ def test_development_with_database_url_attaches_runtime(
     assert isinstance(app.state.channel_integration_ids, dict)
     assert isinstance(app.state.tool_executor, TenantToolExecutors)
     assert isinstance(app.state.onboarding_service, TenantOnboardingService)
+    assert isinstance(app.state.lab_mcp_discoverer, RuntimeLabMcpDiscoverer)
 
 
 def test_tenant_packages_dir_is_published_from_the_environment(
@@ -486,6 +496,122 @@ def test_runtime_compiler_uses_process_read_server_tools() -> None:
     compiler = runtime.agent_harness._compiler
     assert compiler._server_tools == READ_SERVER_TOOLS
     assert compiler._tenant_tools == {}
+    assert compiler._mirror_tenant_tools is True
+
+
+def test_runtime_merges_lab_endpoints_and_env_wins(tmp_path: Path) -> None:
+    write_lab_mcp_endpoint(tmp_path, "soloturnos", "http://192.168.1.247:8001/sse")
+    write_lab_mcp_endpoint(tmp_path, SERVER_ID, "https://from-json.example/sse")
+    runtime = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            "IA_MCP_TENANT_PACKAGES_DIR": str(tmp_path),
+            "IA_MCP_MCP_ENDPOINTS": f"{SERVER_ID}={MCP_ENDPOINT}",
+        },
+    )
+    assert runtime is not None
+    assert isinstance(runtime.tool_executor.transport, SseMcpClient)
+    assert runtime.tool_executor.allowed_hosts == (
+        "http://192.168.1.247",
+        MCP_HOST,
+    )
+
+
+def test_runtime_lab_endpoints_alone_wire_transport(tmp_path: Path) -> None:
+    write_lab_mcp_endpoint(tmp_path, "soloturnos", "http://192.168.1.247:8001/sse")
+    runtime = build_runtime(
+        environment="development",
+        environ={
+            "DATABASE_URL": UNREACHABLE_DATABASE_URL,
+            "IA_MCP_TENANT_PACKAGES_DIR": str(tmp_path),
+        },
+    )
+    assert runtime is not None
+    assert isinstance(runtime.tool_executor.transport, SseMcpClient)
+    assert runtime.tool_executor.allowed_hosts == ("http://192.168.1.247",)
+
+
+def test_runtime_discoverer_lists_without_intersect_or_auth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, object, bool]] = []
+
+    class FakeClient:
+        def __init__(self, *, allowlist: object, timeout_seconds: float = 10.0) -> None:
+            self.allowlist = allowlist
+            del timeout_seconds
+
+        async def list_tools(
+            self,
+            tenant: TenantContext,
+            target: McpTarget,
+            *,
+            intersect_allowed: bool = True,
+        ) -> DiscoveredToolCatalog:
+            calls.append((tenant, target, intersect_allowed))
+            return DiscoveredToolCatalog(
+                server_id="lab",
+                tools=(DiscoveredTool(name="crear_turno"),),
+            )
+
+    monkeypatch.setattr("ia_mcp.api.composition.SseMcpClient", FakeClient)
+    names = _run(RuntimeLabMcpDiscoverer().list_names("https://mcp.example/sse"))
+    assert names == ("crear_turno",)
+    assert calls
+    tenant, target, intersect = calls[0]
+    assert isinstance(tenant, TenantContext)
+    assert target.auth_reference == ""
+    assert target.endpoint == "https://mcp.example/sse"
+    assert intersect is False
+
+
+def test_runtime_discoverer_rejects_userinfo() -> None:
+    with pytest.raises(ValueError):
+        _run(
+            RuntimeLabMcpDiscoverer().list_names(
+                "http://user:secret@192.168.1.247:8001/sse"
+            )
+        )
+
+
+def test_runtime_discoverer_propagates_domain_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeClient:
+        def __init__(self, *, allowlist: object, timeout_seconds: float = 10.0) -> None:
+            del allowlist, timeout_seconds
+
+        async def list_tools(
+            self,
+            tenant: TenantContext,
+            target: McpTarget,
+            *,
+            intersect_allowed: bool = True,
+        ) -> DiscoveredToolCatalog:
+            del tenant, target, intersect_allowed
+            raise DomainError(
+                code="upstream_unavailable",
+                safe_message="The MCP server is unavailable.",
+                retryable=True,
+            )
+
+    monkeypatch.setattr("ia_mcp.api.composition.SseMcpClient", FakeClient)
+    with pytest.raises(DomainError) as caught:
+        _run(RuntimeLabMcpDiscoverer().list_names("https://mcp.example/sse"))
+    assert caught.value.code == "upstream_unavailable"
+    assert "secret" not in caught.value.safe_message.lower()
+
+
+def test_attach_runtime_publishes_lab_mcp_discoverer() -> None:
+    runtime = build_runtime(
+        environment="development",
+        environ={"DATABASE_URL": UNREACHABLE_DATABASE_URL},
+    )
+    assert runtime is not None
+    app = FastAPI()
+    attach_runtime(app, runtime)
+    assert isinstance(app.state.lab_mcp_discoverer, RuntimeLabMcpDiscoverer)
 
 
 def test_runtime_wiring_does_not_branch_on_tenant_identity() -> None:

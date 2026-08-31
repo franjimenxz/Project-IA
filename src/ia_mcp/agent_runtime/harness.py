@@ -79,10 +79,12 @@ def canonical_requires_idempotency_key(name: str) -> bool:
 def invocable_on_turn(
     name: str, *, declared_for_turn: frozenset[str] = frozenset()
 ) -> bool:
-    """Fourth intersection term. Tenant turn declarations default empty."""
+    """Fourth intersection term. Announced names are invocable this turn."""
+    if name in declared_for_turn:
+        return True
     if name in KNOWN_TOOLS:
         return not canonical_requires_idempotency_key(name)
-    return name in declared_for_turn
+    return False
 
 
 def _freeze_arguments(arguments: Mapping[str, Any]) -> tuple[tuple[str, object], ...]:
@@ -217,7 +219,7 @@ class AgentHarness:
                     run_id=run.id,
                     trajectory=tuple(trajectory + ["search"]),
                 )
-            if not hits:
+            if not hits and not config.enabled_tools:
                 grounded = self._policy.apply(hits=hits, decision=None)
                 trajectory.append("policy")
                 return await self._finish(
@@ -317,7 +319,19 @@ class AgentHarness:
             if expired is not None:
                 return expired
             if isinstance(decision, LLMDecision):
-                grounded = self._policy.apply(hits=hits, decision=decision)
+                if (
+                    any(call.ok for call in executed)
+                    and decision.kind == "answer"
+                    and decision.text
+                ):
+                    cited = tuple(
+                        source for source in decision.source_ids if source in allowed
+                    )
+                    grounded = PolicyDecision(
+                        kind="answer", text=decision.text, source_ids=cited
+                    )
+                else:
+                    grounded = self._policy.apply(hits=hits, decision=decision)
                 trajectory.append("policy")
                 status: AgentRunStatus = (
                     "handed_off" if grounded.kind == "handoff" else "succeeded"
@@ -359,7 +373,9 @@ class AgentHarness:
                     executed,
                     error_code="tool_budget_exhausted",
                 )
-            if not invocable_on_turn(decision.name):
+            if not invocable_on_turn(
+                decision.name, declared_for_turn=frozenset(tool_names)
+            ):
                 observations.append(_forbidden_observation(decision.name))
                 executed.append(
                     ExecutedToolCall(

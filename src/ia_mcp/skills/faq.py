@@ -49,8 +49,7 @@ class FAQSkill:
         return ()
 
     def allowed_tools(self, config: TenantConfig) -> frozenset[ToolName]:
-        _READ = frozenset({ToolName("appointments.search"), ToolName("appointments.get")})
-        return frozenset(ToolName(name) for name in config.enabled_tools if name in _READ)
+        return frozenset(ToolName(name) for name in config.enabled_tools)
 
     async def route(self, turn: SkillTurn) -> SkillResult:
         del turn
