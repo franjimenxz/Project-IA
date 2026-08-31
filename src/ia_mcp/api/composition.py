@@ -269,6 +269,7 @@ def build_runtime(
         max_tool_iterations=4,
         turn_deadline_seconds=30.0,
     )
+    packages_dir = tenant_packages_dir_from(environ)
     return RuntimeGraph(
         engine=engine,
         channels=channels,
@@ -283,8 +284,9 @@ def build_runtime(
                 engine,
                 secrets=ResolvableSecretReferences(EnvironmentSecretResolver(environ)),
             ),
+            packages_dir=packages_dir,
         ),
-        tenant_packages_dir=tenant_packages_dir_from(environ),
+        tenant_packages_dir=packages_dir,
     )
 
 

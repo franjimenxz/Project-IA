@@ -42,8 +42,10 @@ def create_app(*, environment: str | None = None) -> FastAPI:
     app.include_router(create_onboarding_router())
 
     if resolved in _NON_PRODUCTION_ENVIRONMENTS:
+        from ia_mcp.api.routes.instituciones import create_instituciones_router
         from ia_mcp.api.routes.simulated import router as simulated_router
 
         app.include_router(simulated_router)
+        app.include_router(create_instituciones_router())
 
     return app

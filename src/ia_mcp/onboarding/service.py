@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -46,6 +49,7 @@ from ia_mcp.onboarding.commands import (
     ProvisionedTenant,
     TenantLifecycleStatus,
 )
+from ia_mcp.onboarding.lab_package import display_name_for
 from ia_mcp.onboarding.models import TenantPackage
 from ia_mcp.onboarding.preflight import (
     CheckOutcome,
@@ -63,7 +67,16 @@ from ia_mcp.tenancy.models import ChannelIntegration, TenantContext, TenantIdent
 
 PLATFORM_ADMIN = "platform_admin"
 TENANT_ADMIN = "tenant_admin"
+_LAB_ENVIRONMENTS = frozenset({"development", "test"})
 type ProvisionIntegrity = Literal["slug_race", "channel_conflict"]
+
+
+@dataclass(frozen=True, slots=True)
+class TenantListItem:
+    slug: str
+    display_name: str
+    status: str
+    config_version: int
 
 metadata = MetaData()
 
@@ -635,6 +648,128 @@ class SqlAlchemyOnboardingStore:
             return _provisioned(tenant, 0, "draft")
         return _provisioned(tenant, int(version_row.version), str(version_row.status))
 
+    async def list_tenants(self) -> tuple[ProvisionedTenant, ...]:
+        async with self._sessions() as session:
+            rows = (
+                (await session.execute(select(tenant_table).order_by(tenant_table.c.slug)))
+                .mappings()
+                .all()
+            )
+            items: list[ProvisionedTenant] = []
+            for tenant in rows:
+                loaded = await self._load_by_slug(session, str(tenant["slug"]))
+                if loaded is not None:
+                    items.append(loaded)
+            return tuple(items)
+
+    async def lab_enable(self, admin: TenantAdminContext) -> ProvisionedTenant:
+        async with self._sessions() as session, session.begin():
+            row = (
+                (
+                    await session.execute(
+                        select(tenant_table)
+                        .where(tenant_table.c.id == admin.identity.tenant_id)
+                        .with_for_update()
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if row is None or row["slug"] != admin.identity.tenant_slug:
+                raise TenantIsolationViolation()
+            config = (
+                await session.execute(
+                    select(
+                        tenant_config_table.c.version,
+                        tenant_config_table.c.status,
+                    )
+                    .where(tenant_config_table.c.tenant_id == admin.identity.tenant_id)
+                    .order_by(tenant_config_table.c.version.desc())
+                    .limit(1)
+                )
+            ).first()
+            if config is None:
+                raise OnboardingError(
+                    "invalid_preflight",
+                    "Tenant configuration is missing.",
+                )
+            now = _now()
+            version = int(config.version)
+            if str(config.status) == "draft":
+                await session.execute(
+                    tenant_config_table.update()
+                    .where(
+                        tenant_config_table.c.tenant_id == admin.identity.tenant_id,
+                        tenant_config_table.c.version == version,
+                    )
+                    .values(status="published", published_at=now)
+                )
+            await session.execute(
+                tenant_table.update()
+                .where(tenant_table.c.id == admin.identity.tenant_id)
+                .values(
+                    status="active",
+                    active_config_version=version,
+                    updated_at=now,
+                )
+            )
+            await session.execute(
+                channel_integration_table.update()
+                .where(
+                    channel_integration_table.c.tenant_id == admin.identity.tenant_id,
+                    channel_integration_table.c.channel == "simulated",
+                )
+                .values(status="active")
+            )
+            await session.execute(
+                integration_table.update()
+                .where(
+                    integration_table.c.tenant_id == admin.identity.tenant_id,
+                    integration_table.c.kind == "mcp",
+                )
+                .values(status="active")
+            )
+            await session.execute(
+                audit_event_table.insert().values(
+                    id=uuid4(),
+                    tenant_id=admin.identity.tenant_id,
+                    actor_id=admin.principal_id,
+                    action="lab_enable",
+                    version=version,
+                    created_at=now,
+                )
+            )
+            return ProvisionedTenant(
+                identity=admin.identity,
+                status="active",
+                config_version=version,
+                config_status="published",
+            )
+
+    async def simulated_channel_id(self, tenant: TenantContext) -> UUID:
+        async with self._sessions() as session:
+            row = (
+                await session.execute(
+                    select(channel_integration_table.c.id, tenant_table.c.slug)
+                    .select_from(
+                        channel_integration_table.join(
+                            tenant_table,
+                            tenant_table.c.id == channel_integration_table.c.tenant_id,
+                        )
+                    )
+                    .where(
+                        channel_integration_table.c.tenant_id == tenant.tenant_id,
+                        channel_integration_table.c.channel == "simulated",
+                    )
+                )
+            ).first()
+            if row is None or row.slug != tenant.tenant_slug:
+                raise TenantIsolationViolation()
+            channel_id = row.id
+            if not isinstance(channel_id, UUID):
+                raise TenantIsolationViolation()
+            return channel_id
+
 
 def _report_from_row(row: Any) -> PreflightReport:
     checks = tuple(CheckOutcome.model_validate(item) for item in row["checks"])
@@ -659,8 +794,10 @@ class TenantOnboardingService:
         *,
         checks: Sequence[PreflightCheckPort] | None = None,
         investigation_query: RunInvestigationQuery | None = None,
+        packages_dir: Path | None = None,
     ) -> None:
         self._store = SqlAlchemyOnboardingStore(engine)
+        self._packages_dir = packages_dir
         self._checks: tuple[PreflightCheckPort, ...] = (
             tuple(checks)
             if checks is not None
@@ -710,6 +847,31 @@ class TenantOnboardingService:
     async def get(self, channel: str, account_id: str) -> ChannelIntegration | None:
         return await self._store.get(channel, account_id)
 
+    async def lab_enable(self, admin: TenantAdminContext) -> ProvisionedTenant:
+        _require_lab_environment()
+        _require_platform_admin(admin.roles)
+        return await self._store.lab_enable(admin)
+
+    async def list_tenants(self, principal: Principal) -> tuple[TenantListItem, ...]:
+        rows = await self._store.list_tenants()
+        visible: list[TenantListItem] = []
+        for tenant in rows:
+            if not _principal_may_see(principal, tenant):
+                continue
+            slug = tenant.identity.tenant_slug
+            visible.append(
+                TenantListItem(
+                    slug=slug,
+                    display_name=display_name_for(self._packages_dir, slug),
+                    status=tenant.status,
+                    config_version=tenant.config_version,
+                )
+            )
+        return tuple(visible)
+
+    async def simulated_channel_id(self, tenant: TenantContext) -> UUID:
+        return await self._store.simulated_channel_id(tenant)
+
 
 def tenant_context_for(
     tenant: ProvisionedTenant, *, correlation_id: UUID | None = None
@@ -750,12 +912,32 @@ def admin_context_for(
     )
 
 
+def _require_lab_environment() -> None:
+    environment = os.environ.get("IA_MCP_ENVIRONMENT", "development").lower()
+    if environment not in _LAB_ENVIRONMENTS:
+        raise OnboardingError(
+            "lab_unavailable",
+            "Lab enable is not available.",
+        )
+
+
 def _require_platform_admin(roles: frozenset[str]) -> None:
     if PLATFORM_ADMIN not in roles:
         raise OnboardingError(
             "forbidden",
             "Administrator is not allowed to perform this action.",
         )
+
+
+def _principal_may_see(principal: Principal, tenant: ProvisionedTenant) -> bool:
+    if PLATFORM_ADMIN in principal.roles:
+        return True
+    if TENANT_ADMIN not in principal.roles:
+        return False
+    return (
+        principal.tenant_id == tenant.identity.tenant_id
+        and principal.tenant_slug == tenant.identity.tenant_slug
+    )
 
 
 def _require_disable_role(admin: TenantAdminContext) -> None:

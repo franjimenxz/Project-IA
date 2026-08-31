@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Instituciones</title>
+  <style>
+    body { font-family: sans-serif; margin: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; }
+    th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
+    fieldset { margin-bottom: 1rem; }
+    label { display: block; margin: 0.3rem 0; }
+    input[type="text"], input[type="password"], textarea { width: 24rem; max-width: 100%; }
+    .token-box { background: #f4f4f4; padding: 0.75rem; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Instituciones</h1>
+  <p>Laboratorio. El token de administrador se guarda en sessionStorage y se envía como Authorization.</p>
+
+  <div class="token-box">
+    <label>Token administrador <input id="admin-token" type="password" autocomplete="off"></label>
+  </div>
+
+  <section id="lista">
+    <h2>Lista</h2>
+    <table>
+      <thead>
+        <tr><th>slug</th><th>display_name</th><th>status</th><th>config_version</th><th></th></tr>
+      </thead>
+      <tbody>$rows</tbody>
+    </table>
+  </section>
+
+  <section id="alta">
+    <h2>Alta / edición</h2>
+    <form data-admin method="post" action="/admin/instituciones">
+      <label>slug <input name="slug" type="text" required></label>
+      <label>display_name <input name="display_name" type="text" required></label>
+      <label>tone <input name="tone" type="text" required></label>
+      <label>instructions <textarea name="instructions" maxlength="2000"></textarea></label>
+      <fieldset>
+        <legend>enabled_skills</legend>
+        <label><input type="checkbox" name="enabled_skills" value="faq"> faq</label>
+        <label><input type="checkbox" name="enabled_skills" value="appointments"> appointments</label>
+        <label><input type="checkbox" name="enabled_skills" value="human_handoff"> human_handoff</label>
+      </fieldset>
+      <fieldset>
+        <legend>enabled_tools</legend>
+        $tool_checks
+      </fieldset>
+      <label>mcp_server_id <input name="mcp_server_id" type="text" required></label>
+      <fieldset>
+        <legend>mcp_capabilities</legend>
+        $capability_checks
+      </fieldset>
+      <label>mcp_credentials_reference <input name="mcp_credentials_reference" type="text" required placeholder="sm://slug/mcp/appointments"></label>
+      <label>knowledge_text <textarea name="knowledge_text"></textarea></label>
+      <button type="submit">Guardar</button>
+    </form>
+  </section>
+  $message
+  <script>
+    (function () {
+      var KEY = "ia_mcp_admin_token";
+      var input = document.getElementById("admin-token");
+      if (input) {
+        input.value = "";
+        input.addEventListener("change", function () {
+          sessionStorage.setItem(KEY, input.value);
+          input.value = "";
+        });
+      }
+      document.querySelectorAll("form[data-admin]").forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var token = sessionStorage.getItem(KEY);
+          var headers = {};
+          if (token) { headers.Authorization = "Bearer " + token; }
+          headers["Content-Type"] = "application/x-www-form-urlencoded";
+          fetch(form.getAttribute("action") || location.pathname, {
+            method: (form.getAttribute("method") || "POST").toUpperCase(),
+            headers: headers,
+            body: new URLSearchParams(new FormData(form))
+          }).then(function (response) { return response.text(); }).then(function (html) {
+            document.open();
+            document.write(html);
+            document.close();
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
