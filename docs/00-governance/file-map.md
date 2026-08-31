@@ -19,22 +19,22 @@
 
 | Ruta | Responsabilidad | Owner inicial |
 |---|---|---|
-| `src/ia_mcp/api/` | adapters HTTP/FastAPI, auth de entrada y composition root | P02-T01 / P10-T01 / P13-T01 (templates lab) / P14-T04 (wiring Gemini + knowledge) |
+| `src/ia_mcp/api/` | adapters HTTP/FastAPI, auth de entrada y composition root | P02-T01 / P10-T01 / P13-T01 (templates lab) / P14-T04 (wiring Gemini + knowledge) / P15-T02 (form endpoint) / P15-T03 (composition merge) |
 | `src/ia_mcp/channels/` | envelopes, adapters y delivery | P02-T05 |
 | `src/ia_mcp/tenancy/` | TenantContext y resolución | P02-T02 |
 | `src/ia_mcp/configuration/` | config versionada | P02-T03 |
 | `src/ia_mcp/conversation/` | Conversation, Message y SessionState | P04-T01 |
-| `src/ia_mcp/agent_runtime/` | Harness, runs, LLM port, context | P04-T02/P04-T04 / P14-T03 (compiler `enabled_tools`) |
-| `src/ia_mcp/skills/` | registry y skills MVP | P04-T02 / P14-T03 (FAQ read tools) |
+| `src/ia_mcp/agent_runtime/` | Harness, runs, LLM port, context | P04-T02/P04-T04 / P14-T03 (compiler `enabled_tools`) / P15-T03 (turno lab MCP) |
+| `src/ia_mcp/skills/` | registry y skills MVP | P04-T02 / P14-T03 (FAQ read tools) / P15-T03 (FAQ = enabled_tools) |
 | `src/ia_mcp/contracts/` | modelos canónicos públicos | P03-T01 |
 | `src/ia_mcp/knowledge/` | ingestión, documentos y retrieval | P04-T03 / P14-T02 (`lab_search.py`) |
 | `src/ia_mcp/llm/` | adaptador Gemini de runtime | P14-T01 |
 | `src/ia_mcp/workflows/` | engine y definitions de negocio | P04-T06 |
-| `src/ia_mcp/mcp/` | registry, resolver, discovery, client, executor y capabilities | P03-T03/P03-T04/P03-T05, P09-T02–T04 |
+| `src/ia_mcp/mcp/` | registry, resolver, discovery, client, executor y capabilities | P03-T03/P03-T04/P03-T05, P09-T02–T04, P15-T03 (SSE si hay endpoint) |
 | `src/ia_mcp/integrations/` | adapters institucionales | P05-T02 |
 | `src/ia_mcp/handoff/` | transferencia y ownership | P04-T11 |
 | `src/ia_mcp/scheduling/` | jobs, clock, reminder | P04-T12 |
-| `src/ia_mcp/onboarding/` | package/lifecycle/preflight | P08-T01 |
+| `src/ia_mcp/onboarding/` | package/lifecycle/preflight | P08-T01 / P15-T02 (`lab_mcp.py`) |
 | `src/ia_mcp/evals/` | runner, scorers y reportes | P06-T01 |
 | `src/ia_mcp/observability/` | correlation, audit y run queries | P02-T04/P07-T01 |
 | `src/ia_mcp/shared/` | errores/primitivas realmente transversales | P02-T04 |

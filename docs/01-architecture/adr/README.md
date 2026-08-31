@@ -14,6 +14,7 @@ Los ADRs registran decisiones que afectan múltiples fases o interfaces. Son inm
 | [ADR-008](ADR-008-tenant-agent-profile.md) | Perfil de agente por tenant hasta el `LLMRequest` | accepted |
 | [ADR-009](ADR-009-operator-html-lab.md) | Páginas HTML de laboratorio para instituciones | accepted |
 | [ADR-010](ADR-010-gemini-runtime-llm.md) | Gemini como LLM de runtime | accepted |
+| [ADR-011](ADR-011-lab-mcp-plugin.md) | Plugin MCP de laboratorio y chat simulado | accepted |
 
 Cada ADR incluye contexto, decisión, consecuencias, alternativas y verificación. ADR-005 enmienda ADR-003 en el boundary MCP institucional; no lo supersede.
 

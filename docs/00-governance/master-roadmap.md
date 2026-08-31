@@ -31,6 +31,8 @@ flowchart LR
     P11 --> P12[Fase 12\nPerfil de agente]
     P12 --> P13[Fase 13\nHTML laboratorio]
     P12 --> P14[Fase 14\nRuntime bot]
+    P13 --> P15[Fase 15\nPlugin MCP lab]
+    P14 --> P15
 ```
 
 ## Estrategia de entrega
@@ -58,6 +60,7 @@ La arquitectura y los contratos se estabilizan primero. A continuación se imple
 | W11 | Fase 12 perfil de agente por tenant | Fase 11 accepted en tablero | El tono e instrucciones del tenant llegan a cada `LLMRequest` del turno |
 | W12 | Fase 13 páginas HTML de laboratorio | Fase 12 accepted | Alta, lista, config y chat de prueba por institución en development/test |
 | W13 | Fase 14 cerrar el bot de runtime | Fase 12 accepted; ADR-010 accepted | Gemini lee el request; knowledge de package; FAQ anuncia tools de lectura |
+| W14 | Fase 15 plugin MCP de laboratorio | Fase 13 y 14 accepted; ADR-011 | Form con URL SSE; chat simula WhatsApp; turno usa el catálogo descubierto |
 
 ## Gates globales
 

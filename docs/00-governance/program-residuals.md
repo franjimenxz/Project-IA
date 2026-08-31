@@ -13,7 +13,7 @@
 | P14-T03 FAQ lectura + compiler | `accepted` | PR #92 (`47081d9`) |
 | P14-T04 wiring de composition | `accepted` | PR #97 (`1473e5f`) |
 
-Fase 13 y Fase 14 T01–T04 accepted. No hay más tareas P14 para delegar.
+Fase 13 y Fase 14 T01–T04 accepted. Fase 15 documentada (ADR-011): T02 `ready` (form + endpoint); T03 `blocked` hasta T02.
 
 ## Fuera de esta wave (no delegar)
 
@@ -32,4 +32,4 @@ Fase 13 y Fase 14 T01–T04 accepted. No hay más tareas P14 para delegar.
 
 El wiring de P14-T04 está en `main`. El operador debe exportar `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
 
-En development/test, las páginas HTML `/admin/instituciones` usan el `platform_admin` declarado en `IA_MCP_ADMIN_PRINCIPALS` cuando el browser no manda Bearer y el `IA_MCP_SECRET_*` de esa entrada resuelve. El token no se incrusta en el HTML. `/v1/admin/*` sigue exigiendo `Authorization`.
+En development/test, las páginas HTML `/admin/instituciones` usan el `platform_admin` declarado en `IA_MCP_ADMIN_PRINCIPALS` cuando el browser no manda Bearer y el `IA_MCP_SECRET_*` de esa entrada resuelve. El token no se incrusta en el HTML. `/v1/admin/*` sigue exigiendo `Authorization`. El enchufe MCP por URL y el catálogo en el chat son Fase 15 (T02/T03).
