@@ -44,9 +44,9 @@
 
 **Brief:** [`agent-briefs/P11-T04-isolation-observability.md`](agent-briefs/P11-T04-isolation-observability.md)
 
-- [ ] Rojo: no existe prueba negativa de que el loop respete el boundary de tenant; `agent.run` y `llm.generate` no se emiten.
-- [ ] Verde: suite negativa multi-tenant, spans del turno y `run_id` propagado a `ToolAuditEvent`.
-- [ ] Commit `feat: isolate and instrument the conversational tool loop`.
+- [x] Rojo: no existe prueba negativa de que el loop respete el boundary de tenant; `agent.run` y `llm.generate` no se emiten.
+- [x] Verde: suite negativa multi-tenant, spans del turno y `run_id` propagado a `ToolAuditEvent`.
+- [x] Commit `feat: isolate and instrument the conversational tool loop`.
 
 ## Wave W10
 

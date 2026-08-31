@@ -1,6 +1,6 @@
 # Fase 11 — Loop de tool calls en el turno
 
-**Estado:** ready  
+**Estado:** accepted  
 **Gate de entrada:** G6 satisfecho; P10-T01 aceptada; ADR-006 aceptado  
 **Salida de fase:** AC-P11-001–AC-P11-012 aceptados; sin gate global nuevo
 
