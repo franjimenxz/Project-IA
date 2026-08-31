@@ -289,6 +289,29 @@ async def test_core_and_tenant_are_not_concatenated() -> None:
 
 
 @pytest.mark.anyio
+async def test_output_contract_is_a_separate_user_part() -> None:
+    llm, transport = _llm()
+    await llm.generate(_request())
+    body = transport.bodies[0]
+    texts = _part_texts(body)
+    contract_parts = [
+        text
+        for text in texts
+        if "OUTPUT_CONTRACT" in text and '"kind"' in text and '"source_ids"' in text
+    ]
+    assert contract_parts
+    assert len(contract_parts) == 1
+    contract = contract_parts[0]
+    assert CORE_INSTRUCTIONS not in contract
+    assert TONE not in contract
+    assert TENANT_POLICY not in contract
+    system = body["systemInstruction"]
+    assert isinstance(system, Mapping)
+    assert system["parts"] == [{"text": CORE_INSTRUCTIONS}]
+    assert "generationConfig" not in body
+
+
+@pytest.mark.anyio
 async def test_tool_results_map_to_function_response() -> None:
     observation = ToolObservation(
         name="appointments.search",

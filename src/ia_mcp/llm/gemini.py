@@ -23,6 +23,13 @@ GENERATE_CONTENT_URL = (
 _TIMEOUT_SECONDS = 10
 _UNAVAILABLE = "provider_unavailable"
 _SAFE_UNAVAILABLE = "The language model is unavailable."
+_OUTPUT_CONTRACT = (
+    "OUTPUT_CONTRACT If you answer in text, reply with a JSON object only, "
+    "no markdown: "
+    '{"kind": "answer"|"clarify"|"insufficient"|"handoff", '
+    '"text": "<string>", "source_ids": ["<id>", ...]}. '
+    "You may instead emit a functionCall whose name is in tool_names."
+)
 
 
 class GeminiTransport(Protocol):
@@ -99,6 +106,7 @@ def _request_body(request: LLMRequest) -> dict[str, object]:
         parts.append({"text": "EVIDENCE\n" + "\n".join(request.knowledge)})
     if request.history:
         parts.append({"text": "HISTORY\n" + "\n".join(request.history)})
+    parts.append({"text": _OUTPUT_CONTRACT})
     if request.allowed_source_ids:
         parts.append(
             {
