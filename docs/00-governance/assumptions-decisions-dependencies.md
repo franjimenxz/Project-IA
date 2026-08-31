@@ -38,6 +38,7 @@
 | D-005 | MCP discovery (`tools/list`) e invocación genérica con intersección tenant/skill/servidor | ADR-005 |
 | D-006 | Loop conversacional de tools de lectura; mutaciones siguen por workflow | ADR-006 |
 | D-007 | Perfil de agente del tenant (`tone` + `instructions` opcionales) llega a cada `LLMRequest` sin concatenarse con Core | ADR-008 |
+| D-008 | Páginas HTML de laboratorio (alta/lista/config/chat) y `lab_enable` sólo en development/test | ADR-009 |
 
 ## Dependencias externas
 

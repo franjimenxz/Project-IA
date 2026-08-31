@@ -12,6 +12,7 @@ Los ADRs registran decisiones que afectan múltiples fases o interfaces. Son inm
 | [ADR-006](ADR-006-conversational-tool-loop.md) | Loop conversacional de tools de lectura | accepted |
 | [ADR-007](ADR-007-admin-service-tokens-and-secret-resolution.md) | Tokens de servicio administrativos y resolución de secretos | proposed |
 | [ADR-008](ADR-008-tenant-agent-profile.md) | Perfil de agente por tenant hasta el `LLMRequest` | accepted |
+| [ADR-009](ADR-009-operator-html-lab.md) | Páginas HTML de laboratorio para instituciones | accepted |
 
 Cada ADR incluye contexto, decisión, consecuencias, alternativas y verificación. ADR-005 enmienda ADR-003 en el boundary MCP institucional; no lo supersede.
 
