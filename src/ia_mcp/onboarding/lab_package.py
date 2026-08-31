@@ -21,10 +21,12 @@ from pydantic import (
 )
 
 from ia_mcp.configuration.models import SkillName
-from ia_mcp.mcp.registry import KNOWN_TOOLS
+from ia_mcp.onboarding.lab_mcp import validate_lab_mcp_endpoint
 from ia_mcp.onboarding.loader import load_yaml
 from ia_mcp.onboarding.models import TenantDocument
 from ia_mcp.onboarding.validator import TOOL_SKILL_PREFIX, URI_RE
+
+_PLACEHOLDER_CREDENTIALS = "sm://slug/mcp/appointments"
 
 Slug = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
 NonEmpty = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
@@ -43,13 +45,37 @@ class InstitucionForm(BaseModel):
     mcp_capabilities: frozenset[str] = Field(default_factory=frozenset)
     mcp_credentials_reference: NonEmpty
     knowledge_text: str | None = None
+    mcp_endpoint: str | None = None
 
-    @field_validator("instructions", "knowledge_text", mode="before")
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_lab_defaults(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        slug = data.get("slug")
+        if not isinstance(slug, str) or not slug.strip():
+            return data
+        updated = dict(data)
+        server_id = updated.get("mcp_server_id")
+        if not isinstance(server_id, str) or not server_id.strip():
+            updated["mcp_server_id"] = slug
+        if updated.get("mcp_credentials_reference") == _PLACEHOLDER_CREDENTIALS:
+            updated["mcp_credentials_reference"] = f"sm://{slug}/mcp/appointments"
+        return updated
+
+    @field_validator("instructions", "knowledge_text", "mcp_endpoint", mode="before")
     @classmethod
     def _omit_blank(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("mcp_endpoint")
+    @classmethod
+    def _lab_endpoint(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_lab_mcp_endpoint(value)
 
     @field_validator("mcp_credentials_reference")
     @classmethod
@@ -58,13 +84,13 @@ class InstitucionForm(BaseModel):
             raise ValueError("mcp_credentials_reference must be a URI")
         return value
 
-    @field_validator("enabled_tools")
+    @field_validator("enabled_tools", "mcp_capabilities")
     @classmethod
-    def _known_tools(cls, value: frozenset[str]) -> frozenset[str]:
-        unknown = value - {str(item) for item in KNOWN_TOOLS}
-        if unknown:
-            raise ValueError("enabled_tools must be known tools")
-        return value
+    def _non_empty_tool_names(cls, value: frozenset[str]) -> frozenset[str]:
+        cleaned = frozenset(item.strip() for item in value)
+        if any(not item for item in cleaned):
+            raise ValueError("tool names must not be empty")
+        return cleaned
 
     @model_validator(mode="after")
     def _tools_match_capabilities_and_skills(self) -> InstitucionForm:

@@ -1,12 +1,14 @@
-"""HTML lab pages for institutions (AC-P13-004, AC-P13-005, AC-P13-006).
+"""HTML lab pages for institutions (AC-P13-004, AC-P13-005, AC-P13-006, AC-P15-005).
 
 No PostgreSQL: collaborators are stubs. The suite checks routes, form fields,
 provision/lab_enable wiring and that chat calls the harness with the slug's
-TenantContext — not the simulated-channel signature.
+TenantContext — not the simulated-channel signature. Discovery uses an
+injected stub; this file does not open a network socket.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -24,10 +26,14 @@ from ia_mcp.configuration.models import (
 from ia_mcp.configuration.service import ConfigurationService
 from ia_mcp.conversation.models import InboundMessage
 from ia_mcp.onboarding.commands import Principal, ProvisionedTenant
+from ia_mcp.onboarding.lab_mcp import LAB_ENDPOINTS_FILE
+from ia_mcp.onboarding.loader import load_yaml
 from ia_mcp.onboarding.models import TenantPackage
 from ia_mcp.onboarding.service import PLATFORM_ADMIN, TenantOnboardingService
 from ia_mcp.tenancy.models import TenantContext, TenantIdentity
 from tests.fixtures.admin_auth import admin_authenticator, bearer
+
+LAN_SSE = "http://192.168.1.247:8001/sse"
 
 TOKEN = "svctest-instituciones-html-token"
 TENANT_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
@@ -130,6 +136,22 @@ class StubConfigService(ConfigurationService):
         )
 
 
+class StubDiscoverer:
+    def __init__(self, names: tuple[str, ...] = ("crear_turno",)) -> None:
+        self.names = names
+        self.endpoints: list[str] = []
+
+    async def list_names(self, endpoint: str) -> tuple[str, ...]:
+        self.endpoints.append(endpoint)
+        return self.names
+
+
+class FailingDiscoverer:
+    async def list_names(self, endpoint: str) -> tuple[str, ...]:
+        del endpoint
+        raise TimeoutError("upstream body must not leak")
+
+
 class StubHarness:
     def __init__(self) -> None:
         self.messages: list[tuple[TenantContext, InboundMessage]] = []
@@ -156,6 +178,7 @@ def _client(
     service: StubOnboardingService | None = None,
     configs: StubConfigService | None = None,
     harness: StubHarness | None = None,
+    discoverer: StubDiscoverer | None = None,
 ) -> tuple[TestClient, StubOnboardingService, StubConfigService, StubHarness]:
     app = create_app(environment=environment)
     onboarding = service or StubOnboardingService()
@@ -166,6 +189,8 @@ def _client(
     app.state.agent_harness = agent
     if packages_dir is not None:
         app.state.tenant_packages_dir = packages_dir
+    if discoverer is not None:
+        app.state.lab_mcp_discoverer = discoverer
     if principal is not None:
         app.state.admin_authenticator = admin_authenticator({TOKEN: principal})
     headers = bearer(TOKEN) if principal is not None else {}
@@ -230,6 +255,7 @@ def test_form_only_exposes_current_package_fields(tmp_path: Path) -> None:
         "mcp_capabilities",
         "mcp_credentials_reference",
         "knowledge_text",
+        "mcp_endpoint",
     ):
         assert field in html
     assert "cuit" not in html
@@ -296,9 +322,94 @@ def test_chat_get_renders_whatsapp_shell(tmp_path: Path) -> None:
     response = client.get(f"/admin/instituciones/{SLUG}/chat")
     assert response.status_code == 200
     assert "Clinica Norte" in response.text or SLUG in response.text
-    assert "chat" in response.text.lower() or "whatsapp" in response.text.lower()
+    assert "simular whatsapp" in response.text.lower()
+    assert "simulated" in response.text.lower()
     assert "URLSearchParams" in response.text
     assert TOKEN not in response.text
+
+
+def test_post_alta_with_mcp_endpoint_discovers_tools_and_redirects_to_chat(
+    tmp_path: Path,
+) -> None:
+    discoverer = StubDiscoverer(("crear_turno",))
+    client, service, _, _ = _client(packages_dir=tmp_path, discoverer=discoverer)
+    response = client.post(
+        "/admin/instituciones",
+        data={
+            "slug": "sede-mcp",
+            "display_name": "Sede MCP",
+            "tone": "cordial",
+            "enabled_skills": ["faq"],
+            "mcp_server_id": "soloturnos",
+            "mcp_capabilities": [],
+            "mcp_credentials_reference": "sm://sede-mcp/mcp/appointments",
+            "mcp_endpoint": LAN_SSE,
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert location.endswith("/admin/instituciones/sede-mcp/chat")
+    assert TOKEN not in response.text
+    assert TOKEN not in location
+    assert discoverer.endpoints == [LAN_SSE]
+    endpoints = json.loads((tmp_path / LAB_ENDPOINTS_FILE).read_text(encoding="utf-8"))
+    assert endpoints == {"soloturnos": LAN_SSE}
+    integrations = load_yaml(
+        (tmp_path / "sede-mcp" / "integrations.yaml").read_text(encoding="utf-8")
+    )
+    config = load_yaml((tmp_path / "sede-mcp" / "config.yaml").read_text(encoding="utf-8"))
+    assert "crear_turno" in integrations["integrations"][0]["capabilities"]
+    assert "crear_turno" in config["enabled_tools"]
+    assert "faq" in config["enabled_skills"]
+    assert LAN_SSE not in (tmp_path / "sede-mcp" / "integrations.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert LAN_SSE not in (tmp_path / "sede-mcp" / "config.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert service.lab_enabled == ["sede-mcp"]
+    chat = client.get(location)
+    assert chat.status_code == 200
+    assert "simular whatsapp" in chat.text.lower()
+    assert TOKEN not in chat.text
+    assert LAN_SSE not in chat.text
+
+
+def test_discovery_failure_still_saves_and_shows_safe_notice(
+    tmp_path: Path,
+) -> None:
+    client, service, _, _ = _client(packages_dir=tmp_path)
+    client.app.state.lab_mcp_discoverer = FailingDiscoverer()
+    response = client.post(
+        "/admin/instituciones",
+        data={
+            "slug": "sede-fallo",
+            "display_name": "Sede Fallo",
+            "tone": "formal",
+            "enabled_skills": ["faq"],
+            "mcp_server_id": "soloturnos",
+            "mcp_credentials_reference": "sm://sede-fallo/mcp/appointments",
+            "mcp_endpoint": LAN_SSE,
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert location.endswith(
+        "/admin/instituciones/sede-fallo/chat?notice=discovery_unavailable"
+    )
+    assert "upstream body must not leak" not in response.text
+    assert TOKEN not in response.text
+    assert (tmp_path / "sede-fallo" / "tenant.yaml").is_file()
+    endpoints = json.loads((tmp_path / LAB_ENDPOINTS_FILE).read_text(encoding="utf-8"))
+    assert endpoints["soloturnos"] == LAN_SSE
+    assert service.lab_enabled == ["sede-fallo"]
+    chat = client.get(location)
+    assert chat.status_code == 200
+    assert "The MCP catalog could not be listed." in chat.text
+    assert "upstream body must not leak" not in chat.text
+    assert TOKEN not in chat.text
 
 
 def test_chat_post_calls_harness_with_slug_tenant_context(tmp_path: Path) -> None:

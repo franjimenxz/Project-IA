@@ -18,7 +18,7 @@ from urllib.parse import parse_qs
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import ValidationError
 
 from ia_mcp.api.auth.admin import AUTHORIZATION_HEADER, get_principal
@@ -40,6 +40,7 @@ from ia_mcp.onboarding.commands import (
     ProvisionedTenant,
     load_tenant_package,
 )
+from ia_mcp.onboarding.lab_mcp import write_lab_mcp_endpoint
 from ia_mcp.onboarding.lab_package import (
     InstitucionForm,
     display_name_for,
@@ -52,7 +53,16 @@ from ia_mcp.onboarding.service import (
     admin_context_for,
 )
 from ia_mcp.onboarding.validator import validate_package
-from ia_mcp.shared.errors import TenantIsolationViolation
+from ia_mcp.shared.errors import DomainError, TenantIsolationViolation
+
+_DISCOVERY_ERRORS = (
+    TimeoutError,
+    OSError,
+    ValueError,
+    TypeError,
+    RuntimeError,
+    DomainError,
+)
 
 _LIST_TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "instituciones.html"
 _CHAT_TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "institucion_chat.html"
@@ -79,7 +89,7 @@ def create_instituciones_router() -> APIRouter:
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
         payload: InstitucionForm,
     ) -> dict[str, str]:
-        tenant = await _save_institucion(request, principal, service, payload)
+        tenant, _failed = await _save_institucion(request, principal, service, payload)
         return {
             "tenant_id": str(tenant.identity.tenant_id),
             "slug": tenant.identity.tenant_slug,
@@ -125,11 +135,19 @@ def create_instituciones_router() -> APIRouter:
         request: Request,
         principal: Annotated[Principal, Depends(html_platform_admin)],
         service: Annotated[TenantOnboardingService, Depends(_get_service)],
-    ) -> HTMLResponse:
+    ) -> HTMLResponse | RedirectResponse:
         message = ""
         try:
             form = await _form_from_request(request)
-            await _save_institucion(request, principal, service, form)
+            tenant, discovery_failed = await _save_institucion(
+                request, principal, service, form
+            )
+            location = f"/admin/instituciones/{tenant.identity.tenant_slug}/chat"
+            if discovery_failed:
+                location = f"{location}?notice=discovery_unavailable"
+            return RedirectResponse(
+                url=location, status_code=status.HTTP_303_SEE_OTHER
+            )
         except ValidationError as exc:
             message = escape(exc.errors()[0]["msg"], quote=True) if exc.errors() else "invalid"
         except HTTPException as exc:
@@ -269,8 +287,12 @@ async def _save_institucion(
     principal: Principal,
     service: TenantOnboardingService,
     form: InstitucionForm,
-) -> ProvisionedTenant:
+) -> tuple[ProvisionedTenant, bool]:
     root = _packages_root(request)
+    discovery_failed = False
+    if form.mcp_endpoint:
+        write_lab_mcp_endpoint(root, form.mcp_server_id, form.mcp_endpoint)
+        form, discovery_failed = await _merge_discovered_catalog(request, form)
     existing = await service.get_by_slug(form.slug)
     package_path = write_lab_package(root, form)
     report = validate_package(package_path)
@@ -284,7 +306,50 @@ async def _save_institucion(
         if configs is not None:
             await configs.publish(admin, _draft_from_form(form))
     admin = admin_context_for(principal, tenant)
-    return await service.lab_enable(admin)
+    enabled = await service.lab_enable(admin)
+    return enabled, discovery_failed
+
+
+async def _merge_discovered_catalog(
+    request: Request, form: InstitucionForm
+) -> tuple[InstitucionForm, bool]:
+    """Copy discovered names into tools/capabilities. Never invent network."""
+    discoverer = getattr(request.app.state, "lab_mcp_discoverer", None)
+    list_names = getattr(discoverer, "list_names", None)
+    names: tuple[str, ...] = ()
+    failed = False
+    if callable(list_names) and form.mcp_endpoint:
+        try:
+            listed = await list_names(form.mcp_endpoint)
+        except _DISCOVERY_ERRORS:
+            failed = True
+            listed = ()
+        if isinstance(listed, tuple):
+            names = listed
+        elif isinstance(listed, (list, set, frozenset)):
+            names = tuple(str(item) for item in listed)
+    return _with_discovered_tools(form, names), failed
+
+
+def _with_discovered_tools(
+    form: InstitucionForm, names: tuple[str, ...]
+) -> InstitucionForm:
+    cleaned = frozenset(
+        name.strip() for name in names if isinstance(name, str) and name.strip()
+    )
+    enabled = form.enabled_tools | cleaned
+    capabilities = form.mcp_capabilities | cleaned
+    skills = set(form.enabled_skills)
+    skills.add("faq")
+    if any(name.startswith("appointments.") for name in enabled):
+        skills.add("appointments")
+    return form.model_copy(
+        update={
+            "enabled_tools": enabled,
+            "mcp_capabilities": capabilities,
+            "enabled_skills": frozenset(skills),
+        }
+    )
 
 
 async def _run_chat_turn(
@@ -365,6 +430,7 @@ async def _form_from_request(request: Request) -> InstitucionForm:
                 form.get("mcp_credentials_reference") or [""]
             )[0],
             "knowledge_text": knowledge_text or None,
+            "mcp_endpoint": (form.get("mcp_endpoint") or [""])[0] or None,
         }
     )
 
@@ -478,6 +544,9 @@ def _render_chat(
             f'<div class="bubble {role}">{escape(item.get("text") or "", quote=True)}</div>'
         )
     encoded = escape(json.dumps(list(history)), quote=True)
+    notice = request.query_params.get("notice")
+    if not error and notice == "discovery_unavailable":
+        error = escape("The MCP catalog could not be listed.", quote=True)
     error_block = f'<p class="error">{error}</p>' if error else ""
     return Template(_CHAT_TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
         display_name=escape(name, quote=True),
