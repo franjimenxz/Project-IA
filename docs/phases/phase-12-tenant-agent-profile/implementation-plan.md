@@ -30,9 +30,9 @@
 
 **Brief:** [`agent-briefs/P12-T02-profile-contract.md`](agent-briefs/P12-T02-profile-contract.md)
 
-- [ ] Rojo: `AgentConfig` no acepta `instructions`; `LLMRequest` no transporta `tone` ni `tenant_instructions`; el harness no los copia.
-- [ ] Verde: campo opcional en `AgentConfig`, campos aditivos en `LLMRequest`, compiler y harness que copian el perfil, schema y fixture de tenant B, suite unitaria y de aislamiento.
-- [ ] Commit `feat: copy tenant agent profile to every LLM request`.
+- [x] Rojo: `AgentConfig` no acepta `instructions`; `LLMRequest` no transporta `tone` ni `tenant_instructions`; el harness no los copia.
+- [x] Verde: campo opcional en `AgentConfig`, campos aditivos en `LLMRequest`, compiler y harness que copian el perfil, schema y fixture de tenant B, suite unitaria y de aislamiento.
+- [x] Commit `feat: copy tenant agent profile to every LLM request`.
 
 ## Wave W11
 

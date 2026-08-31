@@ -1,6 +1,6 @@
 # P12-T02 — Contrato y cableado del perfil
 
-**Estado:** ready · **Wave:** W11 · **Depends on:** P12-T01 aceptada
+**Estado:** accepted · **Wave:** W11 · **Depends on:** P12-T01 aceptada
 
 Hacer que `tone` e `instructions` opcionales del tenant lleguen a cada `LLMRequest` del turno, sin concatenarlos con Core ni inventar un system prompt. Una sola tarea de implementación.
 
