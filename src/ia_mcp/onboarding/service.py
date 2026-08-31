@@ -122,6 +122,7 @@ def _draft_from_package(package: TenantPackage) -> TenantConfigDraft:
         schema_version=1,
         agent=package.config.agent,
         enabled_skills=frozenset(package.config.enabled_skills),
+        enabled_tools=frozenset(package.config.enabled_tools),
         appointments=AppointmentPolicy(
             required_fields=package.config.appointments.required_fields,
             credentials_reference=package.config.appointments.credentials_reference,

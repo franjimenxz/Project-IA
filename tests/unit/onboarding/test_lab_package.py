@@ -12,8 +12,10 @@ import pytest
 from pydantic import ValidationError
 
 from ia_mcp.mcp.registry import KNOWN_TOOLS
+from ia_mcp.onboarding.commands import load_tenant_package
 from ia_mcp.onboarding.lab_package import InstitucionForm, write_lab_package
 from ia_mcp.onboarding.loader import load_package, load_yaml
+from ia_mcp.onboarding.service import _draft_from_package
 from ia_mcp.onboarding.validator import validate_package
 
 TOKEN_CANARY = "sk-live-lab-token-must-not-appear"
@@ -120,6 +122,21 @@ def test_enabled_tools_accepts_discovered_names_inside_capabilities() -> None:
     )
     assert form.enabled_tools == frozenset({"crear_turno"})
     assert form.mcp_capabilities == frozenset({"crear_turno"})
+
+
+def test_package_to_draft_preserves_discovered_enabled_tools(tmp_path: Path) -> None:
+    package_path = write_lab_package(
+        tmp_path,
+        _form(
+            enabled_skills=frozenset({"faq"}),
+            enabled_tools=frozenset({"crear_turno"}),
+            mcp_capabilities=frozenset({"crear_turno"}),
+        ),
+    )
+
+    draft = _draft_from_package(load_tenant_package(package_path))
+
+    assert draft.enabled_tools == frozenset({"crear_turno"})
 
 
 def test_enabled_tools_must_be_declared_capabilities() -> None:
