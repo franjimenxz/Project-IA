@@ -64,7 +64,7 @@ class ContextCompiler:
         configs: ConfigLookup,
         skills: SkillRegistry,
         tenant_tools: Mapping[UUID, frozenset[str]],
-        server_tools: Mapping[UUID, frozenset[str]] | None = None,
+        server_tools: Mapping[UUID, frozenset[str]] | frozenset[str] | None = None,
     ) -> None:
         self._configs = configs
         self._skills = skills
@@ -72,9 +72,12 @@ class ContextCompiler:
         self._server_tools = server_tools
 
     def _server_catalog(self, tenant_id: UUID) -> frozenset[str]:
-        if self._server_tools is None:
+        catalog = self._server_tools
+        if catalog is None:
             return frozenset()
-        return frozenset(self._server_tools.get(tenant_id, ()))
+        if isinstance(catalog, frozenset):
+            return catalog
+        return frozenset(catalog.get(tenant_id, ()))
 
     async def compile(
         self, tenant: TenantContext, request: ContextRequest
@@ -86,7 +89,7 @@ class ContextCompiler:
         authorized = sorted(
             tool_registry.available(
                 server=self._server_catalog(tenant.tenant_id),
-                tenant=self._tenant_tools.get(tenant.tenant_id, ()),
+                tenant=config.enabled_tools,
                 skill=skill.allowed_tools(config),
             )
         )
