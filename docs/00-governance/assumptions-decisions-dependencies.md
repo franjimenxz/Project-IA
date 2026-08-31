@@ -40,6 +40,7 @@
 | D-007 | Perfil de agente del tenant (`tone` + `instructions` opcionales) llega a cada `LLMRequest` sin concatenarse con Core | ADR-008 |
 | D-008 | Páginas HTML de laboratorio (alta/lista/config/chat) y `lab_enable` sólo en development/test | ADR-009 |
 | D-009 | Runtime LLM = Gemini 3.5 Flash (`generativelanguage.googleapis.com`); clave `sm://platform/llm/gemini` | ADR-010 |
+| D-010 | Laboratorio: el bot se adapta al MCP enchufado (`tools/list` + SSE); chat = WhatsApp simulado, no Cloud | ADR-011 |
 
 ## Dependencias externas
 
