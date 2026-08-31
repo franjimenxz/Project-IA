@@ -20,33 +20,33 @@
 
 **Brief:** [`agent-briefs/P11-T01-architecture-docs.md`](agent-briefs/P11-T01-architecture-docs.md)
 
-- [ ] Rojo: el hueco no está escrito en ningún ADR ni fase; revisión documental falla por falta de fuente normativa.
-- [ ] Verde: ADR-006, fase 11 con TDD, criterios, plan y test plan.
-- [ ] Commit `docs: define conversational tool loop and its boundary`.
+- [x] Rojo: el hueco no está escrito en ningún ADR ni fase; revisión documental falla por falta de fuente normativa.
+- [x] Verde: ADR-006, fase 11 con TDD, criterios, plan y test plan.
+- [x] Commit `docs: define conversational tool loop and its boundary`.
 
 ## Task 2: Contrato de decisión y realimentación
 
 **Brief:** [`agent-briefs/P11-T02-decision-contract.md`](agent-briefs/P11-T02-decision-contract.md)
 
-- [ ] Rojo: `LLMPort` no puede expresar una tool call y `LLMRequest` no puede transportar resultados previos.
-- [ ] Verde: `ToolCallProposal`, `LLMTurnDecision`, `ToolObservation`, `LLMRequest.tool_results`, `AgentTurnResult.tool_calls` y ajuste de `observe_turn`.
-- [ ] Commit `feat: add tool call decision and observation contracts`.
+- [x] Rojo: `LLMPort` no puede expresar una tool call y `LLMRequest` no puede transportar resultados previos.
+- [x] Verde: `ToolCallProposal`, `LLMTurnDecision`, `ToolObservation`, `LLMRequest.tool_results`, `AgentTurnResult.tool_calls` y ajuste de `observe_turn`.
+- [x] Commit `feat: add tool call decision and observation contracts`.
 
 ## Task 3: Loop acotado en el harness
 
 **Brief:** [`agent-briefs/P11-T03-harness-loop.md`](agent-briefs/P11-T03-harness-loop.md)
 
-- [ ] Rojo: una `ToolCallProposal` no ejecuta nada y el turno responde como si no hubiera tools.
-- [ ] Verde: loop con `max_tool_iterations`, deadline, superficie invocable fail-closed y mapeo de errores tipados.
-- [ ] Commit `feat: run bounded tool loop in agent harness`.
+- [x] Rojo: una `ToolCallProposal` no ejecuta nada y el turno responde como si no hubiera tools.
+- [x] Verde: loop con `max_tool_iterations`, deadline, superficie invocable fail-closed y mapeo de errores tipados.
+- [x] Commit `feat: run bounded tool loop in agent harness`.
 
 ## Task 4: Aislamiento, auditoría y trazas
 
 **Brief:** [`agent-briefs/P11-T04-isolation-observability.md`](agent-briefs/P11-T04-isolation-observability.md)
 
-- [ ] Rojo: no existe prueba negativa de que el loop respete el boundary de tenant; `agent.run` y `llm.generate` no se emiten.
-- [ ] Verde: suite negativa multi-tenant, spans del turno y `run_id` propagado a `ToolAuditEvent`.
-- [ ] Commit `feat: isolate and instrument the conversational tool loop`.
+- [x] Rojo: no existe prueba negativa de que el loop respete el boundary de tenant; `agent.run` y `llm.generate` no se emiten.
+- [x] Verde: suite negativa multi-tenant, spans del turno y `run_id` propagado a `ToolAuditEvent`.
+- [x] Commit `feat: isolate and instrument the conversational tool loop`.
 
 ## Wave W10
 

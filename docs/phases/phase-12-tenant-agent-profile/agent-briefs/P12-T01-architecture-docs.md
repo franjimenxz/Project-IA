@@ -1,6 +1,6 @@
 # P12-T01 — ADR-008 y documentación de fase
 
-**Estado:** ready · **Wave:** W11 · **Depends on:** Fase 11 accepted en tablero; P10-T01 accepted
+**Estado:** accepted · **Wave:** W11 · **Depends on:** Fase 11 accepted en tablero; P10-T01 accepted
 
 Documentar que el perfil de agente del tenant (tono + instrucciones opcionales) es configuración versionada y llega a cada `LLMRequest` del turno, sin reemplazar Core ni abrir un system prompt libre. Tarea sin código de producción.
 

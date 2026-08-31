@@ -1,7 +1,7 @@
 # TDD — Loop de tool calls en el turno
 
 **ID:** TDD-P11-001  
-**Estado:** draft  
+**Estado:** ready  
 **ADRs:** ADR-002, ADR-003, ADR-005, ADR-006  
 **Requisitos:** RF-004, RF-008, RF-023, RF-034, RF-044, RNF-001, RNF-004, RNF-009, RNF-011
 

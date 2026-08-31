@@ -1,6 +1,6 @@
 # P11-T02 — Contrato de decisión y realimentación
 
-**Estado:** draft · **Wave:** W10 · **Depends on:** P11-T01 aceptada
+**Estado:** accepted · **Wave:** W10 · **Depends on:** P11-T01 aceptada
 
 Permitir que el puerto LLM exprese una tool call y que el resultado de una tool vuelva al request de la iteración siguiente, sin tocar `AnswerKind` ni romper evals.
 

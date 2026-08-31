@@ -1,6 +1,6 @@
 # ADR-008 — Perfil de agente por tenant
 
-**Estado:** proposed  
+**Estado:** accepted  
 **Fecha:** 2026-08-31  
 **Supersedes:** ninguno  
 **Amends:** ninguno

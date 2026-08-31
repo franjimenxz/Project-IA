@@ -1,6 +1,6 @@
 # Fase 12 — Perfil de agente por tenant
 
-**Estado:** ready  
+**Estado:** accepted  
 **Gate de entrada:** G6 satisfecho; P10-T01 aceptada; Fase 11 aceptada en tablero  
 **Salida de fase:** AC-P12-001–AC-P12-008 aceptados; sin gate global nuevo
 
