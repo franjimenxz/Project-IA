@@ -1,7 +1,7 @@
 from typing import Any, Protocol
 from uuid import UUID
 
-from ia_mcp.agent_runtime.models import LLMDecision, LLMRequest
+from ia_mcp.agent_runtime.models import LLMDecision, LLMRequest, LLMTurnDecision
 from ia_mcp.agent_runtime.run_repository import AgentRun, AgentRunResult, AgentRunStatus
 from ia_mcp.conversation.models import InboundMessage, ReceivedMessage
 from ia_mcp.knowledge.models import KnowledgeHit, KnowledgeQuery
@@ -16,7 +16,7 @@ class LLMError(Exception):
 
 
 class LLMPort(Protocol):
-    async def generate(self, request: LLMRequest) -> LLMDecision: ...
+    async def generate(self, request: LLMRequest) -> LLMTurnDecision: ...
 
 
 class FakeLLM:
