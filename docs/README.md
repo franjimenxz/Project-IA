@@ -59,4 +59,4 @@ Una contradicción se resuelve en el nivel superior; nunca mediante una desviaci
 
 ## Estado del programa
 
-La documentación define nueve fases. La API médica, el proveedor real de WhatsApp y la plataforma real de handoff son dependencias externas; el MVP trabaja con puertos y mocks hasta que sus gates estén satisfechos. Fase 9 habilita discovery e invocación genérica de MCPs institucionales (ADR-005).
+La documentación define doce fases. La API médica, el proveedor real de WhatsApp y la plataforma real de handoff son dependencias externas; el MVP trabaja con puertos y mocks hasta que sus gates estén satisfechos. Fase 9 habilita discovery MCP (ADR-005). Fase 11 cablea el loop de tools de lectura. Fase 12 hace que el perfil de agente del tenant (`tone` e `instructions`) llegue al `LLMRequest`.
