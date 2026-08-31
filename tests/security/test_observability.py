@@ -15,6 +15,8 @@ from ia_mcp.api.app import create_app
 from ia_mcp.configuration.adapters.sqlalchemy import audit_event_table
 from ia_mcp.configuration.models import AgentConfig, TenantConfig
 from ia_mcp.configuration.service import ConfigurationService
+from ia_mcp.contracts.common import ToolResult
+from ia_mcp.mcp.executor import McpTarget, ToolAuditEvent, ToolExecutor
 from ia_mcp.observability.adapters.sqlalchemy_run_query import (
     SqlAlchemyRunInvestigationQuery,
 )
@@ -31,6 +33,10 @@ from ia_mcp.observability.propagation import (
 )
 from ia_mcp.observability.run_query import AUDIT_INVESTIGATION_ACTION, RunNotFound
 from ia_mcp.observability.semconv import (
+    ALLOWED_SPAN_ATTRIBUTES,
+    SPAN_AGENT_RUN,
+    SPAN_LLM_GENERATE,
+    SPAN_MCP_RESOLVE,
     SPAN_TOOL_EXECUTE,
     metric_labels,
     span_attributes,
@@ -62,6 +68,15 @@ from tests.integration.observability.test_run_query import (
     _seed_tenants_and_channels,
     seed_investigation_fixture,
 )
+from tests.unit.agent.test_harness import inbound, tenant_a
+from tests.unit.agent.test_harness_loop import (
+    ANSWER,
+    SEARCH_PROPOSAL,
+    RecordingFactory,
+    ScriptedLLM,
+    make_loop_harness,
+)
+from tests.unit.mcp.test_executor import CapabilitySpy
 
 
 def test_metric_labels_drop_high_cardinality_ids() -> None:
@@ -402,3 +417,84 @@ async def test_html_investigation_view_does_not_leak_payloads() -> None:
         assert AUDIT_INVESTIGATION_ACTION in actions
     finally:
         await engine.dispose()
+
+
+_SECRET_FRAGMENTS = (
+    "Bearer",
+    "secret-token",
+    "patient@example.com",
+    "30111222",
+    "sk-live",
+    "password",
+)
+
+
+class _LoopResolver:
+    async def resolve(self, tenant: TenantContext, capability: str) -> McpTarget:
+        del tenant, capability
+        return McpTarget(
+            server_id="mcp-read",
+            allowed_tools=frozenset({"appointments.search"}),
+            endpoint="https://mcp.example/sse",
+        )
+
+
+def _loop_read_executor(audit: list[ToolAuditEvent]) -> ToolExecutor:
+    capability = CapabilitySpy()
+    capability.search.return_value = ToolResult[dict[str, object]](
+        ok=True, value={"slots": 2}
+    )
+    return ToolExecutor(
+        server=frozenset({"appointments.search"}),
+        tenant=frozenset({"appointments.search"}),
+        skill=frozenset({"appointments.search"}),
+        capability=capability,
+        resolver=_LoopResolver(),
+        audit_hook=audit.append,
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.security
+async def test_tool_loop_turn_emits_agent_run_generate_execute_and_resolve() -> None:
+    """AC-P11-011: one executed read tool reconstructs from the four span names."""
+    configure_telemetry()
+    reset_telemetry_context()
+    events: list[ToolAuditEvent] = []
+    llm = ScriptedLLM(SEARCH_PROPOSAL, ANSWER)
+    harness, _knowledge, _llm, _runs = make_loop_harness(
+        llm=llm,
+        executors=RecordingFactory(_loop_read_executor(events)),
+    )
+
+    result = await harness.handle_message(tenant_a(), inbound("hours"))
+    flush_telemetry()
+
+    spans = recorded_spans()
+    names = [span.name for span in spans]
+    assert names.count(SPAN_AGENT_RUN) == 1
+    assert names.count(SPAN_LLM_GENERATE) == 2
+    assert names.count(SPAN_TOOL_EXECUTE) == 1
+    assert names.count(SPAN_MCP_RESOLVE) == 1
+    agent = next(span for span in spans if span.name == SPAN_AGENT_RUN)
+    generates = [span for span in spans if span.name == SPAN_LLM_GENERATE]
+    assert all(span.parent_span_id == agent.span_id for span in generates)
+    assert result.run_id is not None
+    assert agent.attributes.get("run_id") == str(result.run_id)
+    assert agent.attributes.get("tenant_id") == str(tenant_a().tenant_id)
+    assert set(agent.attributes) <= ALLOWED_SPAN_ATTRIBUTES
+    for span in spans:
+        assert set(span.attributes) <= ALLOWED_SPAN_ATTRIBUTES
+        assert "iteration" not in span.attributes
+        dumped = " ".join(f"{key}={value}" for key, value in span.attributes.items())
+        for fragment in _SECRET_FRAGMENTS:
+            assert fragment not in dumped
+            assert fragment not in span.name
+    tree = str(sanitized_span_tree(spans))
+    for fragment in _SECRET_FRAGMENTS:
+        assert fragment not in tree
+    assert events
+    for event in events:
+        assert event.run_id == result.run_id
+        assert event.tenant_id == tenant_a().tenant_id
+
