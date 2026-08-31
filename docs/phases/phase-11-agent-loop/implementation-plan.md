@@ -36,9 +36,9 @@
 
 **Brief:** [`agent-briefs/P11-T03-harness-loop.md`](agent-briefs/P11-T03-harness-loop.md)
 
-- [ ] Rojo: una `ToolCallProposal` no ejecuta nada y el turno responde como si no hubiera tools.
-- [ ] Verde: loop con `max_tool_iterations`, deadline, superficie invocable fail-closed y mapeo de errores tipados.
-- [ ] Commit `feat: run bounded tool loop in agent harness`.
+- [x] Rojo: una `ToolCallProposal` no ejecuta nada y el turno responde como si no hubiera tools.
+- [x] Verde: loop con `max_tool_iterations`, deadline, superficie invocable fail-closed y mapeo de errores tipados.
+- [x] Commit `feat: run bounded tool loop in agent harness`.
 
 ## Task 4: Aislamiento, auditoría y trazas
 

@@ -1,6 +1,6 @@
 # P11-T04 — Aislamiento, auditoría y trazas del loop
 
-**Estado:** draft · **Wave:** W10 · **Depends on:** P11-T03 aceptada
+**Estado:** ready · **Wave:** W10 · **Depends on:** P11-T03 aceptada
 
 Probar que el loop no cruza el boundary de tenant y dejar el turno reconstruible: `agent.run` como span raíz, una `llm.generate` por iteración y `run_id` del turno en cada `ToolAuditEvent`.
 
