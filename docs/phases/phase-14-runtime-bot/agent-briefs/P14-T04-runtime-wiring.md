@@ -1,6 +1,6 @@
 # P14-T04 — Wiring del runtime
 
-**Estado:** ready · **Wave:** W13 · **Depends on:** P14-T01, P14-T02 y P14-T03 `accepted`
+**Estado:** in_progress · **Wave:** W13 · **Depends on:** P14-T01, P14-T02 y P14-T03 `accepted`
 
 `build_runtime` instancia `GeminiLLM` si el secreto existe, `LabKnowledgeSearch` si hay packages dir, y pasa el catálogo MCP de lectura como `server_tools`. Fail-closed a `FakeLLM` / `EmptyKnowledgeSearch` si faltan.
 

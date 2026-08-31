@@ -26,7 +26,7 @@ Gemini lee el `LLMRequest` (Core + perfil + evidencia + tools). El knowledge de 
 | [P14-T01](agent-briefs/P14-T01-gemini-adapter.md) | `GeminiLLM` | `accepted` |
 | [P14-T02](agent-briefs/P14-T02-lab-knowledge.md) | Búsqueda de knowledge del package | `accepted` |
 | [P14-T03](agent-briefs/P14-T03-faq-read-tools.md) | FAQ lectura + compiler usa `enabled_tools` | `accepted` |
-| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `ready` |
+| [P14-T04](agent-briefs/P14-T04-runtime-wiring.md) | Composition: Gemini + knowledge + catálogo servidor | `in_progress` |
 
 P13-T01 y T01–T03 accepted. T04 toca `composition.py`.
 
