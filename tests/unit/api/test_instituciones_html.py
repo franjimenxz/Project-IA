@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from ia_mcp.agent_runtime.models import AgentTurnResult

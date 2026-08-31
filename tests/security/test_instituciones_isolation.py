@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
 
 from ia_mcp.agent_runtime.models import AgentTurnResult
 from ia_mcp.api.app import create_app
-from ia_mcp.configuration.models import AgentConfig, TenantAdminContext, TenantConfig
+from ia_mcp.configuration.models import AgentConfig, TenantConfig
 from ia_mcp.configuration.service import ConfigurationService
 from ia_mcp.conversation.models import InboundMessage
 from ia_mcp.onboarding.commands import Principal, ProvisionedTenant
@@ -94,6 +94,9 @@ class _IsolationOnboarding(TenantOnboardingService):
 
 
 class _IsolationConfig(ConfigurationService):
+    def __init__(self) -> None:
+        self.captures: list[TenantIdentity] = []
+
     async def capture(
         self, identity: TenantIdentity, correlation_id: UUID
     ) -> tuple[TenantContext, TenantConfig]:

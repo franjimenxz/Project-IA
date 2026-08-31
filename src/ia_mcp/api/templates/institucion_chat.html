@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Chat $display_name</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; background: #ece5dd; }
+    header {
+      background: #075e54; color: #fff; padding: 0.8rem 1rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    header a { color: #fff; }
+    .wa-name { font-weight: 600; }
+    .thread { max-width: 40rem; margin: 0 auto; padding: 1rem; min-height: 60vh; }
+    .bubble {
+      max-width: 80%; padding: 0.5rem 0.75rem; border-radius: 0.6rem;
+      margin: 0.35rem 0; clear: both; word-wrap: break-word;
+    }
+    .bubble.user { background: #dcf8c6; float: right; }
+    .bubble.bot { background: #fff; float: left; }
+    .composer {
+      position: sticky; bottom: 0; background: #f0f0f0;
+      padding: 0.6rem; display: flex; gap: 0.5rem;
+    }
+    .composer input[type="text"] { flex: 1; padding: 0.5rem; border-radius: 1rem; border: 1px solid #ccc; }
+    .token-box { background: #fff; padding: 0.5rem 1rem; }
+    .error { color: #b00020; padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/admin/instituciones">←</a>
+    <div class="wa-name">$display_name</div>
+  </header>
+  <div class="token-box">
+    <label>Token administrador <input id="admin-token" type="password" autocomplete="off"></label>
+  </div>
+  $error
+  <section class="thread" id="chat">$bubbles</section>
+  <form class="composer" data-admin method="post" action="/admin/instituciones/$slug/chat">
+    <input type="hidden" name="history" value="$history">
+    <input name="text" type="text" autocomplete="off" placeholder="Mensaje">
+    <button type="submit">Enviar</button>
+  </form>
+  <script>
+    (function () {
+      var KEY = "ia_mcp_admin_token";
+      var input = document.getElementById("admin-token");
+      if (input) {
+        input.value = "";
+        input.addEventListener("change", function () {
+          sessionStorage.setItem(KEY, input.value);
+          input.value = "";
+        });
+      }
+      document.querySelectorAll("form[data-admin]").forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var token = sessionStorage.getItem(KEY);
+          var headers = {};
+          if (token) { headers.Authorization = "Bearer " + token; }
+          fetch(form.getAttribute("action") || location.pathname, {
+            method: "POST",
+            headers: headers,
+            body: new FormData(form)
+          }).then(function (response) { return response.text(); }).then(function (html) {
+            document.open();
+            document.write(html);
+            document.close();
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

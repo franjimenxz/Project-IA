@@ -22,7 +22,7 @@ from ia_mcp.configuration.models import (
     TenantConfig,
 )
 from ia_mcp.configuration.service import ConfigurationService
-from ia_mcp.onboarding.commands import OnboardingError, Principal, ProvisionedTenant
+from ia_mcp.onboarding.commands import OnboardingError, ProvisionedTenant
 from ia_mcp.onboarding.service import PLATFORM_ADMIN, TenantOnboardingService
 from ia_mcp.tenancy.models import TenantIdentity
 
@@ -175,16 +175,7 @@ def test_lab_enable_requires_platform_admin(monkeypatch: pytest.MonkeyPatch) -> 
     assert refused.value.code == "forbidden"
 
 
-def test_list_tenants_returns_visible_items(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("IA_MCP_ENVIRONMENT", "test")
+def test_list_tenants_is_on_the_service() -> None:
     service = _service()
-
-    async def _items(principal: Principal) -> tuple[Any, ...]:
-        return await service.list_tenants(principal)
-
-    platform = Principal(principal_id=PRINCIPAL_ID, roles=frozenset({PLATFORM_ADMIN}))
-    # Without a real store the default SQL path is unreachable; the method
-    # must exist so the HTML router can call it.
     assert hasattr(service, "list_tenants")
     assert asyncio.iscoroutinefunction(service.list_tenants)
-    del _items, platform
