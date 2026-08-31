@@ -15,7 +15,7 @@
 | P15-T01 docs Fase 15 / ADR-011 | `accepted` | PR #100 |
 | P15-T02 form + mapa MCP lab | `accepted` | PR #102 (`87a21b9`) |
 
-Fase 13 y Fase 14 T01–T04 accepted. Fase 15: T01–T02 accepted. T03 `ready` (runtime + catálogo enchufado). Residual T02: `SseLabMcpDiscoverer` es no-op; el POST no lista tools hasta que T03 publique `app.state.lab_mcp_discoverer`.
+Fase 13 y Fase 14 T01–T04 accepted. Fase 15: T01–T02 accepted. T03 `in_progress` (runtime + catálogo enchufado). Residual T02: `SseLabMcpDiscoverer` es no-op; el POST no lista tools hasta que T03 publique `app.state.lab_mcp_discoverer`.
 
 ## Fuera de esta wave (no delegar)
 
