@@ -31,6 +31,8 @@ from ia_mcp.knowledge.models import KnowledgeHit, KnowledgeQuery
 from ia_mcp.knowledge.ports import KnowledgeError
 from ia_mcp.mcp.executor import ToolCall
 from ia_mcp.mcp.registry import KNOWN_TOOLS
+from ia_mcp.observability.propagation import start_span
+from ia_mcp.observability.semconv import SPAN_AGENT_RUN, SPAN_LLM_GENERATE
 from ia_mcp.skills.faq import SAFE_HANDOFF, SAFE_INSUFFICIENT, AnswerPolicy, FAQSkill
 from ia_mcp.skills.registry import SkillNotAuthorized, SkillRegistry
 from ia_mcp.tenancy.models import TenantContext
@@ -189,54 +191,64 @@ class AgentHarness:
             model_provider="fake",
             model_name="fake-llm",
         )
-        try:
-            hits = await self._knowledge.search(
-                tenant, KnowledgeQuery(text=message.text)
-            )
-            trajectory.append("search")
-        except KnowledgeError:
-            await self._runs.finish(
-                tenant, run.id, "failed", error_code="retrieval_unavailable"
-            )
-            return AgentTurnResult(
-                kind="insufficient",
-                text=SAFE_INSUFFICIENT,
-                source_ids=(),
-                tenant_id=tenant.tenant_id,
-                run_id=run.id,
-                trajectory=tuple(trajectory + ["search"]),
-            )
-        if not hits:
-            grounded = self._policy.apply(hits=hits, decision=None)
-            trajectory.append("policy")
-            return await self._finish(
-                tenant, run.id, "succeeded", grounded, trajectory, ()
-            )
-        compiled = await self._compiler.compile(
-            tenant,
-            ContextRequest(
-                skill="faq",
-                knowledge_hits=tuple(
-                    ContextHit(source_id=hit.source_id, text=hit.text) for hit in hits
+        with start_span(
+            SPAN_AGENT_RUN,
+            attributes={
+                "run_id": str(run.id),
+                "tenant_id": str(tenant.tenant_id),
+                "config_version": tenant.config_version,
+                "skill": self._faq.name,
+            },
+        ):
+            try:
+                hits = await self._knowledge.search(
+                    tenant, KnowledgeQuery(text=message.text)
+                )
+                trajectory.append("search")
+            except KnowledgeError:
+                await self._runs.finish(
+                    tenant, run.id, "failed", error_code="retrieval_unavailable"
+                )
+                return AgentTurnResult(
+                    kind="insufficient",
+                    text=SAFE_INSUFFICIENT,
+                    source_ids=(),
+                    tenant_id=tenant.tenant_id,
+                    run_id=run.id,
+                    trajectory=tuple(trajectory + ["search"]),
+                )
+            if not hits:
+                grounded = self._policy.apply(hits=hits, decision=None)
+                trajectory.append("policy")
+                return await self._finish(
+                    tenant, run.id, "succeeded", grounded, trajectory, ()
+                )
+            compiled = await self._compiler.compile(
+                tenant,
+                ContextRequest(
+                    skill="faq",
+                    knowledge_hits=tuple(
+                        ContextHit(source_id=hit.source_id, text=hit.text)
+                        for hit in hits
+                    ),
                 ),
-            ),
-        )
-        trajectory.append("compile")
-        tool_names = tuple(schema.name for schema in compiled.tool_schemas)
-        allowed = tuple(hit.source_id for hit in hits)
-        return await self._run_tool_loop(
-            tenant,
-            config,
-            message,
-            run.id,
-            hits,
-            compiled.core_instructions,
-            compiled.knowledge,
-            compiled.history,
-            allowed,
-            tool_names,
-            trajectory,
-        )
+            )
+            trajectory.append("compile")
+            tool_names = tuple(schema.name for schema in compiled.tool_schemas)
+            allowed = tuple(hit.source_id for hit in hits)
+            return await self._run_tool_loop(
+                tenant,
+                config,
+                message,
+                run.id,
+                hits,
+                compiled.core_instructions,
+                compiled.knowledge,
+                compiled.history,
+                allowed,
+                tool_names,
+                trajectory,
+            )
 
     async def _run_tool_loop(
         self,
@@ -270,19 +282,28 @@ class AgentHarness:
             if expired is not None:
                 return expired
             try:
-                decision = await self._llm.generate(
-                    LLMRequest(
-                        tenant_id=tenant.tenant_id,
-                        skill="faq",
-                        query=message.text,
-                        instructions=instructions,
-                        knowledge=knowledge,
-                        history=history,
-                        allowed_source_ids=allowed,
-                        tool_names=tool_names,
-                        tool_results=tuple(observations),
+                with start_span(
+                    SPAN_LLM_GENERATE,
+                    attributes={
+                        "run_id": str(run_id),
+                        "tenant_id": str(tenant.tenant_id),
+                        "config_version": tenant.config_version,
+                        "skill": "faq",
+                    },
+                ):
+                    decision = await self._llm.generate(
+                        LLMRequest(
+                            tenant_id=tenant.tenant_id,
+                            skill="faq",
+                            query=message.text,
+                            instructions=instructions,
+                            knowledge=knowledge,
+                            history=history,
+                            allowed_source_ids=allowed,
+                            tool_names=tool_names,
+                            tool_results=tuple(observations),
+                        )
                     )
-                )
                 trajectory.append("generate")
             except LLMError:
                 return await self._provider_unavailable(
