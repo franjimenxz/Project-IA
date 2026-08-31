@@ -1,9 +1,9 @@
 # Residuales del programa
 
 **Estado:** ready  
-**Propósito:** listar lo que no está cerrado y qué se delega ahora. Sin placeholders.
+**Propósito:** listar lo que no está cerrado. Sin placeholders.
 
-## En curso o listo para delegar
+## Cerrado en esta wave
 
 | Ítem | Estado | Acción |
 |---|---|---|
@@ -11,7 +11,9 @@
 | P14-T01 adaptador Gemini | `accepted` | PR #93 (`c9c23b5`) |
 | P14-T02 knowledge de laboratorio | `accepted` | PR #89 (`83a3f22`) |
 | P14-T03 FAQ lectura + compiler | `accepted` | PR #92 (`47081d9`) |
-| P14-T04 wiring de composition | `in_progress` | [P14-T04](https://cursor.com/agents/bc-95e29507-abcc-511d-8ab6-fae5df73995f). No relanzar |
+| P14-T04 wiring de composition | `accepted` | PR #97 (`1473e5f`) |
+
+Fase 13 y Fase 14 T01–T04 accepted. No hay más tareas P14 para delegar.
 
 ## Fuera de esta wave (no delegar)
 
@@ -28,4 +30,4 @@
 
 ## Demo usable
 
-Hace falta P14-T04 **y** que el operador exporte `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
+El wiring de P14-T04 está en `main`. El operador debe exportar `IA_MCP_SECRET_PLATFORM_LLM_GEMINI` en el entorno. Sin esa variable el proceso sigue en `FakeLLM` (fail-closed). Nadie escribe la clave en git, HTML, logs, traces ni fixtures.
